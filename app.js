@@ -141,7 +141,7 @@ let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
 let isWorking = localStorage.getItem('timerIsWorking') !== 'false';
 
 let timerEndTime = parseInt(localStorage.getItem('timerEndTime')) || 0;
-let timerRunning = localStorage.getItem('timerRunning'] === 'true';
+let timerRunning = localStorage.getItem('timerRunning') === 'true';
 let timeLeft = parseInt(localStorage.getItem('timeLeft')) || (focusMinutes * 60);
 
 if (timerRunning && timerEndTime > Date.now()) {
