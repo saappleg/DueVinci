@@ -1,21 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DueVinci - Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js" defer></script>
+    <style>
+        /* Small override to keep FullCalendar text legible in dark mode */
+        .dark .fc-col-header-cell-cushion, .dark .fc-daygrid-day-number { color: #f1f5f9; }
+        .dark .fc-theme-standard td, .dark .fc-theme-standard th, .dark .fc-theme-standard .fc-scrollgrid { border-color: #334155; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
 
-    <!-- Screen blocks until authenticated in app.js -->
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         
         <!-- Navigation Sidebar -->
-        <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between">
+        <aside class="w-64 bg-slate-900 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 text-white flex flex-col justify-between transition-colors duration-200">
             <div class="p-6">
                 <h1 class="text-2xl font-bold text-indigo-400 mb-8">DueVinci</h1>
                 <nav class="space-y-2">
@@ -27,12 +41,13 @@
                 <button onclick="exportToICS()" class="w-full bg-slate-800 text-indigo-400 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-700 transition text-sm">
                     Export (.ics)
                 </button>
+                <button onclick="toggleTheme()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🌓 Toggle Theme</button>
                 <button onclick="logout()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🚪 Sign Out</button>
             </div>
         </aside>
 
         <!-- Main Calendar View -->
-        <main class="flex-1 p-8 bg-white overflow-y-auto">
+        <main class="flex-1 p-8 bg-white dark:bg-slate-900 overflow-y-auto transition-colors duration-200">
             <div id='calendar' class="h-full"></div>
         </main>
     </div>
