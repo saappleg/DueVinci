@@ -18,9 +18,24 @@
         <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
             <h1 class="text-3xl font-bold text-indigo-600 mb-2">DueVinci 📚</h1>
             <p class="text-slate-500 mb-6">Manage syllabi, color-code classes, and sync deadlines.</p>
-            <button onclick="loginWithGoogle()" class="w-full bg-indigo-600 text-white font-medium py-3 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2">
-                Sign in with Google
-            </button>
+            
+            <!-- Email & Password Form -->
+            <form id="emailAuthForm" class="space-y-4 mb-4">
+                <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
+                <input type="password" id="authPassword" placeholder="Password" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
+                
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="signInWithEmail()" class="w-1/2 bg-indigo-600 text-white font-medium py-2.5 rounded-xl hover:bg-indigo-700 transition">
+                        Sign In
+                    </button>
+                    <button type="button" onclick="signUpWithEmail()" class="w-1/2 bg-slate-800 text-white font-medium py-2.5 rounded-xl hover:bg-slate-900 transition">
+                        Sign Up
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Message Display for Auth Errors/Success -->
+            <p id="authMessage" class="text-sm hidden"></p>
         </div>
     </div>
 
@@ -79,7 +94,6 @@
         const SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
 
-        // FIXED: Renamed to 'supabaseClient' to avoid clashing with the CDN
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentUser = null;
@@ -109,18 +123,59 @@
             }
         }
 
-        window.loginWithGoogle = async () => {
-            await supabaseClient.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: window.location.href
-                }
+        // --- NEW EMAIL AUTHENTICATION FUNCTIONS ---
+        
+        function showAuthMessage(msg, colorClass = "text-red-500") {
+            const msgEl = document.getElementById('authMessage');
+            msgEl.textContent = msg;
+            msgEl.className = `text-sm mt-2 ${colorClass}`;
+            msgEl.classList.remove('hidden');
+        }
+
+        window.signUpWithEmail = async () => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            
+            if (!email || !password) {
+                return showAuthMessage("Please enter an email and password.");
+            }
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password,
             });
+
+            if (error) {
+                showAuthMessage(error.message);
+            } else {
+                showAuthMessage("Account created! You are now logged in.", "text-green-500");
+                // The onAuthStateChange listener will automatically handle routing to the app
+            }
+        };
+
+        window.signInWithEmail = async () => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            if (!email || !password) {
+                return showAuthMessage("Please enter your email and password.");
+            }
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                showAuthMessage(error.message);
+            }
         };
 
         window.logout = async () => {
             await supabaseClient.auth.signOut();
         };
+
+        // --- CALENDAR & DATABASE FUNCTIONS ---
 
         function initCalendar() {
             if (calendarInstance) return;
