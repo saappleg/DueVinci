@@ -33,6 +33,59 @@ function smartParseDate(dateStr) {
     return new Date(year, month, day).toISOString().split('T')[0];
 }
 
+// --- GLOBAL DATE FORMATTER ---
+window.formatDate = (dateString) => {
+    if (!dateString) return '';
+    // Handle standard YYYY-MM-DD inputs from DB
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length !== 3) return dateString;
+    
+    const [year, month, day] = parts;
+    const format = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    
+    if (format === 'MM-DD-YYYY') {
+        return `${month}-${day}-${year}`;
+    } else if (format === 'DD-MM-YYYY') {
+        return `${day}-${month}-${year}`;
+    } else {
+        return `${year}-${month}-${day}`;
+    }
+};
+
+// --- INJECT DATE FORMAT SETTING INTO APPEARANCE TAB ---
+window.injectDateFormatSettings = () => {
+    const appearanceTab = document.getElementById('content-appearance');
+    if (!appearanceTab || document.getElementById('dateFormatContainer')) return;
+
+    const formatDiv = document.createElement('div');
+    formatDiv.id = 'dateFormatContainer';
+    formatDiv.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700';
+    
+    const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    formatDiv.innerHTML = `
+        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Date Format</label>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-500 dark:text-zinc-400">Preferred display format</span>
+            <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="text-xs px-2.5 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="YYYY-MM-DD" ${currentFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
+                <option value="MM-DD-YYYY" ${currentFormat === 'MM-DD-YYYY' ? 'selected' : ''}>MM-DD-YYYY</option>
+                <option value="DD-MM-YYYY" ${currentFormat === 'DD-MM-YYYY' ? 'selected' : ''}>DD-MM-YYYY</option>
+            </select>
+        </div>
+    `;
+    appearanceTab.appendChild(formatDiv);
+};
+
+window.updateDateFormat = (format) => {
+    localStorage.setItem('duevinci_date_format', format);
+    if (typeof loadDashboardStats === 'function') loadDashboardStats();
+    if (typeof loadCoursesPage === 'function') loadCoursesPage();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(window.injectDateFormatSettings, 400);
+});
+
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
 calendarDarkFixStyle.innerHTML = `
@@ -502,7 +555,7 @@ async function loadDashboardStats() {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
                 
-                const dateStr = new Date(assign.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
                 
                 upNextListEl.innerHTML += `
@@ -510,7 +563,7 @@ async function loadDashboardStats() {
                         <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div>
                             <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${dateStr}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${formattedDate}</p>
                         </div>
                     </div>`;
             });
