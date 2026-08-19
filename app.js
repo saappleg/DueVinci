@@ -533,112 +533,125 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- MODULAR SETTINGS POPUP LOGIC ---
+// --- MODULAR SETTINGS POPUP (AUTO-INJECTED) ---
+function ensureSettingsModalExists() {
+    if (document.getElementById('settingsModal')) return;
+    const div = document.createElement('div');
+    div.id = 'settingsModal';
+    div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden';
+    div.innerHTML = `
+        <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-md p-6 shadow-xl flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-brand-700">
+                <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Settings</h3>
+                <button type="button" onclick="closeSettingsModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xl font-bold">✕</button>
+            </div>
+            <div class="flex gap-4 pt-4">
+                <div class="w-1/3 border-r border-zinc-200 dark:border-brand-700 pr-2 space-y-1">
+                    <button type="button" onclick="switchSettingsTab('profile')" id="tab-profile" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition">Profile</button>
+                    <button type="button" onclick="switchSettingsTab('appearance')" id="tab-appearance" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition">Appearance</button>
+                </div>
+                <div class="w-2/3 pl-2">
+                    <div id="content-profile">
+                        <form id="settingsForm" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1">Email</label>
+                                <input type="email" id="profileEmail" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1">New Password</label>
+                                <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">Save Changes</button>
+                            <p id="settingsMsg" class="text-xs text-center mt-2 hidden"></p>
+                        </form>
+                    </div>
+                    <div id="content-appearance" class="hidden space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-500 mb-1">Theme</label>
+                            <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                                <option value="system">System</option>
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(div);
+
+    const form = document.getElementById('settingsForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('profileEmail').value;
+            const password = document.getElementById('profilePassword').value;
+            const msgEl = document.getElementById('settingsMsg');
+            
+            let updates = {};
+            if(email && email !== currentUser?.email) updates.email = email;
+            if(password) updates.password = password;
+            
+            if(Object.keys(updates).length === 0) {
+                msgEl.textContent = "No changes made.";
+                msgEl.className = "text-xs text-center mt-2 text-zinc-500";
+                msgEl.classList.remove('hidden');
+                return;
+            }
+            
+            const { error } = await supabaseClient.auth.updateUser(updates);
+            if (error) {
+                msgEl.textContent = error.message;
+                msgEl.className = "text-xs text-center mt-2 text-red-500";
+            } else {
+                msgEl.textContent = "Profile updated successfully!";
+                msgEl.className = "text-xs text-center mt-2 text-green-500";
+                document.getElementById('profilePassword').value = '';
+            }
+            msgEl.classList.remove('hidden');
+        });
+    }
+}
+
 window.openSettingsModal = () => {
+    ensureSettingsModalExists();
     if(currentUser) document.getElementById('profileEmail').value = currentUser.email;
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
     document.getElementById('settingsModal').classList.remove('hidden');
+    if (typeof window.injectAppearanceSettingsExtras === 'function') {
+        window.injectAppearanceSettingsExtras();
+    }
 };
 
 window.closeSettingsModal = () => {
-    document.getElementById('settingsModal').classList.add('hidden');
-    document.getElementById('settingsMsg').classList.add('hidden');
+    const m = document.getElementById('settingsModal');
+    if (m) m.classList.add('hidden');
+    const msg = document.getElementById('settingsMsg');
+    if (msg) msg.classList.add('hidden');
 };
 
 window.switchSettingsTab = (tabName) => {
     document.getElementById('content-profile').classList.add('hidden');
     document.getElementById('content-appearance').classList.add('hidden');
-    
     document.getElementById('tab-profile').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
     document.getElementById('tab-appearance').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
-    
     document.getElementById(`content-${tabName}`).classList.remove('hidden');
     document.getElementById(`tab-${tabName}`).className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
 };
-
-const settingsForm = document.getElementById('settingsForm');
-if(settingsForm) {
-    settingsForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('profileEmail').value;
-        const password = document.getElementById('profilePassword').value;
-        const msgEl = document.getElementById('settingsMsg');
-        
-        let updates = {};
-        if(email && email !== currentUser.email) updates.email = email;
-        if(password) updates.password = password;
-        
-        if(Object.keys(updates).length === 0) {
-            msgEl.textContent = "No changes made.";
-            msgEl.className = "text-xs text-center mt-2 text-zinc-500";
-            msgEl.classList.add('hidden');
-            return;
-        }
-        
-        const { error } = await supabaseClient.auth.updateUser(updates);
-        if (error) {
-            msgEl.textContent = error.message;
-            msgEl.className = "text-xs text-center mt-2 text-red-500";
-        } else {
-            msgEl.textContent = "Profile updated successfully!";
-            msgEl.className = "text-xs text-center mt-2 text-green-500";
-            document.getElementById('profilePassword').value = '';
-        }
-        msgEl.classList.remove('hidden');
-    });
-}
 
 // --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
-    
     if (!courses || !assignments) return;
-
-    const getUnitNum = (item) => {
-        if (item.unit_number) return parseInt(item.unit_number) || 0;
-        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        return 0;
-    };
-
-    const getLessonNum = (item) => {
-        const match = item.title.match(/lesson\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        const numMatch = item.title.replace(/[^0-9]/g, '');
-        return numMatch ? parseInt(numMatch) : 999;
-    };
-
-    assignments.sort((a, b) => {
-        let unitA = getUnitNum(a);
-        let unitB = getUnitNum(b);
-        if (unitA !== unitB) return unitA - unitB;
-        
-        let isSubA = a.title.startsWith('↳');
-        let isSubB = b.title.startsWith('↳');
-        
-        if (!isSubA && isSubB) return -1;
-        if (isSubA && !isSubB) return 1;
-        
-        if (isSubA && isSubB) {
-            let lessonA = getLessonNum(a);
-            let lessonB = getLessonNum(b);
-            if (lessonA !== lessonB) return lessonA - lessonB;
-        }
-        
-        return new Date(a.due_date) - new Date(b.due_date);
-    });
 
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
-        
-        const upcoming = assignments.filter(a => !a.is_completed && (
-            a.title.includes('↳') || 
-            /lesson|exam|final|midterm|test|review/i.test(a.title)
-        ));
+        const upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
         
         if (upcoming.length === 0) {
             upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming lessons. You\'re all caught up!</p>';
@@ -646,7 +659,6 @@ async function loadDashboardStats() {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
-                
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
                 
@@ -665,20 +677,17 @@ async function loadDashboardStats() {
     const goalsListEl = document.getElementById('goalsList');
     if (goalsListEl) {
         goalsListEl.innerHTML = '';
-        if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking weekly progress.</p>';
-        else {
-            courses.forEach(course => {
-                const cAssign = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
-                const complete = cAssign.filter(a => a.is_completed).length;
-                let pct = course.is_completed ? 100 : (cAssign.length ? Math.round((complete/cAssign.length)*100) : 0);
-                
-                goalsListEl.innerHTML += `
-                    <div>
-                        <div class="flex justify-between text-sm mb-2"><span class="font-bold text-zinc-700 dark:text-zinc-300">${course.emoji} ${course.code}</span><span class="font-bold" style="color: ${course.color}">${pct}%</span></div>
-                        <div class="w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${course.color}"></div></div>
-                    </div>`;
-            });
-        }
+        courses.forEach(course => {
+            const cAssign = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
+            const complete = cAssign.filter(a => a.is_completed).length;
+            let pct = course.is_completed ? 100 : (cAssign.length ? Math.round((complete/cAssign.length)*100) : 0);
+            
+            goalsListEl.innerHTML += `
+                <div>
+                    <div class="flex justify-between text-sm mb-2"><span class="font-bold text-zinc-700 dark:text-zinc-300">${course.emoji} ${course.code}</span><span class="font-bold" style="color: ${course.color}">${pct}%</span></div>
+                    <div class="w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${course.color}"></div></div>
+                </div>`;
+        });
     }
 }
 
@@ -1006,7 +1015,6 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Ensure Modal Tab Structure Exists
     const modalContainer = document.querySelector('#courseModal .bg-white') || document.querySelector('#courseModal > div');
     if (modalContainer && !document.getElementById('courseTabNav')) {
         const bodyContent = modalContainer.querySelector('.overflow-y-auto');
@@ -1416,7 +1424,32 @@ async function loadAssignments(courseId, page = 1) {
         return match ? parseInt(match[1]) || 0 : 0;
     };
 
-    assignments.sort((a, b) => getUnitNum(a) - getUnitNum(b) || new Date(a.due_date) - new Date(b.due_date));
+    const getLessonNum = (item) => {
+        const match = item.title.match(/lesson\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        const numMatch = item.title.replace(/[^0-9]/g, '');
+        return numMatch ? parseInt(numMatch) : 999;
+    };
+
+    assignments.sort((a, b) => {
+        let unitA = getUnitNum(a);
+        let unitB = getUnitNum(b);
+        if (unitA !== unitB) return unitA - unitB;
+        
+        let isSubA = a.title.startsWith('↳');
+        let isSubB = b.title.startsWith('↳');
+        
+        if (!isSubA && isSubB) return -1;
+        if (isSubA && !isSubB) return 1;
+        
+        if (isSubA && isSubB) {
+            let lessonA = getLessonNum(a);
+            let lessonB = getLessonNum(b);
+            if (lessonA !== lessonB) return lessonA - lessonB;
+        }
+        
+        return new Date(a.due_date) - new Date(b.due_date);
+    });
 
     const pageSize = 6;
     const totalPages = Math.ceil(assignments.length / pageSize);
@@ -1440,7 +1473,7 @@ async function loadAssignments(courseId, page = 1) {
             const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && a.title.startsWith('↳'));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
             const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
-            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}" title="Automatically completed when all unit lessons are done"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
             
             if (assign.is_completed !== allDone) {
                 supabaseClient.from('assignments').update({ is_completed: allDone }).eq('id', assign.id);
@@ -1449,11 +1482,16 @@ async function loadAssignments(courseId, page = 1) {
         }
 
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
-        let subItemForm = !isSubItem && assign.unit_number ? `
-            <div class="mt-2 pl-8 flex gap-2">
-                <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
-                <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
-            </div>` : '';
+        
+        let subItemForm = '';
+        if (!isSubItem && assign.unit_number) {
+            subItemForm = `
+                <div class="mt-2 pl-8 flex gap-2">
+                    <input type="text" id="date-${assign.id}" value="${formattedDate}" placeholder="YYYY-MM-DD" class="hidden">
+                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
+                </div>`;
+        }
         
         listEl.innerHTML += `
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm mb-2">
@@ -1462,13 +1500,43 @@ async function loadAssignments(courseId, page = 1) {
                         ${checkboxHtml}
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
-                            <input type="text" value="${formattedDate}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono">
+                            <input type="text" value="${formattedDate}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono" title="Type date matching your format preference">
                         </div>
                     </div>
                     <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
                 </div>
                 ${subItemForm}
             </div>`;
+    });
+
+    if (totalPages > 1) {
+        listEl.innerHTML += `
+            <div class="flex items-center justify-between pt-3 mt-2 border-t border-zinc-200 dark:border-brand-700 text-xs">
+                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page - 1})" ${page <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Previous</button>
+                <span class="text-zinc-500 dark:text-zinc-400 font-medium">Page ${page} of ${totalPages}</span>
+                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page + 1})" ${page >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Next</button>
+            </div>`;
+    }
+}
+
+const aForm = document.getElementById('addAssignmentForm');
+if (aForm) {
+    aForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const courseId = document.getElementById('editCourseId').value;
+        const unitNum = document.getElementById('assignUnit').value ? parseInt(document.getElementById('assignUnit').value) : null;
+        
+        await supabaseClient.from('assignments').insert([{
+            course_id: courseId, user_id: currentUser.id,
+            title: document.getElementById('assignTitle').value,
+            unit_number: unitNum,
+            due_date: document.getElementById('assignDate').value
+        }]);
+        
+        document.getElementById('assignTitle').value = '';
+        document.getElementById('assignUnit').value = '';
+        document.getElementById('assignDate').value = '';
+        loadAssignments(courseId, currentAssignmentPage);
     });
 }
 
