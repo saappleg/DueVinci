@@ -975,6 +975,7 @@ if (cForm) {
     });
 }
 
+// --- COURSE MODAL WITH CLEAN TABS ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1015,33 +1016,37 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Clean, well-spaced tab navigation header inside the modal body
-    const modalContainer = document.querySelector('#courseModal .bg-white') || document.querySelector('#courseModal > div');
-    if (modalContainer && !document.getElementById('courseTabNav')) {
-        const bodyContent = modalContainer.querySelector('.overflow-y-auto');
-        if (bodyContent) {
-            const tabNav = document.createElement('div');
-            tabNav.id = 'courseTabNav';
-            tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-6 pb-3 gap-6 px-1 pt-1 shrink-0';
-            tabNav.innerHTML = `
-                <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition">Coursework</button>
-                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
-                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
-            `;
-            bodyContent.parentNode.insertBefore(tabNav, bodyContent);
+    // Setup Clean Tab Navigation inside Modal
+    const modalContentWrapper = document.querySelector('#courseModal .p-6') || document.querySelector('#courseModal > div > div:nth-child(2)') || document.querySelector('#courseModal .max-w-3xl');
+    if (modalContentWrapper && !document.getElementById('courseTabNav')) {
+        const tabNav = document.createElement('div');
+        tabNav.id = 'courseTabNav';
+        tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-6 pb-3 gap-6';
+        tabNav.innerHTML = `
+            <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
+            <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Coursework</button>
+            <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+            <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
+        `;
+        // Insert right below modal header title area
+        const headerArea = modalContentWrapper.querySelector('.flex.items-center.justify-between');
+        if (headerArea) {
+            headerArea.insertAdjacentElement('afterend', tabNav);
+        } else {
+            modalContentWrapper.prepend(tabNav);
         }
     }
 
-    renderTabPanels(course);
+    renderCourseModalPanels(course);
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
 };
 
-window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
+window.closeCourseModal = () => document.getElementById('courseModal'].classList.add('hidden');
 
 window.switchCourseTab = (tabName) => {
-    ['coursework', 'resources', 'scratchpad'].forEach(t => {
+    ['overview', 'coursework', 'resources', 'scratchpad'].forEach(t => {
         const panel = document.getElementById(`panel-${t}`);
         const btn = document.getElementById(`tabBtn-${t}`);
         if (panel) panel.classList.toggle('hidden', t !== tabName);
@@ -1053,24 +1058,44 @@ window.switchCourseTab = (tabName) => {
     });
 };
 
-function renderTabPanels(course) {
-    const modalBody = document.querySelector('#courseModal .overflow-y-auto');
-    if (!modalBody) return;
+function renderCourseModalPanels(course) {
+    const modalContent = document.querySelector('#courseModal .p-6') || document.querySelector('#courseModal .max-w-3xl');
+    if (!modalContent) return;
 
-    let cwPanel = document.getElementById('panel-coursework');
-    if (!cwPanel) {
-        const existingList = document.getElementById('assignmentList');
-        const addForm = document.getElementById('addAssignmentForm');
-        
-        modalBody.innerHTML = `
-            <div id="panel-coursework" class="space-y-4"></div>
+    let overviewPanel = document.getElementById('panel-overview');
+    if (!overviewPanel) {
+        // Grab existing edit form, metadata box, and PDF/screenshot uploaders
+        const editForm = document.getElementById('editCourseForm');
+        const metadataBox = document.getElementById('courseMetadataBox');
+        const pdfImportSection = document.getElementById('syllabusFile')?.closest('.border') || document.querySelector('#courseModal input[type="file"]')?.closest('div');
+
+        // Create container wrappers for all 4 tabs
+        const panelsWrapper = document.createElement('div');
+        panelsWrapper.id = 'coursePanelsWrapper';
+        panelsWrapper.className = 'mt-4 max-h-[65vh] overflow-y-auto pr-1';
+        panelsWrapper.innerHTML = `
+            <div id="panel-overview" class="space-y-6"></div>
+            <div id="panel-coursework" class="hidden space-y-4"></div>
             <div id="panel-resources" class="hidden space-y-4"></div>
             <div id="panel-scratchpad" class="hidden space-y-4"></div>
         `;
-        if (addForm) document.getElementById('panel-coursework').appendChild(addForm);
-        if (existingList) document.getElementById('panel-coursework').appendChild(existingList);
+        modalContent.appendChild(panelsWrapper);
+
+        // Move Overview items into overview panel
+        const ovPanel = document.getElementById('panel-overview');
+        if (metadataBox) ovPanel.appendChild(metadataBox);
+        if (editForm) ovPanel.appendChild(editForm);
+        if (pdfImportSection) ovPanel.appendChild(pdfImportSection);
+
+        // Move Coursework items into coursework panel
+        const cwPanel = document.getElementById('panel-coursework');
+        const addAssignForm = document.getElementById('addAssignmentForm');
+        const assignList = document.getElementById('assignmentList');
+        if (addAssignForm) cwPanel.appendChild(addAssignForm);
+        if (assignList) cwPanel.appendChild(assignList);
     }
 
+    // Render Resources
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1092,11 +1117,12 @@ function renderTabPanels(course) {
         `;
     }
 
+    // Render Scratchpad
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
-            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="8" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
+            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="10" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
         `;
     }
 }
@@ -1116,7 +1142,7 @@ window.addResourceLink = async (courseId) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderTabPanels(course);
+    renderCourseModalPanels(course);
 };
 
 window.removeResourceLink = async (courseId, idx) => {
@@ -1128,7 +1154,7 @@ window.removeResourceLink = async (courseId, idx) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderTabPanels(course);
+    renderCourseModalPanels(course);
 };
 
 window.saveCourseScratchpad = async (courseId, val) => {
