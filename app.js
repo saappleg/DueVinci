@@ -247,7 +247,7 @@ if(settingsForm) {
             msgEl.className = "text-xs text-center mt-2 text-green-500";
             document.getElementById('profilePassword').value = '';
         }
-        msgEl.classList.add('hidden');
+        msgEl.classList.remove('hidden');
     });
 }
 
@@ -258,7 +258,7 @@ async function loadDashboardStats() {
     
     if (!courses || !assignments) return;
 
-    // Apply exact numeric & chronological sorting to dashboard stats as well
+    // Strict numerical & chronological sorting for Up Next
     const getUnitNum = (item) => {
         if (item.unit_number) return parseInt(item.unit_number) || 0;
         const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
@@ -295,8 +295,11 @@ async function loadDashboardStats() {
 
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
+        // Make Up Next container scrollable while maintaining its exact size
+        upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
-        const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
+        
+        const upcoming = assignments.filter(a => !a.is_completed);
         if (upcoming.length === 0) {
             upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming items. You\'re all caught up!</p>';
         } else {
@@ -465,7 +468,6 @@ window.parseSyllabusPDF = async () => {
                                document.getElementById('metaOnly');
         const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
 
-        // Use the targeted metadata-only Edge Function type if ticked
         const apiCallType = isMetadataOnly ? 'syllabus_metadata' : 'syllabus';
 
         const { data: responseData, error: functionError } = await supabaseClient.functions.invoke('gemini-parser', {
@@ -491,6 +493,7 @@ window.parseSyllabusPDF = async () => {
             }
         }
 
+        // IRONCLAD SAFEGUARD: If metadata-only is ticked, stop completely here!
         if (isMetadataOnly) {
             statusMsg.textContent = "Successfully imported course description & objectives!";
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
@@ -898,7 +901,7 @@ async function loadCalendarCourses() {
     }
 }
 
-window.openEventModal = () => document.getElementById('eventModal').classList.remove('hidden');
+window.openEventModal = () => document.getElementById('eventModal').classList.add('hidden');
 window.closeEventModal = () => document.getElementById('eventModal').classList.add('hidden');
 
 const customEventForm = document.getElementById('customEventForm');
