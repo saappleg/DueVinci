@@ -4,8 +4,14 @@ window.renderAcademicsDashboardWidget = (containerId) => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    container.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    // Prevent duplicate injection if already rendered
+    if (document.getElementById('academicsAnalyticsWidget')) return;
+
+    const analyticsDiv = document.createElement('div');
+    analyticsDiv.id = 'academicsAnalyticsWidget';
+    analyticsDiv.className = 'mb-6';
+    analyticsDiv.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Estimated GPA</h4>
                 <p id="gpaDisplayResult" class="text-2xl font-extrabold text-indigo-500">4.00</p>
@@ -24,11 +30,28 @@ window.renderAcademicsDashboardWidget = (containerId) => {
             </div>
         </div>
     `;
+
+    // Safely insert the widget below the dashboard title header, preserving Up Next and Goals
+    const headerTitle = container.querySelector('.flex.justify-between.items-end');
+    if (headerTitle && headerTitle.nextSibling) {
+        container.insertBefore(analyticsDiv, headerTitle.nextSibling);
+    } else {
+        container.insertBefore(analyticsDiv, container.firstChild);
+    }
 };
 
 window.renderResourceLinksSection = (courseId, containerId) => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+    let container = document.getElementById(containerId);
+    if (!container) {
+        const targetModalBody = document.querySelector('#courseModal .overflow-y-auto > div:first-child');
+        if (targetModalBody) {
+            container = document.createElement('div');
+            container.id = containerId;
+            targetModalBody.appendChild(container);
+        } else {
+            return;
+        }
+    }
 
     let savedLinks = JSON.parse(localStorage.getItem(`resources_${courseId}`)) || [
         { title: 'GitHub Repository', url: 'https://github.com' },
@@ -51,7 +74,7 @@ window.addResourceLink = (courseId) => {
     if (!title || !url) return;
 
     let savedLinks = JSON.parse(localStorage.getItem(`resources_${courseId}`)) || [];
-    savedLinks.include({ title, url });
+    savedLinks.push({ title, url });
     localStorage.setItem(`resources_${courseId}`, JSON.stringify(savedLinks));
     window.renderResourceLinksSection(courseId, 'courseResourceSection');
 };
