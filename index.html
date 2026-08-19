@@ -1,28 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DueVinci - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <!-- Prevent theme flashing on load -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js" defer></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
 
     <!-- Auth Screen -->
-    <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-slate-100">
-        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-            <h1 class="text-3xl font-bold text-indigo-600 mb-2">DueVinci 📚</h1>
-            <p class="text-slate-500 mb-6">Manage syllabi, color-code classes, and sync deadlines.</p>
+    <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-slate-100 dark:bg-slate-950">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">DueVinci 📚</h1>
+            <p class="text-slate-500 dark:text-slate-400 mb-6">Manage syllabi, color-code classes, and sync deadlines.</p>
             
             <form id="emailAuthForm" class="space-y-4 mb-4">
-                <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
-                <input type="password" id="authPassword" placeholder="Password" required class="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
+                <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
+                <input type="password" id="authPassword" placeholder="Password" required class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500">
                 
                 <div class="flex gap-3 pt-2">
                     <button type="button" onclick="signInWithEmail()" class="w-1/2 bg-indigo-600 text-white font-medium py-2.5 rounded-xl hover:bg-indigo-700 transition">Sign In</button>
-                    <button type="button" onclick="signUpWithEmail()" class="w-1/2 bg-slate-800 text-white font-medium py-2.5 rounded-xl hover:bg-slate-900 transition">Sign Up</button>
+                    <button type="button" onclick="signUpWithEmail()" class="w-1/2 bg-slate-800 dark:bg-slate-900 text-white font-medium py-2.5 rounded-xl hover:bg-slate-700 transition">Sign Up</button>
                 </div>
             </form>
             <p id="authMessage" class="text-sm hidden"></p>
@@ -33,7 +44,7 @@
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         
         <!-- Navigation Sidebar -->
-        <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between">
+        <aside class="w-64 bg-slate-900 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 text-white flex flex-col justify-between transition-colors duration-200">
             <div class="p-6">
                 <h1 class="text-2xl font-bold text-indigo-400 mb-8">DueVinci</h1>
                 <nav class="space-y-2">
@@ -41,7 +52,8 @@
                     <a href="calendar.html" class="block w-full text-left px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-lg transition">📅 Calendar</a>
                 </nav>
             </div>
-            <div class="p-6 border-t border-slate-800">
+            <div class="p-6 border-t border-slate-800 space-y-2">
+                <button onclick="toggleTheme()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🌓 Toggle Theme</button>
                 <button onclick="logout()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🚪 Sign Out</button>
             </div>
         </aside>
@@ -52,47 +64,45 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <!-- Up Next Card -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-lg font-semibold mb-4 text-slate-700">⏰ Up Next</h3>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">⏰ Up Next</h3>
                     <ul class="space-y-3" id="upNextList">
-                        <!-- Placeholder items until we build the assignments database -->
-                        <li class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                        <li class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30">
                             <span class="w-3 h-3 rounded-full bg-red-500"></span>
                             <div>
-                                <p class="text-sm font-bold text-red-700">Midterm Essay</p>
-                                <p class="text-xs text-red-600">Due Tomorrow • 11:59 PM</p>
+                                <p class="text-sm font-bold text-red-700 dark:text-red-400">Midterm Essay</p>
+                                <p class="text-xs text-red-600 dark:text-red-500">Due Tomorrow • 11:59 PM</p>
                             </div>
                         </li>
-                        <li class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                        <li class="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800/30">
                             <span class="w-3 h-3 rounded-full bg-amber-500"></span>
                             <div>
-                                <p class="text-sm font-bold text-amber-700">Chapter 4 Quiz</p>
-                                <p class="text-xs text-amber-600">Due in 3 Days</p>
+                                <p class="text-sm font-bold text-amber-700 dark:text-amber-400">Chapter 4 Quiz</p>
+                                <p class="text-xs text-amber-600 dark:text-amber-500">Due in 3 Days</p>
                             </div>
                         </li>
                     </ul>
                 </div>
 
                 <!-- Course Goals Card -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-lg font-semibold mb-4 text-slate-700">📈 Completion Goals</h3>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">📈 Completion Goals</h3>
                     <div class="space-y-4" id="goalsList">
-                        <!-- Placeholder progress until we link syllabus parsing -->
                         <div>
                             <div class="flex justify-between text-sm mb-1">
-                                <span class="font-medium text-slate-600">CS101: Data Structures</span>
-                                <span class="text-indigo-600 font-bold">45%</span>
+                                <span class="font-medium text-slate-600 dark:text-slate-300">CS101: Data Structures</span>
+                                <span class="text-indigo-600 dark:text-indigo-400 font-bold">45%</span>
                             </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2">
-                                <div class="bg-indigo-600 h-2 rounded-full" style="width: 45%"></div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                                <div class="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full" style="width: 45%"></div>
                             </div>
                         </div>
                         <div>
                             <div class="flex justify-between text-sm mb-1">
-                                <span class="font-medium text-slate-600">ENG200: Literature</span>
-                                <span class="text-emerald-500 font-bold">80%</span>
+                                <span class="font-medium text-slate-600 dark:text-slate-300">ENG200: Literature</span>
+                                <span class="text-emerald-500 dark:text-emerald-400 font-bold">80%</span>
                             </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2">
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
                                 <div class="bg-emerald-500 h-2 rounded-full" style="width: 80%"></div>
                             </div>
                         </div>
@@ -102,19 +112,22 @@
 
             <!-- Course Management Area -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-md font-semibold mb-4 text-slate-700">Add New Course</h3>
+                <div class="col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
+                    <h3 class="text-md font-semibold mb-4 text-slate-700 dark:text-slate-200">Add New Course</h3>
                     <form id="courseForm" class="space-y-3">
-                        <input type="text" id="courseCode" placeholder="e.g. CS101: Data Structures" required class="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                        <div class="flex items-center justify-between">
-                            <label class="text-xs text-slate-500">Class Color Tag:</label>
-                            <input type="color" id="courseColor" value="#4f46e5" class="w-8 h-8 rounded border-0 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-14 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                            <input type="text" id="courseCode" placeholder="e.g. CS101" required class="flex-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
                         </div>
-                        <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">Save Course</button>
+                        <div class="flex items-center justify-between mt-2">
+                            <label class="text-xs text-slate-500 dark:text-slate-400">Class Color Tag:</label>
+                            <input type="color" id="courseColor" value="#4f46e5" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+                        </div>
+                        <button type="submit" class="w-full bg-slate-900 dark:bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 dark:hover:bg-indigo-700 transition">Save Course</button>
                     </form>
                 </div>
-                <div class="col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 class="text-md font-semibold mb-4 text-slate-700">My Active Classes</h3>
+                <div class="col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
+                    <h3 class="text-md font-semibold mb-4 text-slate-700 dark:text-slate-200">My Active Classes</h3>
                     <div id="courseList" class="grid grid-cols-2 gap-3">
                         <!-- Populated dynamically from Supabase -->
                     </div>
