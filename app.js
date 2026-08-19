@@ -468,8 +468,11 @@ async function loadDashboardStats() {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
         
-        // ONLY show lessons in Up Next (starting with '↳' or containing 'lesson')
-        const upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson/i.test(a.title)));
+        // Show lessons and upcoming exams, finals, tests, or reviews in Up Next (excluding generic unit headers)
+        const upcoming = assignments.filter(a => !a.is_completed && (
+        a.title.includes('↳') || 
+        /lesson|exam|final|midterm|test|review/i.test(a.title)
+));
         
         if (upcoming.length === 0) {
             upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming lessons. You\'re all caught up!</p>';
