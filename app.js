@@ -67,25 +67,24 @@ function fireConfetti() {
     }
 }
 
-// --- TOP TITLE BAR INJECTOR ---
+// --- TOP TITLE BAR INJECTOR (FIXED FOR TOP CONTENT HEADER) ---
 function ensureTopTitleBar() {
     const appScreen = document.getElementById('appScreen');
     if (!appScreen) return;
     
-    let titleBar = document.getElementById('appTopTitleBar');
-    if (!titleBar) {
-        titleBar = document.createElement('header');
-        titleBar.id = 'appTopTitleBar';
-        titleBar.className = 'bg-white dark:bg-brand-800 border-b border-zinc-200 dark:border-brand-700 px-6 py-3 flex items-center justify-between shadow-xs shrink-0';
-        titleBar.innerHTML = `
-            <div class="flex items-center gap-3">
+    const headerEl = appScreen.querySelector('header');
+    if (headerEl) {
+        headerEl.className = 'h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0';
+        if (!document.getElementById('headerLogoSection')) {
+            const logoDiv = document.createElement('div');
+            logoDiv.id = 'headerLogoSection';
+            logoDiv.className = 'flex items-center gap-3';
+            logoDiv.innerHTML = `
                 <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
                 <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-lg">DueVinci</h1>
-            </div>
-            <div class="flex items-center gap-4 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                <span>Student Planner Workspace</span>
-            </div>`;
-        appScreen.insertBefore(titleBar, appScreen.firstChild);
+            `;
+            headerEl.insertBefore(logoDiv, headerEl.firstChild);
+        }
     }
 }
 
@@ -408,7 +407,6 @@ async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
     
-    // Ensure all terms from existing courses are also tracked in customTerms
     localCourses.forEach(c => {
         if (c.term && !customTerms.includes(c.term.trim())) {
             customTerms.push(c.term.trim());
@@ -449,7 +447,6 @@ function renderTermFolders() {
     if (!foldersGrid) return;
 
     const termsMap = {};
-    // Ensure all customTerms folders appear even if empty
     customTerms.forEach(t => { termsMap[t] = []; });
     if (!termsMap['Unassigned']) termsMap['Unassigned'] = [];
 
@@ -634,7 +631,6 @@ window.deleteCurrentTermFolder = async () => {
         return;
     }
     if (confirm(`Delete term folder "${activeTermModalName}"? Classes inside will be moved to Unassigned.`)) {
-        // Unassign courses in this term
         const termCourses = localCourses.filter(c => c.term && c.term.trim() === activeTermModalName);
         for (let c of termCourses) {
             await supabaseClient.from('courses').update({ term: null }).eq('id', c.id);
