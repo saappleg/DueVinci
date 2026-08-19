@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grades - DueVinci</title>
+    <title>DueVinci - Grades</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +31,8 @@
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
-        <!-- Sidebar -->
+        
+        <!-- Sidebar matching your other pages[cite: 1, 2, 4] -->
         <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto">
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
@@ -67,37 +68,41 @@
 
             <div class="p-4 flex-1">
                 <nav class="space-y-1">
-                    <a href="index.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">🏠 Dashboard</a>
-                    <a href="courses.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">📚 Classes</a>
-                    <a href="grades.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition">📊 Grades</a>
-                    <a href="calendar.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">📅 Calendar</a>
+                    <a href="index.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Dashboard</a>
+                    <a href="courses.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Classes</a>
+                    <a href="grades.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition">Grades</a>
+                    <a href="calendar.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Calendar</a>
                 </nav>
             </div>
 
             <div class="p-4">
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
-                    ⚙️ Settings
+                    Settings
                 </button>
             </div>
         </aside>
 
         <!-- Main Content Area -->
-        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-white dark:bg-brand-900 p-8">
-            <header class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-3xl font-bold dark:text-white mb-1">Academic Grades & GPA</h2>
-                    <p class="text-zinc-500 dark:text-zinc-400 text-sm">Manage and track grades grouped by course and unit.</p>
-                </div>
-                <div id="gpaBadgeContainer" class="bg-zinc-50 dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 px-4 py-2 rounded-xl shadow-sm text-right">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Cumulative GPA</span>
-                    <span id="cumulativeGpaVal" class="text-lg font-black text-indigo-500">0.00</span>
+        <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
+            <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900">
+                <h2 class="text-xl font-bold dark:text-white">Grades & GPA</h2>
+                <div class="flex items-center gap-4">
+                    <div id="gpaBadgeContainer" class="bg-zinc-50 dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 px-4 py-1.5 rounded-xl shadow-sm text-right">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Cumulative GPA</span>
+                        <span id="cumulativeGpaVal" class="text-base font-black text-indigo-500">0.00</span>
+                    </div>
+                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
+                        Sign out
+                    </button>
                 </div>
             </header>
 
-            <div id="gradesContainer" class="space-y-6">
-                <div class="p-8 text-center text-zinc-400 text-sm">Loading grades breakdown...</div>
-            </div>
-        </main>
+            <main class="flex-1 p-8 overflow-y-auto">
+                <div id="gradesContainer" class="space-y-6">
+                    <div class="p-8 text-center text-zinc-400 text-sm">Loading grades breakdown...</div>
+                </div>
+            </main>
+        </div>
     </div>
 </body>
 </html>
