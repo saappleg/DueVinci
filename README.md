@@ -12,6 +12,8 @@ DueVinci is a modern, modular student planner web application designed to help s
 - **Scripting**: Vanilla JavaScript (ES6+)
 - **Backend & Database**: Supabase (PostgreSQL, Auth)
 - **Libraries**: FullCalendar, PDF.js, Canvas Confetti
+
+
 DueVinci/
 ├── index.html       # Main student dashboard (Up Next & Goals)
 ├── courses.html     # Class management & PDF syllabus parser
