@@ -596,7 +596,7 @@ function ensureSettingsModalExists() {
             if(Object.keys(updates).length === 0) {
                 msgEl.textContent = "No changes made.";
                 msgEl.className = "text-xs text-center mt-2 text-zinc-500";
-                msgEl.classList.remove('hidden');
+                msgEl.classList.add('hidden');
                 return;
             }
             
@@ -1015,17 +1015,18 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
+    // Clean, well-spaced tab navigation header inside the modal body
     const modalContainer = document.querySelector('#courseModal .bg-white') || document.querySelector('#courseModal > div');
     if (modalContainer && !document.getElementById('courseTabNav')) {
         const bodyContent = modalContainer.querySelector('.overflow-y-auto');
         if (bodyContent) {
             const tabNav = document.createElement('div');
             tabNav.id = 'courseTabNav';
-            tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-4 pb-2 gap-4';
+            tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-6 pb-3 gap-6 px-1 pt-1 shrink-0';
             tabNav.innerHTML = `
-                <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-1 border-b-2 border-indigo-500 text-indigo-500 transition">Coursework</button>
-                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
-                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
+                <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition">Coursework</button>
+                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
             `;
             bodyContent.parentNode.insertBefore(tabNav, bodyContent);
         }
@@ -1046,8 +1047,8 @@ window.switchCourseTab = (tabName) => {
         if (panel) panel.classList.toggle('hidden', t !== tabName);
         if (btn) {
             btn.className = t === tabName 
-                ? 'text-xs font-bold pb-1 border-b-2 border-indigo-500 text-indigo-500 transition' 
-                : 'text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
+                ? 'text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition' 
+                : 'text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
         }
     });
 };
@@ -1075,18 +1076,18 @@ function renderTabPanels(course) {
     if (resPanel) {
         resPanel.innerHTML = `
             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">🔗 Resource & Note Links</h3>
-            <div id="linksList_${course.id}" class="space-y-2">
+            <div id="linksList_${course.id}" class="space-y-2 mt-2">
                 ${links.map((l, idx) => `
-                    <div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs">
+                    <div class="flex items-center justify-between p-2.5 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
                         <a href="${l.url}" target="_blank" class="font-bold text-indigo-500 hover:underline truncate">${l.title}</a>
-                        <button onclick="removeResourceLink('${course.id}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button>
+                        <button onclick="removeResourceLink('${course.id}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-2">✕</button>
                     </div>
                 `).join('')}
             </div>
-            <div class="flex gap-2 mt-2">
-                <input type="text" id="resTitle_${course.id}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
-                <input type="url" id="resUrl_${course.id}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
-                <button onclick="addResourceLink('${course.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button>
+            <div class="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
+                <input type="text" id="resTitle_${course.id}" placeholder="Resource Title" class="w-1/3 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <input type="url" id="resUrl_${course.id}" placeholder="https://..." class="flex-1 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <button onclick="addResourceLink('${course.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition">+ Add Link</button>
             </div>
         `;
     }
@@ -1095,7 +1096,7 @@ function renderTabPanels(course) {
     if (scratchPanel) {
         scratchPanel.innerHTML = `
             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
-            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="6" placeholder="Jot down lecture notes or formula reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">${course.scratchpad || ''}</textarea>
+            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="8" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
         `;
     }
 }
