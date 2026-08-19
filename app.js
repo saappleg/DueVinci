@@ -468,19 +468,64 @@ window.parseLessonsImage = async (inputElement) => {
             }
         }
 
-        // 3. Extract Module Theme Title (text on the same line as "Week N")
+        // 3. Extract Module Theme Title (line after the date range, or text on the "Week N" line)
         let weekTitle = `Building with HTML and CSS`;
-        const weekLine = lines.find(l => /^Week\s*0?\d+\s*[:\-–—]?\s*/i.test(l));
-        if (weekLine) {
-            const titlePart = weekLine.replace(/^Week\s*0?\d+\s*[:\-–—]?\s*/i, '').trim();
-            if (titlePart.length > 3) weekTitle = titlePart;
+        const dateIdx = lines.findIndex(l => /^[A-Z][a-z]{2}\s+\d{1,2}\s*[-–—]/.test(l));
+        if (dateIdx >= 0 && lines[dateIdx + 1] && !/^(Lesson|Review|Week)/i.test(lines[dateIdx + 1])) {
+            weekTitle = lines[dateIdx + 1];
+        } else {
+            const weekLine = lines.find(l => /^Week\s*0?\d+\s*[:\-–—]?\s*.+/i.test(l));
+            if (weekLine) {
+                const titlePart = weekLine.replace(/^Week\s*0?\d+\s*[:\-–—]?\s*/i, '').trim();
+                if (titlePart.length > 3) weekTitle = titlePart;
+            }
         }
 
-        // 4. Extract explicit lesson names (each line starting with "Lesson N" or "Review")
+        // 4. Extract explicit lesson names. Sources use two-line entries ("Lesson 1" + "How HTML works")
+        //    as well as one-line entries ("Lesson 1: How HTML works"). Pair them up correctly.
         let lessonsList = [];
-        for (const line of lines) {
-            if (/^(Lesson\s*\d+\s*[:\-–—]?\s+|Review\s*[:\-–—]?\s*)/i.test(line)) {
-                lessonsList.push(line);
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // "Lesson N: Title" on a single line
+            let m = line.match(/^Lesson\s*(\d+)\s*[:\-–—]\s*(.+)$/i);
+            if (m) {
+                lessonsList.push(`Lesson ${m[1]}: ${m[2].trim()}`);
+                continue;
+            }
+
+            // "Lesson N" alone, title on the next line
+            m = line.match(/^Lesson\s*(\d+)\s*$/i);
+            if (m) {
+                if (lines[i + 1] && !/^(Lesson|Review|Week)/i.test(lines[i + 1]) && lines[i + 1].length > 1) {
+                    lessonsList.push(`Lesson ${m[1]}: ${lines[i + 1].trim()}`);
+                    i++;
+                } else {
+                    lessonsList.push(`Lesson ${m[1]}`);
+                }
+                continue;
+            }
+
+            // "Review" alone, title on the next line (may be "Review: ...")
+            if (/^Review\s*$/i.test(line) && lines[i + 1]) {
+                const rm = lines[i + 1].match(/^Review\s*[:\-–—]\s*(.+)$/i);
+                if (rm) {
+                    lessonsList.push(`Review: ${rm[1].trim()}`);
+                    i++;
+                } else if (!/^(Lesson|Review|Week)/i.test(lines[i + 1])) {
+                    lessonsList.push(`Review: ${lines[i + 1].trim()}`);
+                    i++;
+                } else {
+                    lessonsList.push(`Review`);
+                }
+                continue;
+            }
+
+            // "Review: Title" on a single line
+            m = line.match(/^Review\s*[:\-–—]\s*(.+)$/i);
+            if (m) {
+                lessonsList.push(`Review: ${m[1].trim()}`);
+                continue;
             }
         }
 
