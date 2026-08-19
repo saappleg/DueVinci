@@ -12,6 +12,27 @@ let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
 let lastProcessedSessionToken = null;
 
+// --- SMART DATE PARSER WITH YEAR CROSSOVER SAFEGUARD ---
+function smartParseDate(dateStr) {
+    if (!dateStr) return null;
+    let d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    
+    const now = new Date();
+    let month = d.getMonth();
+    let day = d.getDate();
+    let year = now.getFullYear();
+    
+    // Handle year crossover (e.g., late fall into early winter/spring)
+    if (now.getMonth() >= 10 && month <= 1) {
+        year = now.getFullYear() + 1;
+    } else if (now.getMonth() <= 1 && month >= 10) {
+        year = now.getFullYear() - 1;
+    }
+    
+    return new Date(year, month, day).toISOString().split('T')[0];
+}
+
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
 calendarDarkFixStyle.innerHTML = `
@@ -933,16 +954,18 @@ window.parseSyllabusPDF = async () => {
 
             for (let i = 0; i < parsedData.units.length; i++) {
                 let u = parsedData.units[i];
-                let targetDate = u.dateStr ? new Date(u.dateStr) : new Date(baseDate);
-                if (!u.dateStr) {
-                    targetDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                let targetDate = u.dateStr ? smartParseDate(u.dateStr) : null;
+                if (!targetDate) {
+                    let fallbackDate = new Date(baseDate);
+                    fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                    targetDate = fallbackDate.toISOString().split('T')[0];
                 }
 
                 const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                     course_id: courseId, user_id: currentUser.id,
                     title: `Unit ${u.num || i + 1}: ${u.title}`,
                     unit_number: u.num || i + 1,
-                    due_date: targetDate.toISOString().split('T')[0]
+                    due_date: targetDate
                 }]).select();
 
                 if (insertedUnit && insertedUnit[0] && u.lessons) {
@@ -954,7 +977,7 @@ window.parseSyllabusPDF = async () => {
                             course_id: courseId, user_id: currentUser.id,
                             title: `↳ ${formattedTitle}`,
                             unit_number: u.num || i + 1,
-                            due_date: targetDate.toISOString().split('T')[0]
+                            due_date: targetDate
                         }]);
                         lessonNum++;
                     }
@@ -1016,16 +1039,18 @@ window.parseLessonsImage = async (inputElement) => {
                 for (let i = 0; i < parsedData.units.length; i++) {
                     let wk = parsedData.units[i];
                     
-                    let targetDate = wk.dateStr ? new Date(wk.dateStr) : new Date(baseDate);
-                    if (!wk.dateStr) {
-                        targetDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                    let targetDate = wk.dateStr ? smartParseDate(wk.dateStr) : null;
+                    if (!targetDate) {
+                        let fallbackDate = new Date(baseDate);
+                        fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                        targetDate = fallbackDate.toISOString().split('T')[0];
                     }
 
                     const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                         course_id: courseId, user_id: currentUser.id,
                         title: wk.title || `Week ${wk.num}`,
                         unit_number: wk.num,
-                        due_date: targetDate.toISOString().split('T')[0]
+                        due_date: targetDate
                     }]).select();
 
                     if (insertedUnit && insertedUnit[0] && wk.lessons) {
@@ -1037,7 +1062,7 @@ window.parseLessonsImage = async (inputElement) => {
                                 course_id: courseId, user_id: currentUser.id,
                                 title: `↳ ${formattedTitle}`,
                                 unit_number: wk.num,
-                                due_date: targetDate.toISOString().split('T')[0]
+                                due_date: targetDate
                             }]);
                             lessonNum++;
                         }
