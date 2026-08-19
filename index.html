@@ -20,14 +20,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=16" defer></script>
+    <script src="app.js?v=17" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
     <!-- Auth Screen -->
     <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-zinc-100 dark:bg-brand-900">
         <div class="bg-white dark:bg-brand-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-zinc-200 dark:border-brand-700">
-            <h1 class="text-3xl font-bold text-indigo-600 dark:text-white mb-2">DueVinci 📚</h1>
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-white mb-2">DueVinci</h1>
             <p class="text-zinc-500 dark:text-zinc-400 mb-6">Your study materials in one place.</p>
             
             <form id="emailAuthForm" class="space-y-4 mb-4">
@@ -119,14 +119,24 @@
         <!-- Main Content Area -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
             
-            <!-- Restored Global Title Header -->
+            <!-- Global Title Header with Leonardo Da Vinci Inspired SVG Logo -->
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
                 <div class="flex items-center gap-4">
                     <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
                     </button>
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
+                    <div class="hidden md:flex items-center gap-3">
+                        <div class="w-10 h-10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-sm">
+                                <!-- Vitruvian Proportions Background -->
+                                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                                <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                                <!-- The 'DV' Drafting Compass & Hourglass -->
+                                <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                                <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                                <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            </svg>
+                        </div>
                         <div>
                             <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
                             <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner</p>
@@ -165,6 +175,54 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Modular Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
+            <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
+                <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                <nav class="space-y-1">
+                    <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                    <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                </nav>
+            </div>
+            <div class="flex-1 p-6 relative">
+                <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                <div id="content-profile" class="block space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
+                    </div>
+                    <form id="settingsForm" class="max-w-sm space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                            <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+                            <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
+                        <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
+                    </form>
+                </div>
+                <div id="content-appearance" class="hidden space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
+                    </div>
+                    <div class="max-w-sm">
+                        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
+                        <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
+                            <option value="system">💻 Follow System</option>
+                            <option value="light">☀️ Light Mode</option>
+                            <option value="dark">🌙 Dark Mode</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </body>
