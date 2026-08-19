@@ -20,13 +20,12 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
-    <!-- Include Tesseract.js for visual screenshot OCR scanning -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=16" defer></script>
+    <script src="app.js?v=17" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -89,9 +88,7 @@
             </div>
         </aside>
 
-        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
-            
-            <!-- Restored Global Title Header -->
+        <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
                 <div class="flex items-center gap-4">
                     <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
@@ -121,7 +118,8 @@
                     </div>
                 </div>
                 
-                <div class="space-y-6">
+                <div class="space-y-8">
+                    <!-- 1. The Safe Add Class Form -->
                     <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 flex items-center justify-between gap-4">
                         <form id="courseForm" class="flex-1 flex gap-3 items-center">
                             <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
@@ -134,8 +132,23 @@
                             </button>
                         </form>
                     </div>
-                    <div class="bg-transparent rounded-2xl transition-colors duration-200">
-                        <div id="courseList" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+
+                    <!-- 2. The Term Folders Grid safely hardcoded -->
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
+                                <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
+                            </div>
+                        </div>
+                        <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+                    </div>
+
+                    <!-- 3. The Alphabetical Course List safely hardcoded -->
+                    <div class="pt-6 border-t border-zinc-200 dark:border-brand-700">
+                        <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
+                        <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                     </div>
                 </div>
             </main>
@@ -164,7 +177,7 @@
             <!-- Modal Content Panels -->
             <div class="p-6 overflow-y-auto flex-1">
                 
-                <!-- 1. Overview & Syllabus Panel (Combines Info & Weekly Units) -->
+                <!-- 1. Overview & Syllabus Panel -->
                 <div id="panel-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-6">
                         <div>
