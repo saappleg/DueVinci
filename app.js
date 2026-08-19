@@ -242,39 +242,6 @@ function recordStudyActivity() {
     }
 }
 
-// --- TOP TITLE BAR INJECTOR & SIDEBAR TOGGLE ---
-function ensureTopTitleBar() {
-    const appScreen = document.getElementById('appScreen');
-    if (!appScreen) return;
-    
-    const headerEl = appScreen.querySelector('header');
-    if (headerEl) {
-        headerEl.className = 'h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0';
-        if (!document.getElementById('headerLogoSection')) {
-            const logoDiv = document.createElement('div');
-            logoDiv.id = 'headerLogoSection';
-            logoDiv.className = 'flex items-center gap-3';
-            logoDiv.innerHTML = `
-                <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-                </button>
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
-                <div>
-                    <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
-                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner Workspace</p>
-                </div>
-            `;
-            headerEl.insertBefore(logoDiv, headerEl.firstChild);
-        }
-    }
-}
-
-window.toggleSidebar = () => {
-    const aside = document.querySelector('aside');
-    if (!aside) return;
-    aside.classList.toggle('hidden');
-};
-
 // --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
@@ -282,7 +249,6 @@ let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
 let isWorking = localStorage.getItem('timerIsWorking') !== 'false';
 
 let timerEndTime = parseInt(localStorage.getItem('timerEndTime')) || 0;
-// FIXED SYNTAX ERROR HERE
 let timerRunning = localStorage.getItem('timerRunning') === 'true';
 let timeLeft = parseInt(localStorage.getItem('timeLeft')) || (focusMinutes * 60);
 
@@ -306,42 +272,7 @@ function updateTimerDisplay() {
         circle.style.strokeDashoffset = percent;
     }
     localStorage.setItem('timeLeft', timeLeft);
-    updateFloatingTimer();
 }
-
-function updateFloatingTimer() {
-    let floatWidget = document.getElementById('floatingTimerWidget');
-    if (!timerRunning || floatingTimerDismissed) {
-        if (floatWidget) floatWidget.classList.add('hidden');
-        return;
-    }
-    if (!floatWidget) {
-        floatWidget = document.createElement('div');
-        floatWidget.id = 'floatingTimerWidget';
-        floatWidget.className = 'fixed bottom-5 right-5 z-[9999] bg-zinc-900/95 dark:bg-brand-800 text-white p-4 rounded-2xl shadow-2xl border border-zinc-700 backdrop-blur-md w-64 transition-all';
-        document.body.appendChild(floatWidget);
-    }
-    floatWidget.classList.remove('hidden');
-    const min = Math.floor(timeLeft / 60);
-    const sec = timeLeft % 60;
-    const label = isWorking ? 'Focus Session' : 'Break Time';
-    floatWidget.innerHTML = `
-        <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
-            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
-            <button onclick="dismissFloatingTimer()" class="text-zinc-400 hover:text-white text-xs">✕</button>
-        </div>
-        <div class="flex justify-between items-center">
-            <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
-            <button onclick="toggleTimer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-bold transition">⏸ Pause</button>
-        </div>
-    `;
-}
-
-window.dismissFloatingTimer = () => {
-    floatingTimerDismissed = true;
-    const floatWidget = document.getElementById('floatingTimerWidget');
-    if (floatWidget) floatWidget.classList.add('hidden');
-};
 
 window.toggleTimer = () => {
     const btn = document.getElementById('timerPlayBtn');
@@ -370,7 +301,6 @@ window.toggleTimer = () => {
         }, 1000);
         recordStudyActivity();
     }
-    updateFloatingTimer();
 };
 
 window.resetTimer = () => {
@@ -473,7 +403,6 @@ function handleAuth(session) {
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) {
             document.getElementById('appScreen').classList.remove('hidden');
-            ensureTopTitleBar();
         }
         
         const path = window.location.pathname;
@@ -534,96 +463,34 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- MODULAR SETTINGS POPUP (AUTO-INJECTED) ---
-function ensureSettingsModalExists() {
-    if (document.getElementById('settingsModal')) return;
-    const div = document.createElement('div');
-    div.id = 'settingsModal';
-    div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden';
-    div.innerHTML = `
-        <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-md p-6 shadow-xl flex flex-col">
-            <div class="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-brand-700">
-                <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Settings</h3>
-                <button type="button" onclick="closeSettingsModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xl font-bold">✕</button>
-            </div>
-            <div class="flex gap-4 pt-4">
-                <div class="w-1/3 border-r border-zinc-200 dark:border-brand-700 pr-2 space-y-1">
-                    <button type="button" onclick="switchSettingsTab('profile')" id="tab-profile" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition">Profile</button>
-                    <button type="button" onclick="switchSettingsTab('appearance')" id="tab-appearance" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition">Appearance</button>
-                </div>
-                <div class="w-2/3 pl-2">
-                    <div id="content-profile">
-                        <form id="settingsForm" class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-bold text-zinc-500 mb-1">Email</label>
-                                <input type="email" id="profileEmail" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-zinc-500 mb-1">New Password</label>
-                                <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
-                            </div>
-                            <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">Save Changes</button>
-                            <p id="settingsMsg" class="text-xs text-center mt-2 hidden"></p>
-                        </form>
-                    </div>
-                    <div id="content-appearance" class="hidden space-y-3">
-                        <div>
-                            <label class="block text-xs font-bold text-zinc-500 mb-1">Theme</label>
-                            <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
-                                <option value="system">System</option>
-                                <option value="dark">Dark</option>
-                                <option value="light">Light</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(div);
-
-    const form = document.getElementById('settingsForm');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('profileEmail').value;
-            const password = document.getElementById('profilePassword').value;
-            const msgEl = document.getElementById('settingsMsg');
-            
-            let updates = {};
-            if(email && email !== currentUser?.email) updates.email = email;
-            if(password) updates.password = password;
-            
-            if(Object.keys(updates).length === 0) {
-                msgEl.textContent = "No changes made.";
-                msgEl.className = "text-xs text-center mt-2 text-zinc-500";
-                msgEl.classList.add('hidden');
-                return;
-            }
-            
-            const { error } = await supabaseClient.auth.updateUser(updates);
-            if (error) {
-                msgEl.textContent = error.message;
-                msgEl.className = "text-xs text-center mt-2 text-red-500";
-            } else {
-                msgEl.textContent = "Profile updated successfully!";
-                msgEl.className = "text-xs text-center mt-2 text-green-500";
-                document.getElementById('profilePassword').value = '';
-            }
-            msgEl.classList.remove('hidden');
-        });
-    }
-}
-
+// --- MODULAR SETTINGS POPUP ---
 window.openSettingsModal = () => {
-    ensureSettingsModalExists();
-    if(currentUser) document.getElementById('profileEmail').value = currentUser.email;
+    if(currentUser) {
+        const emailInput = document.getElementById('profileEmail');
+        if (emailInput) emailInput.value = currentUser.email;
+    }
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
-    document.getElementById('settingsModal').classList.remove('hidden');
+    
     if (typeof window.injectAppearanceSettingsExtras === 'function') {
         window.injectAppearanceSettingsExtras();
     }
+
+    // Explicitly sync all settings with localStorage so they never visually "reset"
+    const dfSelect = document.getElementById('dateFormatSelect');
+    if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    
+    const muteSwitch = document.getElementById('muteAlarmSwitch');
+    if (muteSwitch) muteSwitch.checked = localStorage.getItem('duevinci_mute_alarm') === 'true';
+    
+    const gpaSelect = document.getElementById('gpaScaleSelect');
+    if (gpaSelect) gpaSelect.value = localStorage.getItem('duevinci_gpa_scale') || '4.0';
+    
+    const acadSwitch = document.getElementById('academicsSwitch');
+    if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
+
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.remove('hidden');
 };
 
 window.closeSettingsModal = () => {
@@ -634,13 +501,54 @@ window.closeSettingsModal = () => {
 };
 
 window.switchSettingsTab = (tabName) => {
-    document.getElementById('content-profile').classList.add('hidden');
-    document.getElementById('content-appearance').classList.add('hidden');
-    document.getElementById('tab-profile').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
-    document.getElementById('tab-appearance').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
-    document.getElementById(`content-${tabName}`).classList.remove('hidden');
-    document.getElementById(`tab-${tabName}`).className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+    const cp = document.getElementById('content-profile');
+    const ca = document.getElementById('content-appearance');
+    if (cp) cp.classList.add('hidden');
+    if (ca) ca.classList.add('hidden');
+
+    const tp = document.getElementById('tab-profile');
+    const ta = document.getElementById('tab-appearance');
+    if (tp) tp.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+    if (ta) ta.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+
+    const contentTarget = document.getElementById(`content-${tabName}`);
+    if (contentTarget) contentTarget.classList.remove('hidden');
+
+    const tabTarget = document.getElementById(`tab-${tabName}`);
+    if (tabTarget) tabTarget.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
 };
+
+const settingsForm = document.getElementById('settingsForm');
+if (settingsForm) {
+    settingsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('profileEmail').value;
+        const password = document.getElementById('profilePassword').value;
+        const msgEl = document.getElementById('settingsMsg');
+        
+        let updates = {};
+        if(email && email !== currentUser?.email) updates.email = email;
+        if(password) updates.password = password;
+        
+        if(Object.keys(updates).length === 0) {
+            msgEl.textContent = "No changes made.";
+            msgEl.className = "text-xs text-center mt-2 text-zinc-500";
+            msgEl.classList.remove('hidden');
+            return;
+        }
+        
+        const { error } = await supabaseClient.auth.updateUser(updates);
+        if (error) {
+            msgEl.textContent = error.message;
+            msgEl.className = "text-xs text-center mt-2 text-red-500";
+        } else {
+            msgEl.textContent = "Profile updated successfully!";
+            msgEl.className = "text-xs text-center mt-2 text-green-500";
+            document.getElementById('profilePassword').value = '';
+        }
+        msgEl.classList.remove('hidden');
+    });
+}
 
 // --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
@@ -724,7 +632,9 @@ async function loadDashboardStats() {
                 </div>`;
         });
     }
-}// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
+}
+
+// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -1007,8 +917,7 @@ if (cForm) {
         }
     });
 }
-
-// --- COURSE MODAL TAB SWITCHING & RENDERING ---
+// --- STABLE COURSE MODAL TAB SWITCHING & RENDERING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1049,9 +958,9 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Default to Overview tab when opening
+    // Default to Overview tab
     switchCourseTab('overview');
-    renderDynamicCoursePanels(course);
+    renderStaticCoursePanels(course);
 
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
@@ -1064,7 +973,7 @@ window.closeCourseModal = () => {
 };
 
 window.switchCourseTab = (tabName) => {
-    ['overview', 'coursework', 'resources', 'scratchpad'].forEach(t => {
+    ['overview', 'resources', 'scratchpad'].forEach(t => {
         const panel = document.getElementById(`panel-${t}`);
         const btn = document.getElementById(`tabBtn-${t}`);
         if (panel) panel.classList.toggle('hidden', t !== tabName);
@@ -1076,16 +985,7 @@ window.switchCourseTab = (tabName) => {
     });
 };
 
-function renderDynamicCoursePanels(course) {
-    // Populate Coursework tab
-    const cwPanel = document.getElementById('panel-coursework');
-    if (cwPanel && !document.getElementById('activeAssignListWrapper')) {
-        cwPanel.innerHTML = `
-            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
-            <div id="activeAssignListWrapper"></div>
-        `;
-    }
-
+function renderStaticCoursePanels(course) {
     // Populate Resources tab
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
@@ -1133,7 +1033,7 @@ window.addResourceLink = async (courseId) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderDynamicCoursePanels(course);
+    renderStaticCoursePanels(course);
 };
 
 window.removeResourceLink = async (courseId, idx) => {
@@ -1145,7 +1045,7 @@ window.removeResourceLink = async (courseId, idx) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderDynamicCoursePanels(course);
+    renderStaticCoursePanels(course);
 };
 
 window.saveCourseScratchpad = async (courseId, val) => {
