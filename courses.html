@@ -26,13 +26,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=15" defer></script>
+    <script src="app.js?v=16" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         
-        <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto">
+        <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto shrink-0">
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>
@@ -89,11 +89,28 @@
             </div>
         </aside>
 
-        <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
-            <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-end px-8 gap-4 bg-white dark:bg-brand-900">
-                <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Sign out
-                </button>
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
+            
+            <!-- Restored Global Title Header -->
+            <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
+                <div class="flex items-center gap-4">
+                    <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                    </button>
+                    <div class="hidden md:flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
+                        <div>
+                            <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
+                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
+                        <span class="hidden sm:inline">Sign out</span>
+                    </button>
+                </div>
             </header>
 
             <main class="flex-1 p-8 overflow-y-auto" id="coursesGrid">
@@ -128,7 +145,8 @@
     <!-- Course Settings Modal -->
     <div id="courseModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50">
+            
+            <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50 shrink-0">
                 <h2 class="text-xl font-bold dark:text-white flex items-center gap-2" id="modalCourseTitle"><span>📚</span> Course Settings</h2>
                 <div class="flex items-center gap-3">
                     <button type="button" id="markCourseCompleteBtn" class="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition">✔ Mark Complete</button>
@@ -136,15 +154,17 @@
                 </div>
             </div>
 
-            <!-- Static Tab Navigation -->
+            <!-- Static Tab Navigation WITHOUT Coursework Tab -->
             <div class="flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-3 gap-6 shrink-0 bg-white dark:bg-brand-800">
                 <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
                 <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
                 <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
             </div>
 
+            <!-- Modal Content Panels -->
             <div class="p-6 overflow-y-auto flex-1">
-                <!-- Overview Panel -->
+                
+                <!-- 1. Overview & Syllabus Panel (Combines Info & Weekly Units) -->
                 <div id="panel-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-6">
                         <div>
@@ -164,7 +184,6 @@
                             <div id="courseMetadataBox"></div>
                         </div>
 
-                        <!-- Import Sections -->
                         <div class="border-t border-zinc-200 dark:border-brand-700 pt-4 space-y-4">
                             <div>
                                 <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
@@ -178,10 +197,8 @@
 
                             <div>
                                 <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📸 Import Lessons Screenshot</h3>
-                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Upload a screenshot of your course breakdown page to scan exact week numbers & dates.</p>
                                 <input type="file" id="lessonImageFile" accept="image/*" onchange="parseLessonsImage(this)" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer">
                             </div>
-
                             <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
                         </div>
 
@@ -196,7 +213,7 @@
                                 <input type="number" id="assignUnit" placeholder="Unit #" class="w-20 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
                             </div>
                             <div class="flex gap-2">
-                                <input type="date" id="assignDate" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="assignDate" placeholder="YYYY-MM-DD" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 font-mono">
                                 <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Unit</button>
                             </div>
                         </form>
@@ -204,11 +221,12 @@
                     </div>
                 </div>
 
-                <!-- Resources Panel -->
+                <!-- 2. Resources & Links Panel -->
                 <div id="panel-resources" class="hidden space-y-4"></div>
 
-                <!-- Scratchpad Panel -->
+                <!-- 3. Scratchpad Panel -->
                 <div id="panel-scratchpad" class="hidden space-y-4"></div>
+
             </div>
         </div>
     </div>
