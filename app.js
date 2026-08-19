@@ -322,7 +322,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Weekly Unit Syllabus Parser (Maps Unit blocks and allows date customization per week)
+// Weekly Unit Syllabus Parser
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
