@@ -44,23 +44,42 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// --- SMART DATE PARSER WITH YEAR CROSSOVER SAFEGUARD ---
+// --- SMART DATE PARSER WITH DATE RANGE & YEAR SAFEGUARDS ---
 function smartParseDate(dateStr) {
     if (!dateStr) return null;
-    let d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
     
+    // 1. Handle date ranges (e.g. "Aug 03 - Aug 10" -> extracts "Aug 10")
+    if (dateStr.includes('-')) {
+        dateStr = dateStr.split('-').pop().trim();
+    } else if (dateStr.toLowerCase().includes(' to ')) {
+        dateStr = dateStr.toLowerCase().split(' to ').pop().trim();
+    }
+
+    // 2. Attempt initial parse
+    let d = new Date(dateStr);
+    
+    // 3. Fallback if browser fails on missing year (e.g. "Aug 10")
+    if (isNaN(d.getTime())) {
+        const currentYear = new Date().getFullYear();
+        d = new Date(`${dateStr}, ${currentYear}`);
+        if (isNaN(d.getTime())) return null;
+    }
+
     const now = new Date();
     let month = d.getMonth();
     let day = d.getDate();
-    let year = now.getFullYear();
-    
+    let year = d.getFullYear();
+
+    // Fix JS quirk where missing years sometimes default to 2001
+    if (year === 2001) year = now.getFullYear();
+
+    // End of year crossover logic
     if (now.getMonth() >= 10 && month <= 1) {
         year = now.getFullYear() + 1;
     } else if (now.getMonth() <= 1 && month >= 10) {
         year = now.getFullYear() - 1;
     }
-    
+
     return new Date(year, month, day).toISOString().split('T')[0];
 }
 
@@ -247,11 +266,11 @@ window.toggleSidebar = () => {
     const aside = document.querySelector('aside');
     if (aside) {
         aside.classList.toggle('hidden');
-        updateFloatingTimer(); // Trigger float check
+        updateFloatingTimer();
     }
 };
 
-// --- POMODORO TIMER LOGIC WITH REFRESH PERSISTENCE ---
+// --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
@@ -289,7 +308,6 @@ function updateFloatingTimer() {
     const aside = document.querySelector('aside');
     const sidebarHidden = aside ? aside.classList.contains('hidden') : false;
     
-    // Only show floating timer if it's running, not dismissed, AND the main timer is out of view (collapsed or sidebar hidden)
     const shouldFloat = timerRunning && !floatingTimerDismissed && (timerCollapsed || sidebarHidden);
 
     if (!shouldFloat) {
@@ -419,7 +437,7 @@ window.toggleTimerCollapse = () => {
     timerCollapsed = !timerCollapsed;
     localStorage.setItem('timerCollapsed', timerCollapsed);
     applyTimerCollapse();
-    updateFloatingTimer(); // Ensure it floats immediately
+    updateFloatingTimer(); 
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -517,7 +535,7 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- MODULAR SETTINGS POPUP (FIXED: ALWAYS INJECTED) ---
+// --- MODULAR SETTINGS POPUP ---
 function ensureSettingsModalExists() {
     if (document.getElementById('settingsModal')) return;
     const div = document.createElement('div');
@@ -656,7 +674,9 @@ window.switchSettingsTab = (tabName) => {
 
     const tabTarget = document.getElementById(`tab-${tabName}`);
     if (tabTarget) tabTarget.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
-};// --- DASHBOARD LOGIC ---
+};
+
+// --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
@@ -738,9 +758,7 @@ async function loadDashboardStats() {
                 </div>`;
         });
     }
-}
-
-// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
+}// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -752,7 +770,6 @@ async function loadCoursesPage() {
     });
     localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
     
-    // Safely populate the grids without overwriting the static HTML form
     renderTermFolders();
     renderAlphabeticals();
 }
@@ -887,7 +904,7 @@ function ensureTermModalExists() {
     if (!modal) {
         const div = document.createElement('div');
         div.id = 'termModal';
-        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden';
+        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
         div.innerHTML = `
             <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-lg p-6 shadow-xl max-h-[85vh] flex flex-col">
                 <div class="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-brand-700">
@@ -999,7 +1016,7 @@ if (cForm) {
     });
 }
 
-// --- COURSE MODAL TAB SWITCHING & RENDERING ---
+// --- STABLE COURSE MODAL TAB SWITCHING & RENDERING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1095,7 +1112,9 @@ function renderStaticCoursePanels(course) {
             <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="10" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
         `;
     }
-}window.addResourceLink = async (courseId) => {
+}
+
+window.addResourceLink = async (courseId) => {
     const titleInput = document.getElementById(`resTitle_${courseId}`);
     const urlInput = document.getElementById(`resUrl_${courseId}`);
     const title = titleInput ? titleInput.value.trim() : '';
@@ -1131,7 +1150,6 @@ window.saveCourseScratchpad = async (courseId, val) => {
     await supabaseClient.from('courses').update({ scratchpad: val }).eq('id', courseId);
 };
 
-// --- EDGE FUNCTION SYLLABUS & SCREENSHOT PARSERS ---
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -1325,9 +1343,7 @@ window.parseLessonsImage = async (inputElement) => {
             statusMsg.className = "text-xs text-center mt-2 text-red-500";
         }
     };
-};
-
-const eForm = document.getElementById('editCourseForm');
+};const eForm = document.getElementById('editCourseForm');
 if (eForm) {
     eForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1569,7 +1585,6 @@ async function loadGradesPage() {
         Object.keys(unitsMap).sort((a,b) => a-b).forEach(uNum => {
             let lessonsHtml = '';
             
-            // Fixed: Enforce lesson sorting before rendering the HTML for the grades page
             unitsMap[uNum].sort((a, b) => {
                 const getLessonNum = (item) => {
                     const match = item.title.match(/lesson\s*([0-9]+)/i);
