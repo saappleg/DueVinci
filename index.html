@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,10 @@
     <script>
         tailwind.config = { darkMode: 'class' }
     </script>
-    <!-- Prevent theme flashing on load -->
+    <!-- Rock-solid Theme Initialization -->
     <script>
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        const theme = localStorage.getItem('theme') || 'system';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         } else {
             document.documentElement.classList.remove('dark');
@@ -52,9 +53,16 @@
                     <a href="calendar.html" class="block w-full text-left px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-lg transition">📅 Calendar</a>
                 </nav>
             </div>
-            <div class="p-6 border-t border-slate-800 space-y-2">
-                <button onclick="toggleTheme()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🌓 Toggle Theme</button>
-                <button onclick="logout()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🚪 Sign Out</button>
+            <div class="p-6 border-t border-slate-800 space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 mb-1 block">Appearance</label>
+                    <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full bg-slate-800 text-slate-300 border border-slate-700 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="system">💻 System</option>
+                        <option value="light">☀️ Light</option>
+                        <option value="dark">🌙 Dark</option>
+                    </select>
+                </div>
+                <button onclick="logout()" class="w-full text-left px-2 py-2 text-slate-400 hover:text-white transition">🚪 Sign Out</button>
             </div>
         </aside>
 
@@ -67,20 +75,7 @@
                 <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
                     <h3 class="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">⏰ Up Next</h3>
                     <ul class="space-y-3" id="upNextList">
-                        <li class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30">
-                            <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                            <div>
-                                <p class="text-sm font-bold text-red-700 dark:text-red-400">Midterm Essay</p>
-                                <p class="text-xs text-red-600 dark:text-red-500">Due Tomorrow • 11:59 PM</p>
-                            </div>
-                        </li>
-                        <li class="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                            <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                            <div>
-                                <p class="text-sm font-bold text-amber-700 dark:text-amber-400">Chapter 4 Quiz</p>
-                                <p class="text-xs text-amber-600 dark:text-amber-500">Due in 3 Days</p>
-                            </div>
-                        </li>
+                        <p class="text-sm text-slate-400 italic">No upcoming assignments. You're all caught up!</p>
                     </ul>
                 </div>
 
@@ -88,31 +83,14 @@
                 <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
                     <h3 class="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">📈 Completion Goals</h3>
                     <div class="space-y-4" id="goalsList">
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="font-medium text-slate-600 dark:text-slate-300">CS101: Data Structures</span>
-                                <span class="text-indigo-600 dark:text-indigo-400 font-bold">45%</span>
-                            </div>
-                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
-                                <div class="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full" style="width: 45%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="font-medium text-slate-600 dark:text-slate-300">ENG200: Literature</span>
-                                <span class="text-emerald-500 dark:text-emerald-400 font-bold">80%</span>
-                            </div>
-                            <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
-                                <div class="bg-emerald-500 h-2 rounded-full" style="width: 80%"></div>
-                            </div>
-                        </div>
+                        <p class="text-sm text-slate-400 italic">Tracking will start once assignments are added.</p>
                     </div>
                 </div>
             </div>
 
             <!-- Course Management Area -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200">
+                <div class="col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-200 h-fit">
                     <h3 class="text-md font-semibold mb-4 text-slate-700 dark:text-slate-200">Add New Course</h3>
                     <form id="courseForm" class="space-y-3">
                         <div class="flex items-center gap-2">
@@ -135,5 +113,54 @@
             </div>
         </main>
     </div>
+
+    <!-- Course Settings Modal -->
+    <div id="courseModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                <h2 class="text-xl font-bold flex items-center gap-2" id="modalCourseTitle">
+                    <span>📚</span> Course Settings
+                </h2>
+                <button onclick="closeCourseModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xl">✕</button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Edit Course Details -->
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Edit Details</h3>
+                    <form id="editCourseForm" class="space-y-3">
+                        <input type="hidden" id="editCourseId">
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                            <input type="text" id="editCourseCode" required class="flex-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs text-slate-500 dark:text-slate-400">Class Color Tag:</label>
+                            <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+                        </div>
+                        <button type="submit" class="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition mt-2">Update Course</button>
+                    </form>
+                    <button onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-4 hover:underline">Delete Entire Course</button>
+                </div>
+
+                <!-- Assignments Section -->
+                <div class="flex flex-col h-full">
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Assignments</h3>
+                    
+                    <form id="addAssignmentForm" class="flex gap-2 mb-4">
+                        <input type="text" id="assignTitle" placeholder="e.g. Midterm Essay" required class="flex-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <input type="date" id="assignDate" required class="w-32 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <button type="submit" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700">+</button>
+                    </form>
+
+                    <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto">
+                        <!-- Assignments pop in here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
