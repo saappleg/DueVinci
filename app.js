@@ -439,9 +439,19 @@ window.parseSyllabusPDF = async () => {
 
         if (Object.keys(updates).length > 0) {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
+            // Update localCourses cache immediately so modal updates live
+            const cachedCourse = localCourses.find(c => c.id === courseId);
+            if (cachedCourse) {
+                if (parsedData.description) cachedCourse.description = parsedData.description;
+                if (parsedData.objectives) cachedCourse.objectives = parsedData.objectives;
+            }
         }
 
-        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly');
+        // Robust checkbox detection with multiple possible ID formats
+        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || 
+                               document.getElementById('metadataOnly') || 
+                               document.getElementById('syllabusMetadata') ||
+                               document.getElementById('metaOnly');
         const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
 
         if (isMetadataOnly) {
@@ -449,7 +459,7 @@ window.parseSyllabusPDF = async () => {
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             openCourseModal(courseId);
             loadCoursesPage();
-            return;
+            return; // Skip parsing/inserting units and lessons entirely
         }
 
         let baseDate = new Date();
@@ -598,6 +608,17 @@ if (eForm) {
         const objectives = document.getElementById('editCourseObjectives')?.value || '';
         
         await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
+        
+        // Update local cache
+        const cached = localCourses.find(c => c.id === id);
+        if (cached) {
+            cached.code = code;
+            cached.color = color;
+            cached.emoji = emoji;
+            cached.description = description;
+            cached.objectives = objectives;
+        }
+
         closeCourseModal();
         loadCoursesPage();
     });
@@ -612,16 +633,22 @@ window.deleteCurrentCourse = async () => {
 };
 
 window.toggleCourseComplete = async (courseId, currentState) => {
-    await supabaseClient.from('courses').update({ is_completed: !currentState }).eq('id', courseId);
-    if (!currentState) fireConfetti();
-    closeCourseModal();
+    const newState = !currentState;
+    await supabaseClient.from('courses').update({ is_completed: newState }).eq('id', courseId);
+    
+    // Update local state cache instantly
+    const course = localCourses.find(c => c.id === courseId);
+    if (course) course.is_completed = newState;
+
+    if (newState) fireConfetti();
+    
+    // Refresh modal UI live without closing it
+    openCourseModal(courseId);
     loadCoursesPage();
 };
 
 window.toggleAssignment = async (assignId, currentState, courseId) => {
     const newState = !currentState;
-    
-    // Toggle only the clicked assignment independently
     await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
 
     if (newState) fireConfetti();
@@ -707,11 +734,9 @@ async function loadAssignments(courseId) {
         
         let checkboxHtml = '';
         if (isSubItem) {
-            // Sub-lessons get interactive checkboxes
             const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
             checkboxHtml = `<button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
         } else {
-            // Unit headers have NO checkbox. Automatic completion status based on child lessons.
             const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && a.title.startsWith('↳'));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
             const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
