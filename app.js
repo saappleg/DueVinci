@@ -261,10 +261,9 @@ async function loadDashboardStats() {
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
         upNextListEl.innerHTML = '';
-        // Includes both units and individual lessons on the home screen
         const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming weekly items. You\'re all caught up!</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming items. You\'re all caught up!</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
@@ -275,7 +274,7 @@ async function loadDashboardStats() {
                 
                 upNextListEl.innerHTML += `
                     <div class="flex items-center gap-3 p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700">
-                        <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        <button onclick="toggleAssignment('${assign.id}', false, null, ${assign.unit_number || 'null'})" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div>
                             <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
                             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${dateStr}</p>
@@ -350,7 +349,9 @@ window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
     
-    document.getElementById('modalCourseTitle').innerHTML = `<span>${course.emoji || '📚'}</span> ${course.code}`;
+    const completionBadge = course.is_completed ? `<span class="ml-2 text-xs bg-green-500/10 text-green-500 border border-green-500/30 px-2 py-0.5 rounded-full font-bold">Completed</span>` : '';
+    document.getElementById('modalCourseTitle').innerHTML = `<span>${course.emoji || '📚'}</span> ${course.code} ${completionBadge}`;
+    
     document.getElementById('editCourseId').value = course.id;
     document.getElementById('editCourseEmoji').value = course.emoji || '📚';
     document.getElementById('editCourseCode').value = course.code;
@@ -367,8 +368,14 @@ window.openCourseModal = (courseId) => {
     const btn = document.getElementById('markCourseCompleteBtn');
     if (btn) {
         btn.onclick = () => toggleCourseComplete(course.id, course.is_completed);
-        btn.innerText = course.is_completed ? "↺ Undo Completion" : "✔ Mark Complete";
-        btn.className = course.is_completed ? "text-xs bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-brand-700 dark:text-zinc-400 px-3 py-1.5 rounded font-bold transition" : "text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition";
+        
+        if (course.is_completed) {
+            btn.innerText = "↺ Mark as Incomplete";
+            btn.className = "text-xs bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded font-bold transition";
+        } else {
+            btn.innerText = "✔ Mark Course Complete";
+            btn.className = "text-xs bg-green-500/10 text-green-500 border border-green-500/30 hover:bg-green-500/20 px-3 py-1.5 rounded font-bold transition";
+        }
     }
 
     document.getElementById('pdfStatusMsg').classList.add('hidden');
@@ -459,6 +466,7 @@ window.parseSyllabusPDF = async () => {
                         await supabaseClient.from('assignments').insert([{
                             course_id: courseId, user_id: currentUser.id,
                             title: `↳ ${formattedTitle}`,
+                            unit_number: u.num || i + 1,
                             due_date: targetDate.toISOString().split('T')[0]
                         }]);
                         lessonNum++;
@@ -541,6 +549,7 @@ window.parseLessonsImage = async (inputElement) => {
                             await supabaseClient.from('assignments').insert([{
                                 course_id: courseId, user_id: currentUser.id,
                                 title: `↳ ${formattedTitle}`,
+                                unit_number: wk.num,
                                 due_date: targetDate.toISOString().split('T')[0]
                             }]);
                             lessonNum++;
@@ -591,9 +600,24 @@ window.toggleCourseComplete = async (courseId, currentState) => {
     loadCoursesPage();
 };
 
-window.toggleAssignment = async (assignId, currentState, courseId) => {
-    await supabaseClient.from('assignments').update({ is_completed: !currentState }).eq('id', assignId);
-    if (!currentState) fireConfetti();
+window.toggleAssignment = async (assignId, currentState, courseId, unitNumber) => {
+    const newState = !currentState;
+    
+    // Update the clicked item
+    await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    
+    // If it's a main weekly unit, cascade the completion state to all its child lessons
+    if (unitNumber) {
+        const { data: allAssignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
+        if (allAssignments) {
+            const childLessons = allAssignments.filter(a => a.unit_number === unitNumber && a.title.startsWith('↳'));
+            for (let child of childLessons) {
+                await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', child.id);
+            }
+        }
+    }
+
+    if (newState) fireConfetti();
     
     if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) loadDashboardStats();
     else if (courseId) loadAssignments(courseId);
@@ -610,9 +634,17 @@ window.addSubItem = async (parentId, courseId) => {
     const title = inputEl ? inputEl.value.trim() : "";
     if(!title) return;
     
+    // Find the parent assignment to inherit its unit_number
+    const { data: parentAssign } = await supabaseClient.from('assignments').select('unit_number, due_date').eq('id', parentId).single();
+    const unitNum = parentAssign ? parentAssign.unit_number : null;
+    const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
+
     await supabaseClient.from('assignments').insert([{
-        course_id: courseId, user_id: currentUser.id,
-        title: `↳ ${title}`, due_date: document.getElementById(`date-${parentId}`).value || new Date().toISOString().split('T')[0]
+        course_id: courseId, 
+        user_id: currentUser.id,
+        title: `↳ ${title}`, 
+        unit_number: unitNum,
+        due_date: dueDate
     }]);
     loadAssignments(courseId);
 };
@@ -628,7 +660,7 @@ async function loadAssignments(courseId) {
         return;
     }
     
-    // Strict numeric and chronological sorting (fixes Lesson 10 sorting above Lesson 9)
+    // Strict numeric and chronological sorting: Unit -> Main Unit Header -> Numeric Sub-lessons
     assignments.sort((a, b) => {
         let unitA = a.unit_number || 0;
         let unitB = b.unit_number || 0;
@@ -636,7 +668,9 @@ async function loadAssignments(courseId) {
         
         let isSubA = a.title.startsWith('↳');
         let isSubB = b.title.startsWith('↳');
-        if (isSubA !== isSubB) return isSubA ? 1 : -1;
+        
+        if (!isSubA && isSubB) return -1;
+        if (isSubA && !isSubB) return 1;
         
         if (isSubA && isSubB) {
             let numA = parseInt(a.title.replace(/[^0-9]/g, '')) || 0;
@@ -668,7 +702,7 @@ async function loadAssignments(courseId) {
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                        <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}', ${assign.unit_number || 'null'})" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
                             <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
