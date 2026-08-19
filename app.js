@@ -242,7 +242,16 @@ function recordStudyActivity() {
     }
 }
 
-// --- POMODORO TIMER LOGIC ---
+// --- SIDEBAR TOGGLE ---
+window.toggleSidebar = () => {
+    const aside = document.querySelector('aside');
+    if (aside) {
+        aside.classList.toggle('hidden');
+        updateFloatingTimer(); // Trigger float check
+    }
+};
+
+// --- POMODORO TIMER LOGIC WITH REFRESH PERSISTENCE ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
@@ -272,7 +281,50 @@ function updateTimerDisplay() {
         circle.style.strokeDashoffset = percent;
     }
     localStorage.setItem('timeLeft', timeLeft);
+    updateFloatingTimer();
 }
+
+function updateFloatingTimer() {
+    let floatWidget = document.getElementById('floatingTimerWidget');
+    const aside = document.querySelector('aside');
+    const sidebarHidden = aside ? aside.classList.contains('hidden') : false;
+    
+    // Only show floating timer if it's running, not dismissed, AND the main timer is out of view (collapsed or sidebar hidden)
+    const shouldFloat = timerRunning && !floatingTimerDismissed && (timerCollapsed || sidebarHidden);
+
+    if (!shouldFloat) {
+        if (floatWidget) floatWidget.classList.add('hidden');
+        return;
+    }
+
+    if (!floatWidget) {
+        floatWidget = document.createElement('div');
+        floatWidget.id = 'floatingTimerWidget';
+        floatWidget.className = 'fixed bottom-5 right-5 z-[9999] bg-zinc-900/95 dark:bg-brand-800 text-white p-4 rounded-2xl shadow-2xl border border-zinc-700 backdrop-blur-md w-64 transition-all';
+        document.body.appendChild(floatWidget);
+    }
+    
+    floatWidget.classList.remove('hidden');
+    const min = Math.floor(timeLeft / 60);
+    const sec = timeLeft % 60;
+    const label = isWorking ? 'Focus Session' : 'Break Time';
+    floatWidget.innerHTML = `
+        <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
+            <button onclick="dismissFloatingTimer()" class="text-zinc-400 hover:text-white text-xs">✕</button>
+        </div>
+        <div class="flex justify-between items-center">
+            <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
+            <button onclick="toggleTimer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-bold transition">⏸ Pause</button>
+        </div>
+    `;
+}
+
+window.dismissFloatingTimer = () => {
+    floatingTimerDismissed = true;
+    const floatWidget = document.getElementById('floatingTimerWidget');
+    if (floatWidget) floatWidget.classList.add('hidden');
+};
 
 window.toggleTimer = () => {
     const btn = document.getElementById('timerPlayBtn');
@@ -301,6 +353,7 @@ window.toggleTimer = () => {
         }, 1000);
         recordStudyActivity();
     }
+    updateFloatingTimer();
 };
 
 window.resetTimer = () => {
@@ -366,6 +419,7 @@ window.toggleTimerCollapse = () => {
     timerCollapsed = !timerCollapsed;
     localStorage.setItem('timerCollapsed', timerCollapsed);
     applyTimerCollapse();
+    updateFloatingTimer(); // Ensure it floats immediately
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -463,8 +517,95 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- MODULAR SETTINGS POPUP ---
+// --- MODULAR SETTINGS POPUP (FIXED: ALWAYS INJECTED) ---
+function ensureSettingsModalExists() {
+    if (document.getElementById('settingsModal')) return;
+    const div = document.createElement('div');
+    div.id = 'settingsModal';
+    div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
+    div.innerHTML = `
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
+            <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
+                <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                <nav class="space-y-1">
+                    <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                    <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                </nav>
+            </div>
+            <div class="flex-1 p-6 relative">
+                <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                <div id="content-profile" class="block space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
+                    </div>
+                    <form id="settingsForm" class="max-w-sm space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                            <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+                            <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
+                        <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
+                    </form>
+                </div>
+                <div id="content-appearance" class="hidden space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
+                    </div>
+                    <div class="max-w-sm">
+                        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
+                        <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
+                            <option value="system">💻 Follow System</option>
+                            <option value="light">☀️ Light Mode</option>
+                            <option value="dark">🌙 Dark Mode</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(div);
+
+    const form = document.getElementById('settingsForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('profileEmail').value;
+            const password = document.getElementById('profilePassword').value;
+            const msgEl = document.getElementById('settingsMsg');
+            
+            let updates = {};
+            if(email && email !== currentUser?.email) updates.email = email;
+            if(password) updates.password = password;
+            
+            if(Object.keys(updates).length === 0) {
+                msgEl.textContent = "No changes made.";
+                msgEl.className = "text-xs text-center mt-2 text-zinc-500";
+                msgEl.classList.remove('hidden');
+                return;
+            }
+            
+            const { error } = await supabaseClient.auth.updateUser(updates);
+            if (error) {
+                msgEl.textContent = error.message;
+                msgEl.className = "text-xs text-center mt-2 text-red-500";
+            } else {
+                msgEl.textContent = "Profile updated successfully!";
+                msgEl.className = "text-xs text-center mt-2 text-green-500";
+                document.getElementById('profilePassword').value = '';
+            }
+            msgEl.classList.remove('hidden');
+        });
+    }
+}
+
 window.openSettingsModal = () => {
+    ensureSettingsModalExists();
     if(currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
@@ -476,7 +617,6 @@ window.openSettingsModal = () => {
         window.injectAppearanceSettingsExtras();
     }
 
-    // Explicitly sync all settings with localStorage so they never visually "reset"
     const dfSelect = document.getElementById('dateFormatSelect');
     if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
     
@@ -516,41 +656,7 @@ window.switchSettingsTab = (tabName) => {
 
     const tabTarget = document.getElementById(`tab-${tabName}`);
     if (tabTarget) tabTarget.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
-};
-
-const settingsForm = document.getElementById('settingsForm');
-if (settingsForm) {
-    settingsForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('profileEmail').value;
-        const password = document.getElementById('profilePassword').value;
-        const msgEl = document.getElementById('settingsMsg');
-        
-        let updates = {};
-        if(email && email !== currentUser?.email) updates.email = email;
-        if(password) updates.password = password;
-        
-        if(Object.keys(updates).length === 0) {
-            msgEl.textContent = "No changes made.";
-            msgEl.className = "text-xs text-center mt-2 text-zinc-500";
-            msgEl.classList.remove('hidden');
-            return;
-        }
-        
-        const { error } = await supabaseClient.auth.updateUser(updates);
-        if (error) {
-            msgEl.textContent = error.message;
-            msgEl.className = "text-xs text-center mt-2 text-red-500";
-        } else {
-            msgEl.textContent = "Profile updated successfully!";
-            msgEl.className = "text-xs text-center mt-2 text-green-500";
-            document.getElementById('profilePassword').value = '';
-        }
-        msgEl.classList.remove('hidden');
-    });
-}
-
-// --- DASHBOARD LOGIC ---
+};// --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
@@ -753,7 +859,6 @@ function renderAlphabeticals() {
     });
 }
 
-// --- DRAG AND DROP HANDLERS ---
 window.handleDragStart = (e, courseId) => {
     e.dataTransfer.setData('text/plain', courseId);
 };
@@ -800,7 +905,6 @@ window.createNewTermFolder = () => {
     renderTermFolders();
 };
 
-// --- TERM MODAL POP-UP ---
 function ensureTermModalExists() {
     let modal = document.getElementById('termModal');
     if (!modal) {
@@ -917,7 +1021,8 @@ if (cForm) {
         }
     });
 }
-// --- STABLE COURSE MODAL TAB SWITCHING & RENDERING ---
+
+// --- COURSE MODAL TAB SWITCHING & RENDERING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -958,7 +1063,6 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Default to Overview tab
     switchCourseTab('overview');
     renderStaticCoursePanels(course);
 
@@ -986,7 +1090,6 @@ window.switchCourseTab = (tabName) => {
 };
 
 function renderStaticCoursePanels(course) {
-    // Populate Resources tab
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1008,7 +1111,6 @@ function renderStaticCoursePanels(course) {
         `;
     }
 
-    // Populate Scratchpad tab
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
@@ -1016,9 +1118,7 @@ function renderStaticCoursePanels(course) {
             <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="10" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
         `;
     }
-}
-
-window.addResourceLink = async (courseId) => {
+}window.addResourceLink = async (courseId) => {
     const titleInput = document.getElementById(`resTitle_${courseId}`);
     const urlInput = document.getElementById(`resUrl_${courseId}`);
     const title = titleInput ? titleInput.value.trim() : '';
@@ -1463,7 +1563,7 @@ window.deleteAssignment = async (assignId, courseId) => {
     loadAssignments(courseId, currentAssignmentPage);
 };
 
-// --- GRADES PAGE LOGIC ---
+// --- GRADES PAGE LOGIC WITH FIXED SORTING ---
 async function loadGradesPage() {
     const container = document.getElementById('gradesContainer');
     if (!container) return;
@@ -1491,6 +1591,23 @@ async function loadGradesPage() {
 
         Object.keys(unitsMap).sort((a,b) => a-b).forEach(uNum => {
             let lessonsHtml = '';
+            
+            // Fixed: Enforce lesson sorting before rendering the HTML for the grades page
+            unitsMap[uNum].sort((a, b) => {
+                const getLessonNum = (item) => {
+                    const match = item.title.match(/lesson\s*([0-9]+)/i);
+                    if (match) return parseInt(match[1]);
+                    const numMatch = item.title.replace(/[^0-9]/g, '');
+                    return numMatch ? parseInt(numMatch) : 999;
+                };
+                let isSubA = a.title.startsWith('↳');
+                let isSubB = b.title.startsWith('↳');
+                if (!isSubA && isSubB) return -1;
+                if (isSubA && !isSubB) return 1;
+                if (isSubA && isSubB) return getLessonNum(a) - getLessonNum(b);
+                return new Date(a.due_date) - new Date(b.due_date);
+            });
+
             unitsMap[uNum].forEach(item => {
                 if (item.grade !== null && item.grade !== undefined && !item.exclude_from_gpa) {
                     courseTotal += parseFloat(item.grade);
