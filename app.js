@@ -102,12 +102,22 @@ window.toggleSidebar = () => {
     aside.classList.toggle('hidden');
 };
 
-// --- POMODORO TIMER LOGIC & FLOATING WIDGET ---
+// --- POMODORO TIMER LOGIC WITH REFRESH PERSISTENCE ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
-let timeLeft = focusMinutes * 60;
-let isWorking = true;
+let isWorking = localStorage.getItem('timerIsWorking') !== 'false';
+
+let timerEndTime = parseInt(localStorage.getItem('timerEndTime')) || 0;
+let timerRunning = localStorage.getItem('timerRunning') === 'true';
+let timeLeft = parseInt(localStorage.getItem('timeLeft')) || (focusMinutes * 60);
+
+if (timerRunning && timerEndTime > Date.now()) {
+    timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
+} else {
+    timerRunning = false;
+    localStorage.setItem('timerRunning', 'false');
+}
 
 function updateTimerDisplay() {
     const min = Math.floor(timeLeft / 60);
@@ -121,12 +131,13 @@ function updateTimerDisplay() {
         const percent = ((total - timeLeft) / total) * 301.59;
         circle.style.strokeDashoffset = percent;
     }
+    localStorage.setItem('timeLeft', timeLeft);
     updateFloatingTimer();
 }
 
 function updateFloatingTimer() {
     let floatWidget = document.getElementById('floatingTimerWidget');
-    if (!timerInterval || floatingTimerDismissed) {
+    if (!timerRunning || floatingTimerDismissed) {
         if (floatWidget) floatWidget.classList.add('hidden');
         return;
     }
@@ -160,16 +171,23 @@ window.dismissFloatingTimer = () => {
 
 window.toggleTimer = () => {
     const btn = document.getElementById('timerPlayBtn');
-    if (timerInterval) {
+    if (timerRunning) {
         clearInterval(timerInterval);
         timerInterval = null;
-        btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+        timerRunning = false;
+        localStorage.setItem('timerRunning', 'false');
+        if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
     } else {
-        floatingTimerDismissed = false; // Reset dismissal so floating timer displays again when playing
-        btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        timerRunning = true;
+        floatingTimerDismissed = false;
+        timerEndTime = Date.now() + (timeLeft * 1000);
+        localStorage.setItem('timerRunning', 'true');
+        localStorage.setItem('timerEndTime', timerEndTime);
+        if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        
         timerInterval = setInterval(() => {
-            if (timeLeft > 0) {
-                timeLeft--;
+            if (timerEndTime > Date.now()) {
+                timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                 updateTimerDisplay();
             } else {
                 skipTimer();
@@ -180,19 +198,28 @@ window.toggleTimer = () => {
 };
 
 window.resetTimer = () => {
+    timerRunning = false;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    localStorage.setItem('timerRunning', 'false');
     timeLeft = isWorking ? (focusMinutes * 60) : (breakMinutes * 60);
+    const btn = document.getElementById('timerPlayBtn');
+    if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
     updateTimerDisplay();
 };
 
 window.skipTimer = () => {
     isWorking = !isWorking;
-    document.getElementById('timerLabel').innerText = isWorking ? "Focus" : "Break";
+    localStorage.setItem('timerIsWorking', isWorking);
+    const labelEl = document.getElementById('timerLabel');
+    if (labelEl) labelEl.innerText = isWorking ? "Focus" : "Break";
+    
     timeLeft = isWorking ? (focusMinutes * 60) : (breakMinutes * 60);
+    timerEndTime = Date.now() + (timeLeft * 1000);
+    localStorage.setItem('timerEndTime', timerEndTime);
     updateTimerDisplay();
     
-    if(timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
+    if(!timerRunning) {
         window.toggleTimer();
     }
 };
@@ -210,7 +237,7 @@ window.saveTimerSettings = () => {
     localStorage.setItem('focusMinutes', focusMinutes);
     localStorage.setItem('breakMinutes', breakMinutes);
     document.getElementById('timerSettingsForm').classList.add('hidden');
-    resetTimer();
+    window.resetTimer();
 };
 
 let timerCollapsed = localStorage.getItem('timerCollapsed') === 'true';
@@ -237,6 +264,18 @@ window.toggleTimerCollapse = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     applyTimerCollapse();
+    if (timerRunning && timeLeft > 0) {
+        const btn = document.getElementById('timerPlayBtn');
+        if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        timerInterval = setInterval(() => {
+            if (timerEndTime > Date.now()) {
+                timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
+                updateTimerDisplay();
+            } else {
+                skipTimer();
+            }
+        }, 1000);
+    }
     updateTimerDisplay();
 });
 
