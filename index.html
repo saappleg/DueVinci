@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DueVinci - Student Planner</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FullCalendar CSS & JS -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans">
+
+    <!-- Auth Screen -->
+    <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-slate-100">
+        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+            <h1 class="text-3xl font-bold text-indigo-600 mb-2">DueVinci 📚</h1>
+            <p class="text-slate-500 mb-6">Manage syllabi, color-code classes, and sync deadlines.</p>
+            <button onclick="loginWithGoogle()" class="w-full bg-indigo-600 text-white font-medium py-3 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                Sign in with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Screen (Hidden until logged in) -->
+    <div id="appScreen" class="hidden flex h-screen overflow-hidden">
+        
+        <aside class="w-1/3 bg-white border-r border-slate-200 p-6 flex flex-col justify-between overflow-y-auto">
+            <div>
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-indigo-600">DueVinci</h1>
+                    <button onclick="logout()" class="text-xs text-red-500 hover:underline">Sign Out</button>
+                </div>
+
+                <!-- Add Course Form -->
+                <div class="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <h2 class="text-sm font-semibold text-slate-600 mb-3">Add New Course</h2>
+                    <form id="courseForm" class="space-y-3">
+                        <input type="text" id="courseCode" placeholder="e.g. CS101: Data Structures" required class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                        
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs text-slate-500">Class Color Tag:</label>
+                            <input type="color" id="courseColor" value="#4f46e5" class="w-8 h-8 rounded border-0 cursor-pointer">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">
+                            Save Course
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Course List -->
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">My Classes</h2>
+                    <div id="courseList" class="space-y-2">
+                        <!-- Populated dynamically from Supabase -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Export Action -->
+            <div class="pt-4 border-t border-slate-200">
+                <button onclick="exportToICS()" class="w-full bg-indigo-50 text-indigo-700 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-indigo-100 transition text-sm">
+                    Export Calendar (.ics file)
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Calendar View -->
+        <main class="w-2/3 p-8 bg-white overflow-y-auto">
+            <div id='calendar' class="h-full"></div>
+        </main>
+    </div>
+
+    <script>
+        // TODO: Replace with your actual Supabase Project URL and Anon Key
+        const SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let calendarInstance = null;
+
+        // Check authentication state on page load
+        async function checkUser() {
+            const { data: { session } } = await supabase.auth.getSession();
+            handleAuth(session);
+
+            supabase.auth.onAuthStateChange((_event, session) => {
+                handleAuth(session);
+            });
+        }
+
+        function handleAuth(session) {
+            if (session) {
+                currentUser = session.user;
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('appScreen').classList.remove('hidden');
+                initCalendar();
+                loadCourses();
+            } else {
+                currentUser = null;
+                document.getElementById('authScreen').classList.remove('hidden');
+                document.getElementById('appScreen').classList.add('hidden');
+            }
+        }
+
+        window.loginWithGoogle = async () => {
+            await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.href
+                }
+            });
+        };
+
+        window.logout = async () => {
+            await supabase.auth.signOut();
+        };
+
+        function initCalendar() {
+            if (calendarInstance) return;
+            
+            const calendarEl = document.getElementById('calendar');
+            calendarInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek'
+                },
+                events: []
+            });
+            calendarInstance.render();
+        }
+
+        // Fetch Courses from Supabase Database
+        async function loadCourses() {
+            const { data: courses, error } = await supabase
+                .from('courses')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error loading courses:', error);
+                return;
+            }
+
+            const courseListEl = document.getElementById('courseList');
+            courseListEl.innerHTML = '';
+            let calendarEvents = [];
+
+            courses.forEach(course => {
+                // Render Sidebar Course Item
+                courseListEl.innerHTML += `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-4 h-4 rounded-full inline-block" style="background-color: ${course.color};"></span>
+                            <span class="font-medium text-sm">${course.code}</span>
+                        </div>
+                        <button onclick="deleteCourse('${course.id}')" class="text-xs text-slate-400 hover:text-red-500">✕</button>
+                    </div>
+                `;
+
+                // Add placeholder event to calendar showing the color tag mapping
+                calendarEvents.push({
+                    title: `${course.code} Session`,
+                    start: new Date().toISOString().split('T')[0],
+                    color: course.color
+                });
+            });
+
+            if (calendarInstance) {
+                calendarInstance.removeAllEvents();
+                calendarInstance.addEventSource(calendarEvents);
+            }
+        }
+
+        // Insert Course into Supabase Database
+        document.getElementById('courseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const code = document.getElementById('courseCode').value;
+            const color = document.getElementById('courseColor').value;
+
+            const { error } = await supabase
+                .from('courses')
+                .insert([{ code, color, user_id: currentUser.id }]);
+
+            if (!error) {
+                document.getElementById('courseCode').value = '';
+                loadCourses();
+            } else {
+                alert('Error adding course: ' + error.message);
+            }
+        });
+
+        window.deleteCourse = async (id) => {
+            if (confirm('Delete this course?')) {
+                const { error } = await supabase.from('courses').delete().eq('id', id);
+                if (!error) loadCourses();
+            }
+        };
+
+        // Client-side .ics Calendar Export Tool
+        window.exportToICS = () => {
+            let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
+            
+            const events = calendarInstance.getEvents();
+            events.forEach(ev => {
+                const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+                icsContent += "BEGIN:VEVENT\n";
+                icsContent += `SUMMARY:${ev.title}\n`;
+                icsContent += `DTSTART:${dateStr}\n`;
+                icsContent += `DTEND:${dateStr}\n`;
+                icsContent += "END:VEVENT\n";
+            });
+
+            icsContent += "END:VCALENDAR";
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', 'duevinci-schedule.ics');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        checkUser();
+    </script>
+</body>
+</html>
