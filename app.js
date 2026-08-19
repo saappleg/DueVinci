@@ -1255,7 +1255,7 @@ async function loadAssignments(courseId, page = 1) {
         if (!isSubItem && assign.unit_number) {
             subItemForm = `
                 <div class="mt-2 pl-8 flex gap-2">
-                    <input type="date" id="date-${assign.id}" value="${assign.due_date}" min="2020-01-01" max="2035-12-31" class="hidden">
+                    <input type="text" id="date-${assign.id}" value="${assign.due_date}" placeholder="YYYY-MM-DD" class="hidden">
                     <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
                     <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
                 </div>`;
@@ -1268,7 +1268,7 @@ async function loadAssignments(courseId, page = 1) {
                         ${checkboxHtml}
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
-                            <input type="date" value="${assign.due_date}" min="2020-01-01" max="2035-12-31" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
+                            <input type="text" value="${assign.due_date}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono" title="Type date as YYYY-MM-DD">
                         </div>
                     </div>
                     <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
