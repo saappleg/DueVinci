@@ -470,9 +470,9 @@ async function loadDashboardStats() {
         
         // Show lessons and upcoming exams, finals, tests, or reviews in Up Next (excluding generic unit headers)
         const upcoming = assignments.filter(a => !a.is_completed && (
-        a.title.includes('↳') || 
-        /lesson|exam|final|midterm|test|review/i.test(a.title)
-));
+            a.title.includes('↳') || 
+            /lesson|exam|final|midterm|test|review/i.test(a.title)
+        ));
         
         if (upcoming.length === 0) {
             upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming lessons. You\'re all caught up!</p>';
@@ -502,7 +502,8 @@ async function loadDashboardStats() {
         if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking weekly progress.</p>';
         else {
             courses.forEach(course => {
-                const cAssign = assignments.filter(a => a.course_id === course.id);
+                // Count only lessons and exams/reviews, excluding generic unit headers for accurate progress
+                const cAssign = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
                 const complete = cAssign.filter(a => a.is_completed).length;
                 let pct = course.is_completed ? 100 : (cAssign.length ? Math.round((complete/cAssign.length)*100) : 0);
                 
@@ -549,7 +550,7 @@ async function loadCoursesPage() {
                     <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
                     <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                 </div>
-            </div>`;
+            `;
     }
 
     renderTermFolders();
