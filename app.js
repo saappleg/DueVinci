@@ -10,7 +10,7 @@ let currentAssignmentPage = 1;
 let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
 let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
-let lastProcessedSessionToken = null; // Guard to prevent double execution on load
+let lastProcessedSessionToken = null;
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -58,7 +58,7 @@ window.changeTheme = (themeValue) => {
     }
 };
 
-// --- CONFETTI LOGIC ---
+// --- CONFETTI & STUDY STREAK RECORDER ---
 function fireConfetti() {
     if (typeof confetti !== 'undefined') {
         confetti({
@@ -67,6 +67,16 @@ function fireConfetti() {
             origin: { y: 0.6 },
             colors: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6']
         });
+    }
+    recordStudyActivity();
+}
+
+function recordStudyActivity() {
+    const today = new Date().toISOString().split('T')[0];
+    let activityDates = JSON.parse(localStorage.getItem('duevinci_activity_dates')) || [];
+    if (!activityDates.includes(today)) {
+        activityDates.push(today);
+        localStorage.setItem('duevinci_activity_dates', JSON.stringify(activityDates));
     }
 }
 
@@ -194,6 +204,7 @@ window.toggleTimer = () => {
                 skipTimer();
             }
         }, 1000);
+        recordStudyActivity();
     }
     updateFloatingTimer();
 };
@@ -289,7 +300,7 @@ async function checkUser() {
 
 function handleAuth(session) {
     const token = session?.access_token || null;
-    if (token === lastProcessedSessionToken) return; // Prevent duplicate execution from getSession + onAuthStateChange race condition
+    if (token === lastProcessedSessionToken) return;
     lastProcessedSessionToken = token;
 
     if (session) {
@@ -457,9 +468,11 @@ async function loadDashboardStats() {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
         
-        const upcoming = assignments.filter(a => !a.is_completed);
+        // ONLY show lessons in Up Next (starting with '↳' or containing 'lesson')
+        const upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson/i.test(a.title)));
+        
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming items. You\'re all caught up!</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming lessons. You\'re all caught up!</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
@@ -533,7 +546,7 @@ async function loadCoursesPage() {
                     <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
                     <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                 </div>
-            `;
+            </div>`;
     }
 
     renderTermFolders();
