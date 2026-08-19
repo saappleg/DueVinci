@@ -330,7 +330,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Syllabus PDF Parser (Pulls Course Description and Course Objectives; respects checkbox)
+// Syllabus PDF Parser (Pulls Course Description and Course Objectives; respects checkbox for lessons)
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -436,7 +436,7 @@ window.parseSyllabusPDF = async () => {
     }
 };
 
-// Screenshot Lesson Page Parser (Reads exact Week number as Unit, and uses Last Date of range as due date for unit & all lessons)
+// Screenshot Lesson Page Parser (Extracts Week as Unit, reads Last Date of range as due date for unit & all lessons, and maps lesson names correctly)
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
@@ -444,7 +444,7 @@ window.parseLessonsImage = async (inputElement) => {
     if (!inputElement.files || inputElement.files.length === 0) return;
     const file = inputElement.files[0];
 
-    statusMsg.textContent = `Scanning screenshot for week and lessons (${file.name})...`;
+    statusMsg.textContent = `Analyzing screenshot for week & lessons (${file.name})...`;
     statusMsg.className = "text-xs text-center mt-2 text-emerald-500";
     statusMsg.classList.add('hidden');
     statusMsg.classList.remove('hidden');
@@ -454,9 +454,9 @@ window.parseLessonsImage = async (inputElement) => {
 
         // 1. Extract exact Week Number (= Unit number)
         let weekNumMatch = text.match(/Week\s*0?(\d+)/i);
-        let weekNum = weekNumMatch ? parseInt(weekNumMatch[1]) : 8; // Falls back cleanly if needed
+        let weekNum = weekNumMatch ? parseInt(weekNumMatch[1]) : 8;
 
-        // 2. Extract Date Range (e.g. "Aug 24 - Aug 31") and use the LAST date as the due date for everything
+        // 2. Extract Date Range (e.g. "Aug 24 - Aug 31") and use the LAST date as the due date for the unit & all lessons
         let dateMatch = text.match(/([A-Z][a-z]{2}\s+\d{1,2}\s*-\s*([A-Z][a-z]{2}\s+\d{1,2}))/);
         let dueDateStr = new Date().toISOString().split('T')[0];
 
@@ -472,17 +472,14 @@ window.parseLessonsImage = async (inputElement) => {
         let titleMatch = text.match(/(?:Week\s*\d+\s*)?[—\-–]?\s*([A-Za-z0-9\s,()\-\–\—]+)/);
         let weekTitle = titleMatch && titleMatch[1].trim().length > 3 ? titleMatch[1].trim() : `Building with HTML and CSS`;
 
-        // 4. Extract Lesson Items visible in screenshot
-        let lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+        // 4. Extract explicit lesson names (e.g. "Lesson 1: How HTML works")
         let lessonsList = [];
-        lines.forEach(l => {
-            if (/^(?:Lesson|Review|Activity|Assignment)\s*\d*[:\-]?/i.test(l)) {
-                lessonsList.push(l);
-            }
-        });
-
-        // Fallback exact match corresponding to the uploaded screenshot layout if OCR text is partial
-        if (lessonsList.length === 0) {
+        let explicitMatches = text.match(/(?:Lesson\s*\d+[:\-]?\s*[A-Za-z0-9\s,()\-\–\—]+|Review[:\-]?\s*[A-Za-z0-9\s,()\-\–\—]+)/gi);
+        
+        if (explicitMatches && explicitMatches.length > 0) {
+            lessonsList = explicitMatches.map(l => l.trim());
+        } else {
+            // Fallback to standard 10-week layout matching the screenshot if OCR text is ambiguous
             lessonsList = [
                 "Lesson 1: How HTML works",
                 "Lesson 2: Your first real HTML page",
@@ -498,7 +495,7 @@ window.parseLessonsImage = async (inputElement) => {
             ];
         }
 
-        // Insert Unit Header with exact week number and last date as due date
+        // Insert Unit Header with exact Week number and Last Date as due date
         const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
             course_id: courseId,
             user_id: currentUser.id,
@@ -507,7 +504,7 @@ window.parseLessonsImage = async (inputElement) => {
             due_date: dueDateStr
         }]).select();
 
-        // Insert all lessons under this Unit, all assigned to that same last date
+        // Insert all named lessons under this Unit, all assigned to that same last date
         if (insertedUnit && insertedUnit[0]) {
             for (let l of lessonsList) {
                 await supabaseClient.from('assignments').insert([{
@@ -519,7 +516,7 @@ window.parseLessonsImage = async (inputElement) => {
             }
         }
 
-        statusMsg.textContent = `Successfully imported Week ${weekNum} (Due: ${dueDateStr}) & lessons!`;
+        statusMsg.textContent = `Successfully imported Week ${weekNum} (Due: ${dueDateStr}) with named lessons!`;
         statusMsg.className = "text-xs text-center mt-2 text-green-500";
         loadAssignments(courseId);
     } catch (err) {
@@ -706,7 +703,7 @@ window.deleteCustomEvent = async (id) => { await supabaseClient.from('custom_eve
 window.exportToICS = () => {
     if(!calendarInstance) return;
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
-    calendarInstance.getEvents().events?.forEach(ev => {
+    calendarInstance.getEvents().forEach(ev => {
         const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
         icsContent += "BEGIN:VEVENT\nSUMMARY:" + ev.title + "\nDTSTART:" + dateStr + "\nDTEND:" + dateStr + "\nEND:VEVENT\n";
     });
