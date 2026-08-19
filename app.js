@@ -67,7 +67,7 @@ function fireConfetti() {
     }
 }
 
-// --- TOP TITLE BAR INJECTOR (FIXED FOR TOP CONTENT HEADER) ---
+// --- TOP TITLE BAR INJECTOR (RESTORED FULL TITLE & SUBTITLE) ---
 function ensureTopTitleBar() {
     const appScreen = document.getElementById('appScreen');
     if (!appScreen) return;
@@ -81,7 +81,10 @@ function ensureTopTitleBar() {
             logoDiv.className = 'flex items-center gap-3';
             logoDiv.innerHTML = `
                 <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
-                <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-lg">DueVinci</h1>
+                <div>
+                    <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
+                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner Workspace</p>
+                </div>
             `;
             headerEl.insertBefore(logoDiv, headerEl.firstChild);
         }
