@@ -1009,7 +1009,7 @@ if (cForm) {
     });
 }
 
-// --- COURSE MODAL WITH CLEAN TABS ---
+// --- STABLE COURSE MODAL WITH CSS TAB TOGGLING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1050,27 +1050,25 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Setup Clean Tab Navigation inside Modal
-    const modalContentWrapper = document.querySelector('#courseModal .p-6') || document.querySelector('#courseModal > div > div:nth-child(2)') || document.querySelector('#courseModal .max-w-3xl');
-    if (modalContentWrapper && !document.getElementById('courseTabNav')) {
-        const tabNav = document.createElement('div');
-        tabNav.id = 'courseTabNav';
-        tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-6 pb-3 gap-6';
-        tabNav.innerHTML = `
-            <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
-            <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Coursework</button>
-            <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
-            <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
+    // Inject Tab Buttons above the modal body if not already present
+    const modalBox = document.querySelector('#courseModal .bg-white, #courseModal .dark\\:bg-brand-800') || document.querySelector('#courseModal > div > div');
+    if (modalBox && !document.getElementById('cleanCourseTabs')) {
+        const tabContainer = document.createElement('div');
+        tabContainer.id = 'cleanCourseTabs';
+        tabContainer.className = 'flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-4 gap-6 shrink-0 bg-white dark:bg-brand-800';
+        tabContainer.innerHTML = `
+            <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
+            <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Coursework</button>
+            <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2.5 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+            <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2.5 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
         `;
-        const headerArea = modalContentWrapper.querySelector('.flex.items-center.justify-between');
-        if (headerArea) {
-            headerArea.insertAdjacentElement('afterend', tabNav);
-        } else {
-            modalContentWrapper.prepend(tabNav);
+        const modalHeader = modalBox.querySelector('.flex.items-center.justify-between');
+        if (modalHeader) {
+            modalHeader.insertAdjacentElement('afterend', tabContainer);
         }
     }
 
-    renderCourseModalPanels(course);
+    setupCourseModalPanels(course);
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
@@ -1088,45 +1086,47 @@ window.switchCourseTab = (tabName) => {
         if (panel) panel.classList.toggle('hidden', t !== tabName);
         if (btn) {
             btn.className = t === tabName 
-                ? 'text-xs font-bold pb-2 border-b-2 border-indigo-500 text-indigo-500 transition' 
-                : 'text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
+                ? 'text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition' 
+                : 'text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
         }
     });
 };
 
-function renderCourseModalPanels(course) {
-    const modalContent = document.querySelector('#courseModal .p-6') || document.querySelector('#courseModal .max-w-3xl');
-    if (!modalContent) return;
+function setupCourseModalPanels(course) {
+    const modalBody = document.querySelector('#courseModal .overflow-y-auto');
+    if (!modalBody) return;
 
-    let overviewPanel = document.getElementById('panel-overview');
-    if (!overviewPanel) {
-        const editForm = document.getElementById('editCourseForm');
-        const metadataBox = document.getElementById('courseMetadataBox');
-        const pdfImportSection = document.getElementById('syllabusFile')?.closest('.border') || document.querySelector('#courseModal input[type="file"]')?.closest('div');
-
-        const panelsWrapper = document.createElement('div');
-        panelsWrapper.id = 'coursePanelsWrapper';
-        panelsWrapper.className = 'mt-4 max-h-[65vh] overflow-y-auto pr-1';
-        panelsWrapper.innerHTML = `
-            <div id="panel-overview" class="space-y-6"></div>
-            <div id="panel-coursework" class="hidden space-y-4"></div>
+    // Check if panels wrapper already exists
+    let wrapper = document.getElementById('cleanPanelsWrapper');
+    if (!wrapper) {
+        // Extract existing elements from modalBody to place inside tabs cleanly
+        const existingContent = modalBody.innerHTML;
+        
+        wrapper = document.createElement('div');
+        wrapper.id = 'cleanPanelsWrapper';
+        wrapper.className = 'p-6 space-y-6';
+        wrapper.innerHTML = `
+            <div id="panel-overview" class="space-y-6">
+                ${existingContent}
+            </div>
+            <div id="panel-coursework" class="hidden space-y-4">
+                <div id="courseworkTabContent"></div>
+            </div>
             <div id="panel-resources" class="hidden space-y-4"></div>
             <div id="panel-scratchpad" class="hidden space-y-4"></div>
         `;
-        modalContent.appendChild(panelsWrapper);
+        modalBody.innerHTML = '';
+        modalBody.appendChild(wrapper);
 
-        const ovPanel = document.getElementById('panel-overview');
-        if (metadataBox) ovPanel.appendChild(metadataBox);
-        if (editForm) ovPanel.appendChild(editForm);
-        if (pdfImportSection) ovPanel.appendChild(pdfImportSection);
-
-        const cwPanel = document.getElementById('panel-coursework');
-        const addAssignForm = document.getElementById('addAssignmentForm');
+        // Move add assignment form and list into coursework tab
+        const cwTab = document.getElementById('courseworkTabContent');
+        const addForm = document.getElementById('addAssignmentForm');
         const assignList = document.getElementById('assignmentList');
-        if (addAssignForm) cwPanel.appendChild(addAssignForm);
-        if (assignList) cwPanel.appendChild(assignList);
+        if (addForm) cwTab.appendChild(addForm);
+        if (assignList) cwTab.appendChild(assignList);
     }
 
+    // Populate Resources tab
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1148,6 +1148,7 @@ function renderCourseModalPanels(course) {
         `;
     }
 
+    // Populate Scratchpad tab
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
@@ -1172,7 +1173,7 @@ window.addResourceLink = async (courseId) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderCourseModalPanels(course);
+    setupCourseModalPanels(course);
 };
 
 window.removeResourceLink = async (courseId, idx) => {
@@ -1184,7 +1185,7 @@ window.removeResourceLink = async (courseId, idx) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderCourseModalPanels(course);
+    setupCourseModalPanels(course);
 };
 
 window.saveCourseScratchpad = async (courseId, val) => {
