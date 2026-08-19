@@ -33,10 +33,9 @@ function smartParseDate(dateStr) {
     return new Date(year, month, day).toISOString().split('T')[0];
 }
 
-// --- GLOBAL DATE FORMATTER ---
+// --- GLOBAL DATE FORMATTER & PARSER ---
 window.formatDate = (dateString) => {
     if (!dateString) return '';
-    // Handle standard YYYY-MM-DD inputs from DB
     const parts = dateString.split('T')[0].split('-');
     if (parts.length !== 3) return dateString;
     
@@ -51,6 +50,29 @@ window.formatDate = (dateString) => {
         return `${year}-${month}-${day}`;
     }
 };
+
+function parseInputDate(dateStr) {
+    if (!dateStr) return '';
+    dateStr = dateStr.trim();
+    const format = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    
+    let parts = dateStr.split(/[-/]/);
+    if (parts.length !== 3) return dateStr;
+    
+    let year, month, day;
+    if (format === 'MM-DD-YYYY') {
+        [month, day, year] = parts;
+    } else if (format === 'DD-MM-YYYY') {
+        [day, month, year] = parts;
+    } else {
+        [year, month, day] = parts;
+    }
+    
+    if (year && year.length === 2) year = '20' + year;
+    if (!year || !month || !day) return dateStr;
+    
+    return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
 
 // --- INJECT DATE FORMAT SETTING INTO APPEARANCE TAB ---
 window.injectDateFormatSettings = () => {
@@ -1201,7 +1223,8 @@ window.toggleAssignment = async (assignId, currentState, courseId) => {
 
 window.updateAssignmentDate = async (assignId, newDate, courseId) => {
     if(!newDate) return;
-    await supabaseClient.from('assignments').update({ due_date: newDate }).eq('id', assignId);
+    const parsedDate = parseInputDate(newDate);
+    await supabaseClient.from('assignments').update({ due_date: parsedDate }).eq('id', assignId);
     loadAssignments(courseId, currentAssignmentPage);
 };
 
@@ -1285,6 +1308,7 @@ async function loadAssignments(courseId, page = 1) {
     paginatedAssignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
+        const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
         
         let checkboxHtml = '';
         if (isSubItem) {
@@ -1308,7 +1332,7 @@ async function loadAssignments(courseId, page = 1) {
         if (!isSubItem && assign.unit_number) {
             subItemForm = `
                 <div class="mt-2 pl-8 flex gap-2">
-                    <input type="text" id="date-${assign.id}" value="${assign.due_date}" placeholder="YYYY-MM-DD" class="hidden">
+                    <input type="text" id="date-${assign.id}" value="${formattedDate}" placeholder="YYYY-MM-DD" class="hidden">
                     <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
                     <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
                 </div>`;
@@ -1321,7 +1345,7 @@ async function loadAssignments(courseId, page = 1) {
                         ${checkboxHtml}
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
-                            <input type="text" value="${assign.due_date}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono" title="Type date as YYYY-MM-DD">
+                            <input type="text" value="${formattedDate}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono" title="Type date matching your format preference">
                         </div>
                     </div>
                     <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
