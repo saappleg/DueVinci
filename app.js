@@ -410,7 +410,6 @@ window.parseSyllabusPDF = async () => {
             fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
-        // Send the text to your secure Supabase Edge Function
         const { data: responseData, error: functionError } = await supabaseClient.functions.invoke('gemini-parser', {
             body: { type: 'syllabus', text: fullText }
         });
@@ -418,7 +417,6 @@ window.parseSyllabusPDF = async () => {
         if (functionError) throw new Error(functionError.message);
 
         const rawResponse = responseData.result;
-        
         const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsedData = JSON.parse(cleanJson);
 
@@ -430,14 +428,21 @@ window.parseSyllabusPDF = async () => {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
         }
 
-        let addedCount = 0;
         let baseDate = new Date();
 
         if (parsedData.units && parsedData.units.length > 0) {
+            // Sort units chronologically by end date
+            parsedData.units.sort((a, b) => {
+                if (!a.dateStr || !b.dateStr) return 0;
+                return new Date(a.dateStr) - new Date(b.dateStr);
+            });
+
             for (let i = 0; i < parsedData.units.length; i++) {
                 let u = parsedData.units[i];
-                let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 7));
+                let targetDate = u.dateStr ? new Date(u.dateStr) : new Date(baseDate);
+                if (!u.dateStr) {
+                    targetDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                }
 
                 const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                     course_id: courseId, user_id: currentUser.id,
@@ -446,16 +451,17 @@ window.parseSyllabusPDF = async () => {
                     due_date: targetDate.toISOString().split('T')[0]
                 }]).select();
 
-                addedCount++;
-
                 if (insertedUnit && insertedUnit[0] && u.lessons) {
+                    let lessonNum = 1;
                     for (let lessonTitle of u.lessons) {
+                        let formattedTitle = lessonTitle.toLowerCase().startsWith('lesson') ? lessonTitle : `Lesson ${lessonNum}: ${lessonTitle}`;
+                        
                         await supabaseClient.from('assignments').insert([{
                             course_id: courseId, user_id: currentUser.id,
-                            title: `↳ ${lessonTitle}`,
+                            title: `↳ ${formattedTitle}`,
                             due_date: targetDate.toISOString().split('T')[0]
                         }]);
-                        addedCount++;
+                        lessonNum++;
                     }
                 }
             }
@@ -472,7 +478,9 @@ window.parseSyllabusPDF = async () => {
         statusMsg.textContent = "Error parsing file or contacting Edge Function.";
         statusMsg.className = "text-xs text-center mt-2 text-red-500";
     }
-};// --- 2. EDGE FUNCTION SCREENSHOT PARSER ---
+};
+
+// --- 2. EDGE FUNCTION SCREENSHOT PARSER ---
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
@@ -492,7 +500,6 @@ window.parseLessonsImage = async (inputElement) => {
         const mimeType = file.type;
 
         try {
-            // Send the image to your secure Supabase Edge Function
             const { data: responseData, error: functionError } = await supabaseClient.functions.invoke('gemini-parser', {
                 body: { type: 'screenshot', imageBase64: base64Image, mimeType: mimeType }
             });
@@ -500,18 +507,25 @@ window.parseLessonsImage = async (inputElement) => {
             if (functionError) throw new Error(functionError.message);
 
             const rawResponse = responseData.result;
-            
             const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsedData = JSON.parse(cleanJson);
 
             let baseDate = new Date();
 
             if (parsedData.units && parsedData.units.length > 0) {
+                // Sort units chronologically by end date
+                parsedData.units.sort((a, b) => {
+                    if (!a.dateStr || !b.dateStr) return 0;
+                    return new Date(a.dateStr) - new Date(b.dateStr);
+                });
+
                 for (let i = 0; i < parsedData.units.length; i++) {
                     let wk = parsedData.units[i];
                     
                     let targetDate = wk.dateStr ? new Date(wk.dateStr) : new Date(baseDate);
-                    if (!wk.dateStr) targetDate.setDate(baseDate.getDate() + (i * 7));
+                    if (!wk.dateStr) {
+                        targetDate.setDate(baseDate.getDate() + ((i + 1) * 7));
+                    }
 
                     const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                         course_id: courseId, user_id: currentUser.id,
@@ -521,12 +535,16 @@ window.parseLessonsImage = async (inputElement) => {
                     }]).select();
 
                     if (insertedUnit && insertedUnit[0] && wk.lessons) {
+                        let lessonNum = 1;
                         for (let l of wk.lessons) {
+                            let formattedTitle = l.toLowerCase().startsWith('lesson') ? l : `Lesson ${lessonNum}: ${l}`;
+                            
                             await supabaseClient.from('assignments').insert([{
                                 course_id: courseId, user_id: currentUser.id,
-                                title: `↳ ${l}`,
+                                title: `↳ ${formattedTitle}`,
                                 due_date: targetDate.toISOString().split('T')[0]
                             }]);
+                            lessonNum++;
                         }
                     }
                 }
