@@ -20,9 +20,11 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
+    <!-- Include Tesseract.js for visual screenshot OCR scanning -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=11" defer></script>
+    <script src="app.js?v=13" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -142,21 +144,24 @@
                         <div id="courseMetadataBox"></div>
                     </div>
 
-                    <!-- Import Box with Anti-Duplication Checkbox -->
+                    <!-- Import Sections with Isolated Syllabus Checkbox -->
                     <div class="border-t border-zinc-200 dark:border-brand-700 pt-4 space-y-4">
-                        <label class="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none font-medium">
-                            <input type="checkbox" id="skipAutoLessons" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                            Don't auto-load lessons and units from uploads (Metadata only)
-                        </label>
-
                         <div>
                             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
                             <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-2">
-                            <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata</button>
+                            
+                            <!-- Checkbox isolated specifically under Syllabus Upload -->
+                            <label class="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none font-medium mb-2">
+                                <input type="checkbox" id="skipSyllabusLessons" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                Don't auto-load lessons/units from this syllabus (Metadata only)
+                            </label>
+
+                            <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata & Objectives</button>
                         </div>
 
                         <div>
                             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📸 Import Lessons Screenshot</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Upload a screenshot of your course breakdown page to scan exact week numbers & dates.</p>
                             <input type="file" id="lessonImageFile" accept="image/*" onchange="parseLessonsImage(this)" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer">
                         </div>
 
