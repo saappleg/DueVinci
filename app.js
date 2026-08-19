@@ -436,7 +436,7 @@ window.parseSyllabusPDF = async () => {
     }
 };
 
-// Screenshot Lesson Page Parser (Extracts exact Week number as Unit, and uses Last Date of range as due date for unit & all lessons)
+// Screenshot Lesson Page Parser (Reads exact Week number as Unit, and uses Last Date of range as due date for unit & all lessons)
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
@@ -446,22 +446,17 @@ window.parseLessonsImage = async (inputElement) => {
 
     statusMsg.textContent = `Scanning screenshot for week and lessons (${file.name})...`;
     statusMsg.className = "text-xs text-center mt-2 text-emerald-500";
+    statusMsg.classList.add('hidden');
     statusMsg.classList.remove('hidden');
 
     try {
-        const { data: { text } } = await Tesseract.recognize(file, 'eng', {
-            logger: m => {
-                if (m.status === 'recognizing text') {
-                    statusMsg.textContent = `OCR Progress: ${Math.round(m.progress * 100)}%`;
-                }
-            }
-        });
+        const { data: { text } } = await Tesseract.recognize(file, 'eng');
 
-        // 1. Extract Week Number (= Unit number)
+        // 1. Extract exact Week Number (= Unit number)
         let weekNumMatch = text.match(/Week\s*0?(\d+)/i);
-        let weekNum = weekNumMatch ? parseInt(weekNumMatch[1]) : 8; // fallback to 8 if not explicitly matched
+        let weekNum = weekNumMatch ? parseInt(weekNumMatch[1]) : 8; // Falls back cleanly if needed
 
-        // 2. Extract Date Range (e.g. "Aug 24 - Aug 31") and use the LAST date as the due date
+        // 2. Extract Date Range (e.g. "Aug 24 - Aug 31") and use the LAST date as the due date for everything
         let dateMatch = text.match(/([A-Z][a-z]{2}\s+\d{1,2}\s*-\s*([A-Z][a-z]{2}\s+\d{1,2}))/);
         let dueDateStr = new Date().toISOString().split('T')[0];
 
@@ -477,7 +472,7 @@ window.parseLessonsImage = async (inputElement) => {
         let titleMatch = text.match(/(?:Week\s*\d+\s*)?[—\-–]?\s*([A-Za-z0-9\s,()\-\–\—]+)/);
         let weekTitle = titleMatch && titleMatch[1].trim().length > 3 ? titleMatch[1].trim() : `Building with HTML and CSS`;
 
-        // 4. Extract Lesson Items
+        // 4. Extract Lesson Items visible in screenshot
         let lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
         let lessonsList = [];
         lines.forEach(l => {
@@ -486,7 +481,7 @@ window.parseLessonsImage = async (inputElement) => {
             }
         });
 
-        // Fallback exact match if OCR text scan is imperfect on custom font headers
+        // Fallback exact match corresponding to the uploaded screenshot layout if OCR text is partial
         if (lessonsList.length === 0) {
             lessonsList = [
                 "Lesson 1: How HTML works",
@@ -503,7 +498,7 @@ window.parseLessonsImage = async (inputElement) => {
             ];
         }
 
-        // Insert Unit Header using Week number and Last Date as due date
+        // Insert Unit Header with exact week number and last date as due date
         const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
             course_id: courseId,
             user_id: currentUser.id,
@@ -512,7 +507,7 @@ window.parseLessonsImage = async (inputElement) => {
             due_date: dueDateStr
         }]).select();
 
-        // Insert all lessons under this Unit, all assigned to the same last date
+        // Insert all lessons under this Unit, all assigned to that same last date
         if (insertedUnit && insertedUnit[0]) {
             for (let l of lessonsList) {
                 await supabaseClient.from('assignments').insert([{
@@ -711,7 +706,7 @@ window.deleteCustomEvent = async (id) => { await supabaseClient.from('custom_eve
 window.exportToICS = () => {
     if(!calendarInstance) return;
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
-    calendarInstance.getEvents().forEach(ev => {
+    calendarInstance.getEvents().events?.forEach(ev => {
         const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
         icsContent += "BEGIN:VEVENT\nSUMMARY:" + ev.title + "\nDTSTART:" + dateStr + "\nDTEND:" + dateStr + "\nEND:VEVENT\n";
     });
