@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & SMART PDF SYLLABUS SCANNER LOGIC ---
+// --- COURSES PAGE & ADVANCED SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -322,7 +322,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Intelligent 6-Month Term & Unit Syllabus Parser Engine
+// Robust Unit & Weekly Syllabus Parser
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -336,7 +336,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Scanning syllabus contents...";
+    statusMsg.textContent = "Analyzing syllabus structure...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -349,42 +349,52 @@ window.parseSyllabusPDF = async () => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
+            // Retain spacing chunks better
             fullText += textContent.items.map(item => item.str).join(" ") + "\n";
         }
 
-        // Filter out footer metadata like "Downloaded on..."
-        const cleanLines = fullText.split(/(?:\r\n|\r|\n)/).filter(l => !l.includes("Downloaded on") && l.trim().length > 3);
+        // Clean up footer metadata
+        const lines = fullText.split(/(?:\r\n|\r|\n)/).map(l => l.trim()).filter(l => l.length > 3 && !l.includes("Downloaded on"));
         let addedCount = 0;
+        let baseDate = new Date();
 
-        // Check if syllabus uses "Unit X" format rather than standard calendar dates
-        const unitRegex = /Unit\s+(\d+)[\s\-:]+([^\n]+)/gi;
+        // Regex patterns to capture "Unit 1", "Unit 2- Building...", "Module 1", or "Week 1"
+        const structuralRegex = /(?:Unit|Module|Week)\s*[-–—:]*\s*(\d+)[^\w\n]*([^\n]*)/gi;
         let match;
-        let unitsFound = [];
+        let extractedUnits = [];
 
-        while ((match = unitRegex.exec(cleanLines.join("\n"))) !== null) {
-            unitsFound.push({ unitNum: parseInt(match[1]), title: match[2].trim().substring(0, 50) });
+        for (let line of lines) {
+            while ((match = structuralRegex.exec(line)) !== null) {
+                let uNum = parseInt(match[1]);
+                let uTitle = match[2] ? match[2].trim().replace(/^[:\-\–\—\s]+/, "").substring(0, 50) : `Unit ${uNum}`;
+                if (uTitle.length < 3) uTitle = `Unit ${uNum} Milestone`;
+                
+                // Avoid duplicates if matched multiple times in a stream
+                if (!extractedUnits.some(e => e.unitNum === uNum)) {
+                    extractedUnits.push({ unitNum: uNum, title: uTitle });
+                }
+            }
         }
 
-        if (unitsFound.length > 0) {
-            // Term-based pacing: spread units across a 6-month term (approx every 2 weeks per unit)
-            let baseDate = new Date();
-            for (let i = 0; i < unitsFound.length; i++) {
-                let u = unitsFound[i];
-                let dueDate = new Date(baseDate);
-                dueDate.setDate(baseDate.getDate() + (i * 14)); // spaced 2 weeks apart
+        if (extractedUnits.length > 0) {
+            // Map units across a relative 6-month term timeline (spaced 2 weeks apart per unit)
+            for (let i = 0; i < extractedUnits.length; i++) {
+                let eu = extractedUnits[i];
+                let targetDate = new Date(baseDate);
+                targetDate.setDate(baseDate.getDate() + (i * 14));
 
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
                     user_id: currentUser.id,
-                    title: `Unit ${u.unitNum}: ${u.title}`,
-                    unit_number: u.unitNum,
-                    due_date: dueDate.toISOString().split('T')[0]
+                    title: `Unit ${eu.unitNum}: ${eu.title}`,
+                    unit_number: eu.unitNum,
+                    due_date: targetDate.toISOString().split('T')[0]
                 }]);
                 addedCount++;
             }
         } else {
-            // Fallback: regular date scanning if explicit units aren't structured cleanly
-            for (let line of cleanLines) {
+            // Fallback for standard date matching
+            for (let line of lines) {
                 const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}|\b\d{1,2}\/\d{1,2}/i);
                 if (dateMatch) {
                     let parsedDate = new Date(dateMatch[0] + " " + new Date().getFullYear());
@@ -405,11 +415,11 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} units/deadlines for your 6-month term!`;
+            statusMsg.textContent = `Successfully extracted ${addedCount} units/modules for your term!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not automatically detect units or dates. Add them manually below.";
+            statusMsg.textContent = "Could not find standard units or dates. You can add items manually.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
