@@ -1,29 +1,36 @@
 # DueVinci 📚
 
-DueVinci is a modern, modular student planner web application designed to help students manage courses, track assignments, map 6-month term units, and stay focused with an integrated Pomodoro timer.
+DueVinci is a comprehensive, student-focused academic workspace and planner. Built to replace fragmented productivity apps, it combines coursework tracking, GPA calculation, an integrated Pomodoro timer, and AI-powered syllabus parsing into a single, cohesive dashboard.
 
----
+## ✨ Features
 
-## ✨ Key Features
-
-- **Modular Architecture**: Clean multi-page layout separating the Dashboard, Class Management, and Schedule.
-- **Secure Authentication**: Email/Password authentication powered by Supabase Auth with RLS database protection.
-- **Intelligent Syllabus PDF Parser**: Upload course syllabus PDFs using built-in PDF.js to automatically extract units and milestones.
-- **Pomodoro Focus Timer**: Fully functional focus/break timer with custom duration controls and a collapsible sidebar widget.
-- **Interactive Calendar**: Sync and visualize assignments and custom events with FullCalendar, complete with `.ics` export capability.
-- **Customization & Themes**: Class color-coding, custom emoji icons, celebratory confetti on task completion, and a dynamic theme switcher.
-
----
+*   **AI-Powered Syllabus & Schedule Import:** Upload a course syllabus (PDF) or a screenshot of your lessons. DueVinci utilizes Google's Gemini API via a secure Supabase Edge Function to extract course descriptions, objectives, and automatically map out weekly units and due dates.
+*   **Smart Course Management:** Organize classes into custom term folders with intuitive drag-and-drop functionality. Track individual assignments, exams, and reviews.
+*   **Real-Time Academic Grade Tracker:** Input grades for completed coursework to see real-time course averages and cumulative GPA calculations on a customizable 4.0 or 5.0 scale.
+*   **Integrated Pomodoro Timer:** Keep your study sessions on track with a built-in focus and break timer, featuring a floating widget mode and Web Audio API alerts.
+*   **Interactive Calendar:** Visual schedule utilizing FullCalendar with support for course deadlines, custom user events, and `.ics` schedule exporting.
+*   **Highly Customizable:** Features full dark/light mode support, adjustable date formats, modular layout toggles, and personalized course color tags and emojis.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: HTML5, Tailwind CSS (via CDN)
-- **Scripting**: Vanilla JavaScript (ES6+)
-- **Backend & Database**: Supabase (PostgreSQL, Auth)
-- **Libraries**: FullCalendar, PDF.js, Canvas Confetti
+**Frontend:**
+*   HTML5 & Vanilla JavaScript
+*   Tailwind CSS (via CDN for rapid prototyping and dark mode support)
+*   [FullCalendar](https://fullcalendar.io/) (Schedule visualization)
+*   [PDF.js](https://mozilla.github.io/pdf.js/) (Client-side PDF text extraction)
+*   Canvas Confetti (Micro-interactions and completion rewards)
 
----
+**Backend & APIs:**
+*   [Supabase](https://supabase.com/): PostgreSQL Database and User Authentication
+*   **Supabase Edge Functions:** Serverless Deno functions handling secure API requests
+*   **Google Gemini API:** AI processing for intelligent document and image parsing (`gemini-1.5-flash`)
 
+## 🚀 Setup & Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/yourusername/duevinci.git](https://github.com/yourusername/duevinci.git)
+   cd duevinci
 ## 📂 Project Structure
 
 ```text
