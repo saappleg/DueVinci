@@ -228,7 +228,7 @@ async function loadDashboardStats() {
         upNextListEl.innerHTML = '';
         const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming assignments. You\'re all caught up!</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming coursework. You\'re all caught up!</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
@@ -240,7 +240,7 @@ async function loadDashboardStats() {
                         <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div>
                             <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Due: ${dateStr}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${dateStr}</p>
                         </div>
                     </div>`;
             });
@@ -250,7 +250,7 @@ async function loadDashboardStats() {
     const goalsListEl = document.getElementById('goalsList');
     if (goalsListEl) {
         goalsListEl.innerHTML = '';
-        if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking your progress.</p>';
+        if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking your term progress.</p>';
         else {
             courses.forEach(course => {
                 const cAssign = assignments.filter(a => a.course_id === course.id);
@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & ADVANCED SYLLABUS SCANNER LOGIC ---
+// --- COURSES PAGE & UNIVERSAL SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -281,7 +281,7 @@ async function loadCoursesPage() {
             <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex flex-col justify-between ${opacity} min-h-[100px]">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
-                    <div><h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">View assignments &rarr;</p></div>
+                    <div><h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">View coursework &rarr;</p></div>
                 </div>
                 <div class="mt-3 flex justify-end">${checkIcon}</div>
             </div>`;
@@ -322,7 +322,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Robust Unit & Weekly Syllabus Parser
+// Universal Syllabus Parser: Supports Date-based, Weekly Unit-based, and 6-Month Term windows
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -336,7 +336,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Analyzing syllabus structure...";
+    statusMsg.textContent = "Analyzing syllabus format...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -349,27 +349,23 @@ window.parseSyllabusPDF = async () => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            // Retain spacing chunks better
             fullText += textContent.items.map(item => item.str).join(" ") + "\n";
         }
 
-        // Clean up footer metadata
         const lines = fullText.split(/(?:\r\n|\r|\n)/).map(l => l.trim()).filter(l => l.length > 3 && !l.includes("Downloaded on"));
         let addedCount = 0;
         let baseDate = new Date();
 
-        // Regex patterns to capture "Unit 1", "Unit 2- Building...", "Module 1", or "Week 1"
-        const structuralRegex = /(?:Unit|Module|Week)\s*[-–—:]*\s*(\d+)[^\w\n]*([^\n]*)/gi;
+        // Check for Unit / Module / Week structures (ideal for 6-month term & weekly models)
+        const unitRegex = /(?:Unit|Module|Week)\s*[-–—:]*\s*(\d+)[^\w\n]*([^\n]*)/gi;
         let match;
         let extractedUnits = [];
 
         for (let line of lines) {
-            while ((match = structuralRegex.exec(line)) !== null) {
+            while ((match = unitRegex.exec(line)) !== null) {
                 let uNum = parseInt(match[1]);
                 let uTitle = match[2] ? match[2].trim().replace(/^[:\-\–\—\s]+/, "").substring(0, 50) : `Unit ${uNum}`;
-                if (uTitle.length < 3) uTitle = `Unit ${uNum} Milestone`;
-                
-                // Avoid duplicates if matched multiple times in a stream
+                if (uTitle.length < 3) uTitle = `Unit ${uNum} Requirements`;
                 if (!extractedUnits.some(e => e.unitNum === uNum)) {
                     extractedUnits.push({ unitNum: uNum, title: uTitle });
                 }
@@ -377,11 +373,11 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (extractedUnits.length > 0) {
-            // Map units across a relative 6-month term timeline (spaced 2 weeks apart per unit)
+            // For 6-month term or weekly courses, spread units logically across a balanced term schedule
             for (let i = 0; i < extractedUnits.length; i++) {
                 let eu = extractedUnits[i];
                 let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 14));
+                targetDate.setDate(baseDate.getDate() + (i * 12)); // Spacing units across term pacing
 
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
@@ -393,7 +389,7 @@ window.parseSyllabusPDF = async () => {
                 addedCount++;
             }
         } else {
-            // Fallback for standard date matching
+            // Fallback for standard date-based courses
             for (let line of lines) {
                 const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}|\b\d{1,2}\/\d{1,2}/i);
                 if (dateMatch) {
@@ -415,11 +411,11 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully extracted ${addedCount} units/modules for your term!`;
+            statusMsg.textContent = `Successfully imported ${addedCount} coursework milestones!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not find standard units or dates. You can add items manually.";
+            statusMsg.textContent = "No standard structure detected. You can add requirements manually.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
@@ -443,7 +439,7 @@ if (eForm) {
 }
 
 window.deleteCurrentCourse = async () => {
-    if (confirm('Delete this course and ALL its assignments?')) {
+    if (confirm('Delete this course and ALL its coursework?')) {
         await supabaseClient.from('courses').delete().eq('id', document.getElementById('editCourseId').value);
         closeCourseModal(); loadCoursesPage();
     }
@@ -466,7 +462,7 @@ async function loadAssignments(courseId) {
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId).order('due_date', { ascending: true });
     const listEl = document.getElementById('assignmentList');
     listEl.innerHTML = '';
-    if (!assignments || !assignments.length) { listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No assignments yet.</p></div>'; return; }
+    if (!assignments || !assignments.length) { listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>'; return; }
 
     assignments.forEach(assign => {
         const dateStr = new Date(assign.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
