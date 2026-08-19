@@ -274,7 +274,7 @@ async function loadDashboardStats() {
                 
                 upNextListEl.innerHTML += `
                     <div class="flex items-center gap-3 p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700">
-                        <button onclick="toggleAssignment('${assign.id}', false, null, ${assign.unit_number || 'null'})" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div>
                             <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
                             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${dateStr}</p>
@@ -357,7 +357,6 @@ window.openCourseModal = (courseId) => {
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
     
-    // Populate description and objectives in edit form inputs if present
     const descInput = document.getElementById('editCourseDescription');
     if (descInput) descInput.value = course.description || '';
     const objInput = document.getElementById('editCourseObjectives');
@@ -442,7 +441,6 @@ window.parseSyllabusPDF = async () => {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
         }
 
-        // Check if metadata-only checkbox is ticked
         const metadataOnlyEl = document.getElementById('syllabusMetadataOnly');
         const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
 
@@ -451,7 +449,7 @@ window.parseSyllabusPDF = async () => {
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             openCourseModal(courseId);
             loadCoursesPage();
-            return; // Skip parsing/inserting units and lessons entirely
+            return;
         }
 
         let baseDate = new Date();
@@ -620,20 +618,11 @@ window.toggleCourseComplete = async (courseId, currentState) => {
     loadCoursesPage();
 };
 
-window.toggleAssignment = async (assignId, currentState, courseId, unitNumber) => {
+window.toggleAssignment = async (assignId, currentState, courseId) => {
     const newState = !currentState;
     
+    // Toggle only the clicked assignment independently
     await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
-    
-    if (unitNumber) {
-        const { data: allAssignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
-        if (allAssignments) {
-            const childLessons = allAssignments.filter(a => a.unit_number === unitNumber && a.title.startsWith('↳'));
-            for (let child of childLessons) {
-                await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', child.id);
-            }
-        }
-    }
 
     if (newState) fireConfetti();
     
@@ -677,10 +666,24 @@ async function loadAssignments(courseId) {
         return;
     }
     
-    // Strict numeric and chronological sorting
+    // Robust helpers for strict numerical sorting
+    const getUnitNum = (item) => {
+        if (item.unit_number) return parseInt(item.unit_number) || 0;
+        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        return 0;
+    };
+
+    const getLessonNum = (item) => {
+        const match = item.title.match(/lesson\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        const numMatch = item.title.replace(/[^0-9]/g, '');
+        return numMatch ? parseInt(numMatch) : 999;
+    };
+
     assignments.sort((a, b) => {
-        let unitA = a.unit_number || 0;
-        let unitB = b.unit_number || 0;
+        let unitA = getUnitNum(a);
+        let unitB = getUnitNum(b);
         if (unitA !== unitB) return unitA - unitB;
         
         let isSubA = a.title.startsWith('↳');
@@ -690,9 +693,9 @@ async function loadAssignments(courseId) {
         if (isSubA && !isSubB) return 1;
         
         if (isSubA && isSubB) {
-            let numA = parseInt(a.title.replace(/[^0-9]/g, '')) || 0;
-            let numB = parseInt(b.title.replace(/[^0-9]/g, '')) || 0;
-            if (numA !== numB) return numA - numB;
+            let lessonA = getLessonNum(a);
+            let lessonB = getLessonNum(b);
+            if (lessonA !== lessonB) return lessonA - lessonB;
         }
         
         return new Date(a.due_date) - new Date(b.due_date);
@@ -702,7 +705,24 @@ async function loadAssignments(courseId) {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
         
-        const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
+        let checkboxHtml = '';
+        if (isSubItem) {
+            // Sub-lessons get interactive checkboxes
+            const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
+            checkboxHtml = `<button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
+        } else {
+            // Unit headers have NO checkbox. Automatic completion status based on child lessons.
+            const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && a.title.startsWith('↳'));
+            const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
+            const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
+            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}" title="Automatically completed when all unit lessons are done"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+            
+            if (assign.is_completed !== allDone) {
+                supabaseClient.from('assignments').update({ is_completed: allDone }).eq('id', assign.id);
+                assign.is_completed = allDone;
+            }
+        }
+
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
         
         let subItemForm = '';
@@ -719,7 +739,7 @@ async function loadAssignments(courseId) {
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                        <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}', ${assign.unit_number || 'null'})" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        ${checkboxHtml}
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
                             <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
