@@ -317,11 +317,10 @@ window.openCourseModal = (courseId) => {
     }
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
-    document.getElementById('courseModal').classList.add('hidden'); // wait, keep modal open!
     document.getElementById('courseModal').classList.remove('hidden');
     loadAssignments(course.id);
 };
-window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
+window.closeCourseModal = () => document.getElementById('courseModal'].classList.add('hidden');
 
 // Weekly Unit Syllabus Parser (Maps Unit blocks and allows date customization per week)
 window.parseSyllabusPDF = async () => {
@@ -332,7 +331,6 @@ window.parseSyllabusPDF = async () => {
     if (!fileInput.files || fileInput.files.length === 0) {
         statusMsg.textContent = "Please select a PDF file first.";
         statusMsg.className = "text-xs text-center mt-2 text-red-500";
-        statusMsg.classList.add('hidden'); // ensure visibility logic is clean
         statusMsg.classList.remove('hidden');
         return;
     }
@@ -358,7 +356,6 @@ window.parseSyllabusPDF = async () => {
         let baseDate = new Date();
         let extractedUnits = [];
 
-        // Catch structural headings like "Unit 1", "Unit 2", etc.
         const unitPattern = /Unit\s+(\d+)\s*[-–—:]*\s*([A-Za-z0-9\s,\/\-]+?)(?=\s+Unit\s+\d+|\s+Review|\s+Text|\s+Grading|$)/gi;
         let match;
         let foundUnits = new Set();
@@ -389,7 +386,7 @@ window.parseSyllabusPDF = async () => {
             for (let i = 0; i < extractedUnits.length; i++) {
                 let eu = extractedUnits[i];
                 let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 7)); // 1 week per unit
+                targetDate.setDate(baseDate.getDate() + (i * 7));
 
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
@@ -403,11 +400,11 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} weekly units! You can edit individual target dates below.`;
+            statusMsg.textContent = `Successfully imported ${addedCount} weekly units! You can edit target dates or add lessons below.`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not parse units automatically. Add your weekly coursework items manually below.";
+            statusMsg.textContent = "Could not parse units automatically. Add your weekly items manually below.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
@@ -450,10 +447,25 @@ window.toggleAssignment = async (assignId, currentState, courseId) => {
     else if (courseId) loadAssignments(courseId);
 };
 
-// Allows updating individual assignment target dates directly from the modal list
 window.updateAssignmentDate = async (assignId, newDate, courseId) => {
     if(!newDate) return;
     await supabaseClient.from('assignments').update({ due_date: newDate }).eq('id', assignId);
+    loadAssignments(courseId);
+};
+
+// Sub-item (Lesson) Management
+window.addSubItem = async (parentId, courseId) => {
+    const inputEl = document.getElementById(`subInput-${parentId}`);
+    const title = inputEl ? inputEl.value.trim() : "";
+    if(!title) return;
+
+    // We can store lessons using a naming convention or a sub-title format linked to the parent unit
+    await supabaseClient.from('assignments').insert([{ 
+        course_id: courseId, 
+        user_id: currentUser.id, 
+        title: `↳ ${title}`, 
+        due_date: document.getElementById(`date-${parentId}`).value || new Date().toISOString().split('T')[0]
+    }]);
     loadAssignments(courseId);
 };
 
@@ -464,20 +476,34 @@ async function loadAssignments(courseId) {
     if (!assignments || !assignments.length) { listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>'; return; }
 
     assignments.forEach(assign => {
+        const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
         const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
         
+        let subItemForm = '';
+        if (!isSubItem && assign.unit_number) {
+            subItemForm = `
+                <div class="mt-2 pl-8 flex gap-2">
+                    <input type="date" id="date-${assign.id}" value="${assign.due_date}" class="hidden">
+                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson (e.g. Lesson 1: Welcome)" class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
+                </div>`;
+        }
+
         listEl.innerHTML += `
-            <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm gap-2">
-                <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
-                    <div class="flex flex-col min-w-0 flex-1">
-                        <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
-                        <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        <div class="flex flex-col min-w-0 flex-1">
+                            <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
+                            <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
+                        </div>
                     </div>
+                    <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
                 </div>
-                <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
+                ${subItemForm}
             </div>`;
     });
 }
