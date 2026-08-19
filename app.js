@@ -49,7 +49,9 @@ function fireConfetti() {
 
 // --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
-let timeLeft = 25 * 60; 
+let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
+let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
+let timeLeft = focusMinutes * 60; 
 let isWorking = true; 
 
 function updateTimerDisplay() {
@@ -61,7 +63,7 @@ function updateTimerDisplay() {
     if(display) display.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     
     if(circle) {
-        const total = isWorking ? (25 * 60) : (5 * 60);
+        const total = isWorking ? (focusMinutes * 60) : (breakMinutes * 60);
         const percent = ((total - timeLeft) / total) * 301.59; 
         circle.style.strokeDashoffset = percent;
     }
@@ -87,14 +89,14 @@ window.toggleTimer = () => {
 };
 
 window.resetTimer = () => {
-    timeLeft = isWorking ? (25 * 60) : (5 * 60);
+    timeLeft = isWorking ? (focusMinutes * 60) : (breakMinutes * 60);
     updateTimerDisplay();
 };
 
 window.skipTimer = () => {
     isWorking = !isWorking;
     document.getElementById('timerLabel').innerText = isWorking ? "Focus" : "Break";
-    timeLeft = isWorking ? (25 * 60) : (5 * 60);
+    timeLeft = isWorking ? (focusMinutes * 60) : (breakMinutes * 60);
     updateTimerDisplay();
     if(timerInterval) {
         clearInterval(timerInterval);
@@ -102,6 +104,97 @@ window.skipTimer = () => {
         window.toggleTimer();
     }
 };
+
+window.toggleTimerSettings = () => {
+    const form = document.getElementById('timerSettingsForm');
+    document.getElementById('focusMinInput').value = focusMinutes;
+    document.getElementById('breakMinInput').value = breakMinutes;
+    form.classList.toggle('hidden');
+};
+
+window.saveTimerSettings = () => {
+    focusMinutes = parseInt(document.getElementById('focusMinInput').value) || 25;
+    breakMinutes = parseInt(document.getElementById('breakMinInput').value) || 5;
+    localStorage.setItem('focusMinutes', focusMinutes);
+    localStorage.setItem('breakMinutes', breakMinutes);
+    document.getElementById('timerSettingsForm').classList.add('hidden');
+    resetTimer(); // Apply new times immediately
+};
+
+// Handle Timer Collapse UI
+let timerCollapsed = localStorage.getItem('timerCollapsed') === 'true';
+
+function applyTimerCollapse() {
+    const content = document.getElementById('timerContent');
+    const icon = document.getElementById('timerCollapseIcon');
+    if (!content || !icon) return;
+    if(timerCollapsed) {
+        content.classList.add('hidden');
+        icon.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>`; // Down arrow
+    } else {
+        content.classList.remove('hidden');
+        icon.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>`; // Up arrow
+    }
+}
+
+window.toggleTimerCollapse = () => {
+    timerCollapsed = !timerCollapsed;
+    localStorage.setItem('timerCollapsed', timerCollapsed);
+    applyTimerCollapse();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    applyTimerCollapse();
+    updateTimerDisplay();
+});
+
+
+// --- SETTINGS MODAL & PROFILE LOGIC ---
+window.openSettingsModal = () => {
+    if(currentUser) {
+        document.getElementById('profileEmail').value = currentUser.email;
+    }
+    document.getElementById('settingsModal').classList.remove('hidden');
+};
+
+window.closeSettingsModal = () => {
+    document.getElementById('settingsModal').classList.add('hidden');
+    document.getElementById('settingsMsg').classList.add('hidden');
+};
+
+const settingsForm = document.getElementById('settingsForm');
+if(settingsForm) {
+    settingsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('profileEmail').value;
+        const password = document.getElementById('profilePassword').value;
+        const msgEl = document.getElementById('settingsMsg');
+        
+        let updates = {};
+        if(email && email !== currentUser.email) updates.email = email;
+        if(password) updates.password = password;
+        
+        if(Object.keys(updates).length === 0) {
+            msgEl.textContent = "No changes made.";
+            msgEl.className = "text-xs text-center mt-2 text-zinc-500";
+            msgEl.classList.remove('hidden');
+            return;
+        }
+
+        const { data, error } = await supabaseClient.auth.updateUser(updates);
+        
+        if (error) {
+            msgEl.textContent = error.message;
+            msgEl.className = "text-xs text-center mt-2 text-red-500";
+        } else {
+            msgEl.textContent = "Profile updated successfully!";
+            msgEl.className = "text-xs text-center mt-2 text-green-500";
+            document.getElementById('profilePassword').value = '';
+        }
+        msgEl.classList.remove('hidden');
+    });
+}
+
 
 // --- AUTH & ROUTING LOGIC ---
 async function checkUser() {
@@ -123,7 +216,12 @@ function handleAuth(session) {
 
         if (isIndex && document.getElementById('dashboardGrid')) loadDashboardStats();
         if (isCourses && document.getElementById('coursesGrid')) loadCoursesPage();
-        if (isCalendar && document.getElementById('calendar')) loadCalendarCourses();
+        
+        // This explicitly fixes the calendar loading bug:
+        if (isCalendar && document.getElementById('calendar')) {
+            initCalendar();
+            loadCalendarCourses();
+        }
 
     } else {
         currentUser = null;
@@ -168,14 +266,13 @@ window.logout = async () => {
     window.location.href = 'index.html'; 
 };
 
-// --- DASHBOARD (index.html) LOGIC ---
+// --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*').order('due_date', { ascending: true });
 
     if (!courses || !assignments) return;
 
-    // Populating Up Next
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
         upNextListEl.innerHTML = '';
@@ -205,7 +302,6 @@ async function loadDashboardStats() {
         }
     }
 
-    // Populating Goals
     const goalsListEl = document.getElementById('goalsList');
     if (goalsListEl) {
         goalsListEl.innerHTML = '';
@@ -239,7 +335,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE (courses.html) LOGIC ---
+// --- COURSES PAGE LOGIC ---
 async function loadCoursesPage() {
     const { data: courses, error } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     if (error) return console.error('Error loading courses:', error);
@@ -291,7 +387,7 @@ if (courseForm) {
     });
 }
 
-// --- COURSE MODAL & COMPLETION LOGIC ---
+// --- COURSE MODAL LOGIC ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -302,10 +398,11 @@ window.openCourseModal = (courseId) => {
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
 
+    // Fix for toggling completion specifically:
     const completeBtn = document.getElementById('markCourseCompleteBtn');
     if (completeBtn) {
         completeBtn.onclick = () => toggleCourseComplete(course.id, course.is_completed);
-        completeBtn.innerText = course.is_completed ? "Undo Completion" : "✔ Mark Complete";
+        completeBtn.innerText = course.is_completed ? "↺ Undo Completion" : "✔ Mark Complete";
         completeBtn.className = course.is_completed 
             ? "text-xs bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-brand-700 dark:text-zinc-400 px-3 py-1.5 rounded font-bold transition"
             : "text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition";
@@ -349,9 +446,9 @@ window.deleteCurrentCourse = async () => {
 
 window.toggleCourseComplete = async (courseId, currentState) => {
     await supabaseClient.from('courses').update({ is_completed: !currentState }).eq('id', courseId);
-    if (!currentState) fireConfetti(); // Confetti on completion!
+    if (!currentState) fireConfetti(); 
     closeCourseModal();
-    loadCoursesPage();
+    loadCoursesPage(); // Reload the UI so the checkmark renders!
 };
 
 window.toggleAssignment = async (assignId, currentState, courseId) => {
@@ -465,7 +562,7 @@ async function loadCalendarCourses() {
         calendarEvents.push({
             title: `${course.emoji || '📚'} ${assign.title}`,
             start: assign.due_date,
-            color: assign.is_completed ? '#9ca3af' : course.color // Grey out on calendar if done
+            color: assign.is_completed ? '#9ca3af' : course.color 
         });
     });
 
