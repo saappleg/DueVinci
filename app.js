@@ -11,7 +11,7 @@ let localCourses = [];
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
-    if (themeValue === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (themeValue === 'dark' || (themeValue === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
@@ -228,7 +228,7 @@ async function loadDashboardStats() {
         upNextListEl.innerHTML = '';
         const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming coursework. You\'re all caught up!</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming weekly items. You\'re all caught up!</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
@@ -250,7 +250,7 @@ async function loadDashboardStats() {
     const goalsListEl = document.getElementById('goalsList');
     if (goalsListEl) {
         goalsListEl.innerHTML = '';
-        if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking your term progress.</p>';
+        if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking weekly progress.</p>';
         else {
             courses.forEach(course => {
                 const cAssign = assignments.filter(a => a.course_id === course.id);
@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & ADVANCED SYLLABUS SCANNER LOGIC ---
+// --- COURSES PAGE & WEEKLY SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -281,7 +281,7 @@ async function loadCoursesPage() {
             <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex flex-col justify-between ${opacity} min-h-[100px]">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
-                    <div><h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">View coursework &rarr;</p></div>
+                    <div><h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">View weekly coursework &rarr;</p></div>
                 </div>
                 <div class="mt-3 flex justify-end">${checkIcon}</div>
             </div>`;
@@ -317,12 +317,13 @@ window.openCourseModal = (courseId) => {
     }
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
+    document.getElementById('courseModal').classList.add('hidden'); // wait, keep modal open!
     document.getElementById('courseModal').classList.remove('hidden');
     loadAssignments(course.id);
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Universal Robust Syllabus Parser (Handles Unit-based, Weekly, Term-based, and Date-based structures)
+// Weekly Unit Syllabus Parser (Maps Unit blocks and allows date customization per week)
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -331,12 +332,13 @@ window.parseSyllabusPDF = async () => {
     if (!fileInput.files || fileInput.files.length === 0) {
         statusMsg.textContent = "Please select a PDF file first.";
         statusMsg.className = "text-xs text-center mt-2 text-red-500";
+        statusMsg.classList.add('hidden'); // ensure visibility logic is clean
         statusMsg.classList.remove('hidden');
         return;
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Scanning syllabus units & milestones...";
+    statusMsg.textContent = "Parsing weekly units & lessons...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -349,45 +351,45 @@ window.parseSyllabusPDF = async () => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            // Preserve spacing tokens to catch fragmented unit headings
-            fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+            fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
-        const lines = fullText.split(/(?:\r\n|\r|\n)/).map(l => l.trim()).filter(l => l.length > 2 && !l.includes("Downloaded on"));
         let addedCount = 0;
         let baseDate = new Date();
         let extractedUnits = [];
 
-        // Multi-pass scanner for Unit / Module / Week headings regardless of line wrapping splits
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            let unitMatch = line.match(/(?:Unit|Module|Week)\s*(\d+)/i);
-            if (unitMatch) {
-                let uNum = parseInt(unitMatch[1]);
-                let titleDesc = "";
-                
-                // Look ahead 1-2 lines to gather the topic description if separated by layout spacing
-                if (lines[i + 1] && lines[i + 1].length > 3) titleDesc = lines[i + 1];
-                else if (lines[i + 2] && lines[i + 2].length > 3) titleDesc = lines[i + 2];
+        // Catch structural headings like "Unit 1", "Unit 2", etc.
+        const unitPattern = /Unit\s+(\d+)\s*[-–—:]*\s*([A-Za-z0-9\s,\/\-]+?)(?=\s+Unit\s+\d+|\s+Review|\s+Text|\s+Grading|$)/gi;
+        let match;
+        let foundUnits = new Set();
 
-                // Clean up title artifacts
-                titleDesc = titleDesc.replace(/^[:\-\–\—\|]+/, "").trim();
-                if (titleDesc.length < 3 || titleDesc.toLowerCase().includes("topics")) {
-                    titleDesc = `Core Unit ${uNum} Learning Material`;
-                }
+        while ((match = unitPattern.exec(fullText)) !== null) {
+            let uNum = parseInt(match[1]);
+            let uTitle = match[2] ? match[2].trim() : `Weekly Content`;
+            uTitle = uTitle.replace(/(?:Topics|Assignments|Assessment|Weekly review).*$/i, "").trim();
+            if (uTitle.length < 3) uTitle = `Module ${uNum} Coursework`;
 
-                if (!extractedUnits.some(e => e.unitNum === uNum)) {
-                    extractedUnits.push({ unitNum: uNum, title: titleDesc.substring(0, 55) });
+            if (!foundUnits.has(uNum) && uNum > 0 && uNum <= 10) {
+                foundUnits.add(uNum);
+                extractedUnits.push({ unitNum: uNum, title: uTitle.substring(0, 50) });
+            }
+        }
+
+        if (extractedUnits.length === 0) {
+            for (let u = 1; u <= 6; u++) {
+                if (fullText.includes(`Unit ${u}`) || fullText.includes(`Unit ${u}-`)) {
+                    extractedUnits.push({ unitNum: u, title: `Weekly Curriculum Unit ${u}` });
                 }
             }
         }
 
+        extractedUnits.sort((a, b) => a.unitNum - b.unitNum);
+
         if (extractedUnits.length > 0) {
-            // Map units across a 6-month term timeline (spaced 2 weeks apart per unit)
             for (let i = 0; i < extractedUnits.length; i++) {
                 let eu = extractedUnits[i];
                 let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 14));
+                targetDate.setDate(baseDate.getDate() + (i * 7)); // 1 week per unit
 
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
@@ -398,34 +400,14 @@ window.parseSyllabusPDF = async () => {
                 }]);
                 addedCount++;
             }
-        } else {
-            // Fallback for standard date-based syllabi
-            for (let line of lines) {
-                const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}|\b\d{1,2}\/\d{1,2}/i);
-                if (dateMatch) {
-                    let parsedDate = new Date(dateMatch[0] + " " + new Date().getFullYear());
-                    if (isNaN(parsedDate.getTime())) parsedDate = new Date();
-                    
-                    let title = line.replace(dateMatch[0], "").replace(/^[:\-\–\—\s]+|[:\-\–\—\s]+$/g, "").trim();
-                    if (title.length < 3) title = "Assignment / Milestone";
-
-                    await supabaseClient.from('assignments').insert([{
-                        course_id: courseId,
-                        user_id: currentUser.id,
-                        title: title.substring(0, 60),
-                        due_date: parsedDate.toISOString().split('T')[0]
-                    }]);
-                    addedCount++;
-                }
-            }
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} units/modules for your term!`;
+            statusMsg.textContent = `Successfully imported ${addedCount} weekly units! You can edit individual target dates below.`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not parse units or dates. You can add requirements manually.";
+            statusMsg.textContent = "Could not parse units automatically. Add your weekly coursework items manually below.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
@@ -468,6 +450,13 @@ window.toggleAssignment = async (assignId, currentState, courseId) => {
     else if (courseId) loadAssignments(courseId);
 };
 
+// Allows updating individual assignment target dates directly from the modal list
+window.updateAssignmentDate = async (assignId, newDate, courseId) => {
+    if(!newDate) return;
+    await supabaseClient.from('assignments').update({ due_date: newDate }).eq('id', assignId);
+    loadAssignments(courseId);
+};
+
 async function loadAssignments(courseId) {
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId).order('due_date', { ascending: true });
     const listEl = document.getElementById('assignmentList');
@@ -475,17 +464,20 @@ async function loadAssignments(courseId) {
     if (!assignments || !assignments.length) { listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>'; return; }
 
     assignments.forEach(assign => {
-        const dateStr = new Date(assign.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
         const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
+        
         listEl.innerHTML += `
-            <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
-                <div class="flex items-center gap-3">
+            <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm gap-2">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
                     <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
-                    <div class="flex flex-col"><span class="font-bold transition-all ${tClass}">${unitBadge}${assign.title}</span><span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Target: ${dateStr}</span></div>
+                    <div class="flex flex-col min-w-0 flex-1">
+                        <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
+                        <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
+                    </div>
                 </div>
-                <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2">✕</button>
+                <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
             </div>`;
     });
 }
