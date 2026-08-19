@@ -1,40 +1,46 @@
-// --- DYNAMIC ACADEMICS, STREAK, EXAM COUNTDOWN, & SETTINGS TOGGLE ---
+// --- DYNAMIC ACADEMICS, STREAK, EXAM/FINAL COUNTDOWN, & SETTINGS TOGGLE ---
 
 window.renderAcademicsDashboardWidget = async (containerId) => {
     if (localStorage.getItem('duevinci_hide_academics') === 'true') {
-        const existingWidget = document.getElementById('academicsAnalyticsWidget');
-        if (existingWidget) existingWidget.remove();
+        document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
         return;
     }
 
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Remove any existing instance to prevent duplication
-    const existing = document.getElementById('academicsAnalyticsWidget');
-    if (existing) existing.remove();
+    // Purge ALL existing instances across the DOM to guarantee no doubling
+    document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
 
-    // Fetch real task counts from Supabase
+    // Fetch real task counts and uncompleted exams/finals from Supabase
     let completedCount = 0;
     let totalCount = 0;
+    let examCountdownsHtml = '';
+
     try {
-        const { data: assignments } = await supabaseClient.from('assignments').select('is_completed');
+        const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code, emoji)');
+        
         if (assignments) {
             totalCount = assignments.length;
             completedCount = assignments.filter(a => a.is_completed).length;
+
+            // Filter uncompleted assignments matching exams, finals, midterms, or tests
+            const uncompletedExams = assignments.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
+            
+            if (uncompletedExams.length > 0) {
+                examCountdownsHtml = uncompletedExams.map(exam => {
+                    const diffTime = new Date(exam.due_date + 'T12:00:00') - new Date();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const timeText = diffDays >= 0 ? `${diffDays} Day${diffDays === 1 ? '' : 's'}` : `Due today/past`;
+                    return `<div class="text-xs font-bold text-red-500 truncate" title="${exam.title}">• ${exam.title}: <span class="font-normal text-zinc-600 dark:text-zinc-300">${timeText}</span></div>`;
+                }).join('');
+            } else {
+                examCountdownsHtml = `<p class="text-xs text-zinc-400">No active exams or finals pending.</p>`;
+            }
         }
     } catch (e) {
         console.error("Error fetching academic stats:", e);
-    }
-
-    const examName = localStorage.getItem('duevinci_exam_name') || 'Midterm Exam';
-    const examDateStr = localStorage.getItem('duevinci_exam_date');
-    let countdownText = 'No exam set';
-
-    if (examDateStr) {
-        const diffTime = new Date(examDateStr) - new Date();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        countdownText = diffDays >= 0 ? `${examName} in ${diffDays} Day${diffDays === 1 ? '' : 's'}` : `${examName} passed`;
+        examCountdownsHtml = `<p class="text-xs text-zinc-400">Unable to load exam countdowns.</p>`;
     }
 
     const analyticsDiv = document.createElement('div');
@@ -51,8 +57,10 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
                 <p id="tasksCompletedCount" class="text-2xl font-extrabold text-amber-500">${completedCount} / ${totalCount}</p>
             </div>
             <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
-                <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Next Exam Countdown</h4>
-                <p id="examCountdownDisplay" class="text-lg font-bold text-red-500 truncate">${countdownText}</p>
+                <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Exams & Finals Countdown</h4>
+                <div class="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                    ${examCountdownsHtml}
+                </div>
             </div>
         </div>
     `;
@@ -65,7 +73,6 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
     }
 };
 
-// Inject Academics visibility toggle directly into Settings -> Appearance tab
 window.injectAcademicsSettingsToggle = () => {
     const appearanceTab = document.getElementById('content-appearance');
     if (!appearanceTab || document.getElementById('academicsToggleContainer')) return;
@@ -93,8 +100,7 @@ window.toggleAcademicsVisibility = (show) => {
         }
     } else {
         localStorage.setItem('duevinci_hide_academics', 'true');
-        const widget = document.getElementById('academicsAnalyticsWidget');
-        if (widget) widget.remove();
+        document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
     }
 };
 
