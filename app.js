@@ -320,7 +320,7 @@ window.openCourseModal = (courseId) => {
     document.getElementById('courseModal').classList.remove('hidden');
     loadAssignments(course.id);
 };
-window.closeCourseModal = () => document.getElementById('courseModal'].classList.add('hidden');
+window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
 // Weekly Unit Syllabus Parser (Maps Unit blocks and allows date customization per week)
 window.parseSyllabusPDF = async () => {
@@ -459,7 +459,6 @@ window.addSubItem = async (parentId, courseId) => {
     const title = inputEl ? inputEl.value.trim() : "";
     if(!title) return;
 
-    // We can store lessons using a naming convention or a sub-title format linked to the parent unit
     await supabaseClient.from('assignments').insert([{ 
         course_id: courseId, 
         user_id: currentUser.id, 
