@@ -234,11 +234,12 @@ async function loadDashboardStats() {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
                 const dateStr = new Date(assign.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
                 upNextListEl.innerHTML += `
                     <div class="flex items-center gap-3 p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700">
                         <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                         <div>
-                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${assign.title}</p>
+                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
                             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Due: ${dateStr}</p>
                         </div>
                     </div>`;
@@ -265,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & PDF PARSING LOGIC ---
+// --- COURSES PAGE & SMART PDF SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -295,7 +296,7 @@ if (cForm) {
         const color = document.getElementById('courseColor').value;
         const emoji = document.getElementById('courseEmoji').value || '📚';
         const { error } = await supabaseClient.from('courses').insert([{ code, color, emoji, user_id: currentUser.id }]);
-        if (!error) { document.getElementById('courseCode').value; loadCoursesPage(); }
+        if (!error) { document.getElementById('courseCode').value = ''; loadCoursesPage(); }
     });
 }
 
@@ -321,7 +322,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// PDF Syllabus Parser Engine
+// Intelligent 6-Month Term & Unit Syllabus Parser Engine
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -335,7 +336,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Reading PDF...";
+    statusMsg.textContent = "Scanning syllabus contents...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -348,53 +349,67 @@ window.parseSyllabusPDF = async () => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(" ");
-            fullText += pageText + "\n";
+            fullText += textContent.items.map(item => item.str).join(" ") + "\n";
         }
 
-        // Basic line/date extraction heuristics
-        // Looks for common date patterns like MM/DD or Jan 15 inside lines
-        const lines = fullText.split(/(?:\r\n|\r|\n|(?:\s{2,}))/);
+        // Filter out footer metadata like "Downloaded on..."
+        const cleanLines = fullText.split(/(?:\r\n|\r|\n)/).filter(l => !l.includes("Downloaded on") && l.trim().length > 3);
         let addedCount = 0;
-        const currentYear = new Date().getFullYear();
 
-        for (let line of lines) {
-            line = line.trim();
-            if (line.length < 5) continue;
+        // Check if syllabus uses "Unit X" format rather than standard calendar dates
+        const unitRegex = /Unit\s+(\d+)[\s\-:]+([^\n]+)/gi;
+        let match;
+        let unitsFound = [];
 
-            // Simple regex match for dates (e.g. 10/12, Oct 12, October 12)
-            const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/i);
-            
-            if (dateMatch) {
-                // Parse out potential date string
-                let parsedDate = new Date(dateMatch[0] + " " + currentYear);
-                if (isNaN(parsedDate.getTime())) {
-                    parsedDate = new Date(); // fallback to today if unparseable
-                }
-                const dateStr = parsedDate.toISOString().split('T')[0];
+        while ((match = unitRegex.exec(cleanLines.join("\n"))) !== null) {
+            unitsFound.push({ unitNum: parseInt(match[1]), title: match[2].trim().substring(0, 50) });
+        }
 
-                // Clean title by removing the date snippet
-                let title = line.replace(dateMatch[0], "").trim();
-                title = title.replace(/^[:\-\–\—\s]+|[:\-\–\—\s]+$/g, ""); // clean symbols
-                if (title.length < 3) title = "Assignment / Milestone";
+        if (unitsFound.length > 0) {
+            // Term-based pacing: spread units across a 6-month term (approx every 2 weeks per unit)
+            let baseDate = new Date();
+            for (let i = 0; i < unitsFound.length; i++) {
+                let u = unitsFound[i];
+                let dueDate = new Date(baseDate);
+                dueDate.setDate(baseDate.getDate() + (i * 14)); // spaced 2 weeks apart
 
-                // Insert into DB
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
                     user_id: currentUser.id,
-                    title: title.substring(0, 60),
-                    due_date: dateStr
+                    title: `Unit ${u.unitNum}: ${u.title}`,
+                    unit_number: u.unitNum,
+                    due_date: dueDate.toISOString().split('T')[0]
                 }]);
                 addedCount++;
+            }
+        } else {
+            // Fallback: regular date scanning if explicit units aren't structured cleanly
+            for (let line of cleanLines) {
+                const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}|\b\d{1,2}\/\d{1,2}/i);
+                if (dateMatch) {
+                    let parsedDate = new Date(dateMatch[0] + " " + new Date().getFullYear());
+                    if (isNaN(parsedDate.getTime())) parsedDate = new Date();
+                    
+                    let title = line.replace(dateMatch[0], "").replace(/^[:\-\–\—\s]+|[:\-\–\—\s]+$/g, "").trim();
+                    if (title.length < 3) title = "Assignment / Milestone";
+
+                    await supabaseClient.from('assignments').insert([{
+                        course_id: courseId,
+                        user_id: currentUser.id,
+                        title: title.substring(0, 60),
+                        due_date: parsedDate.toISOString().split('T')[0]
+                    }]);
+                    addedCount++;
+                }
             }
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} assignments!`;
+            statusMsg.textContent = `Successfully imported ${addedCount} units/deadlines for your 6-month term!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "No standard date patterns found in PDF. Try adding manually.";
+            statusMsg.textContent = "Could not automatically detect units or dates. Add them manually below.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
@@ -445,13 +460,14 @@ async function loadAssignments(courseId) {
 
     assignments.forEach(assign => {
         const dateStr = new Date(assign.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
         const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
         listEl.innerHTML += `
             <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
                 <div class="flex items-center gap-3">
                     <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
-                    <div class="flex flex-col"><span class="font-bold transition-all ${tClass}">${assign.title}</span><span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Due: ${dateStr}</span></div>
+                    <div class="flex flex-col"><span class="font-bold transition-all ${tClass}">${unitBadge}${assign.title}</span><span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Target: ${dateStr}</span></div>
                 </div>
                 <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2">✕</button>
             </div>`;
@@ -463,8 +479,17 @@ if (aForm) {
     aForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const courseId = document.getElementById('editCourseId').value;
-        await supabaseClient.from('assignments').insert([{ course_id: courseId, user_id: currentUser.id, title: document.getElementById('assignTitle').value, due_date: document.getElementById('assignDate').value }]);
-        document.getElementById('assignTitle').value = ''; document.getElementById('assignDate').value = '';
+        const unitNum = document.getElementById('assignUnit').value ? parseInt(document.getElementById('assignUnit').value) : null;
+        await supabaseClient.from('assignments').insert([{ 
+            course_id: courseId, 
+            user_id: currentUser.id, 
+            title: document.getElementById('assignTitle').value, 
+            unit_number: unitNum,
+            due_date: document.getElementById('assignDate').value 
+        }]);
+        document.getElementById('assignTitle').value = ''; 
+        document.getElementById('assignUnit').value = '';
+        document.getElementById('assignDate').value = '';
         loadAssignments(courseId);
     });
 }
@@ -500,7 +525,8 @@ async function loadCalendarCourses() {
     if(assignments) assignments.forEach(assign => {
         const course = courseMap[assign.course_id];
         if(!course) return;
-        calendarEvents.push({ title: `${course.emoji || '📚'} ${assign.title}`, start: assign.due_date, color: assign.is_completed ? '#9ca3af' : course.color });
+        const prefix = assign.unit_number ? `[U${assign.unit_number}] ` : '';
+        calendarEvents.push({ title: `${course.emoji || '📚'} ${prefix}${assign.title}`, start: assign.due_date, color: assign.is_completed ? '#9ca3af' : course.color });
     });
 
     if(customEvents) customEvents.forEach(ev => {
