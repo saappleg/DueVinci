@@ -1,4 +1,4 @@
-// --- DYNAMIC ACADEMICS, STREAK, EXAM/FINAL COUNTDOWN, & SETTINGS TOGGLE ---
+// --- DYNAMIC ACADEMICS, REAL STUDY STREAK, EXAM/FINAL COUNTDOWN, & SETTINGS TOGGLE ---
 
 window.renderAcademicsDashboardWidget = async (containerId) => {
     if (localStorage.getItem('duevinci_hide_academics') === 'true') {
@@ -9,10 +9,9 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Purge ALL existing instances across the DOM to guarantee no doubling
+    // Purge ALL existing instances across the DOM to prevent doubling
     document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
 
-    // Fetch real task counts and uncompleted exams/finals from Supabase
     let completedCount = 0;
     let totalCount = 0;
     let examCountdownsHtml = '';
@@ -21,8 +20,10 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
         const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code, emoji)');
         
         if (assignments) {
-            totalCount = assignments.length;
-            completedCount = assignments.filter(a => a.is_completed).length;
+            // Count ONLY individual lessons or review exams/tests/finals
+            const validItems = assignments.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
+            totalCount = validItems.length;
+            completedCount = validItems.filter(a => a.is_completed).length;
 
             // Filter uncompleted assignments matching exams, finals, midterms, or tests
             const uncompletedExams = assignments.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
@@ -43,6 +44,31 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
         examCountdownsHtml = `<p class="text-xs text-zinc-400">Unable to load exam countdowns.</p>`;
     }
 
+    // Calculate actual study streak from activity history
+    let streakDays = 0;
+    try {
+        const activityDates = JSON.parse(localStorage.getItem('duevinci_activity_dates')) || [];
+        if (activityDates.length > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let checkDate = new Date();
+            
+            // Check consecutive days backwards starting from today or yesterday
+            let currentDateStr = checkDate.toISOString().split('T')[0];
+            if (!activityDates.includes(currentDateStr)) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                currentDateStr = checkDate.toISOString().split('T')[0];
+            }
+
+            while (activityDates.includes(currentDateStr)) {
+                streakDays++;
+                checkDate.setDate(checkDate.getDate() - 1);
+                currentDateStr = checkDate.toISOString().split('T')[0];
+            }
+        }
+    } catch (err) {
+        console.error("Error calculating streak:", err);
+    }
+
     const analyticsDiv = document.createElement('div');
     analyticsDiv.id = 'academicsAnalyticsWidget';
     analyticsDiv.className = 'mb-6';
@@ -50,7 +76,7 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Study Streak</h4>
-                <p class="text-2xl font-extrabold text-emerald-500">🔥 5 Days</p>
+                <p class="text-2xl font-extrabold text-emerald-500">🔥 ${streakDays} Day${streakDays === 1 ? '' : 's'}</p>
             </div>
             <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Tasks Completed</h4>
