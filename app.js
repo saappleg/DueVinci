@@ -8,6 +8,42 @@ let calendarInstance = null;
 let localCourses = [];
 let currentAssignmentPage = 1;
 
+// --- INJECT CALENDAR DARK MODE FIX STYLES ---
+const calendarDarkFixStyle = document.createElement('style');
+calendarDarkFixStyle.innerHTML = `
+    .dark .fc-popover {
+        background-color: #18181b !important;
+        border-color: #27272a !important;
+        color: #f4f4f5 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+    .dark .fc-popover-header {
+        background-color: #27272a !important;
+        color: #f4f4f5 !important;
+        padding: 10px 14px !important;
+        border-bottom: 1px solid #3f3f46 !important;
+    }
+    .dark .fc-popover-title {
+        color: #f4f4f5 !important;
+        font-weight: 700 !important;
+        font-size: 0.875rem !important;
+    }
+    .dark .fc-popover-close {
+        color: #a1a1aa !important;
+        opacity: 0.9 !important;
+        cursor: pointer;
+    }
+    .dark .fc-popover-close:hover {
+        color: #ffffff !important;
+    }
+    .dark .fc-popover-body {
+        padding: 8px !important;
+    }
+`;
+document.head.appendChild(calendarDarkFixStyle);
+
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
@@ -296,7 +332,6 @@ async function loadDashboardStats() {
 
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
-        // Make Up Next container scrollable while maintaining its exact size
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
         
@@ -343,30 +378,204 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & METADATA / SCREENSHOT PARSERS ---
+// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
-    localCourses = courses;
+    localCourses = courses || [];
     
-    const listEl = document.getElementById('courseList');
-    if (!listEl) return;
-    
-    listEl.innerHTML = '';
-    courses.forEach(course => {
-        const emoji = course.emoji || '📚';
-        const opacity = course.is_completed ? 'opacity-50' : '';
-        const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
-        
-        listEl.innerHTML += `
-            <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex flex-col justify-between ${opacity} min-h-[100px]">
-                <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
-                    <div><h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">View weekly coursework &rarr;</p></div>
+    const coursesGridEl = document.getElementById('coursesGrid') || document.getElementById('courseList')?.parentElement;
+    if (!coursesGridEl) return;
+
+    let container = document.getElementById('coursesMainContainer');
+    if (!container) {
+        coursesGridEl.innerHTML = `
+            <div id="coursesMainContainer" class="space-y-8">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
+                        <div class="flex gap-2">
+                            <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
+                            <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
+                        </div>
+                    </div>
+                    <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
                 </div>
-                <div class="mt-3 flex justify-end">${checkIcon}</div>
+                <div class="pt-6 border-t border-zinc-200 dark:border-brand-700">
+                    <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
+                    <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
+                </div>
+            `;
+    }
+
+    renderTermFolders();
+    renderAlphabeticals();
+}
+
+function renderTermFolders() {
+    const foldersGrid = document.getElementById('termFoldersGrid');
+    if (!foldersGrid) return;
+
+    const termsMap = {};
+    localCourses.forEach(c => {
+        const t = c.term ? c.term.trim() : 'Unassigned';
+        if (!termsMap[t]) termsMap[t] = [];
+        termsMap[t].push(c);
+    });
+
+    foldersGrid.innerHTML = '';
+    const termNames = Object.keys(termsMap).sort();
+
+    termNames.forEach(termName => {
+        const termCourses = termsMap[termName];
+        foldersGrid.innerHTML += `
+            <div onclick="openTermModal('${termName}')" 
+                 ondragover="allowDrop(event)" 
+                 ondrop="handleDropToTerm(event, '${termName}')"
+                 class="cursor-pointer group bg-white dark:bg-brand-800 p-5 rounded-xl border-2 border-dashed border-zinc-300 dark:border-brand-600 hover:border-indigo-500 dark:hover:border-indigo-400 transition shadow-sm flex flex-col justify-between min-h-[130px]">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-2xl">📁</span>
+                        <h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${termName}</h4>
+                    </div>
+                    <span class="text-xs bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold">${termCourses.length} class${termCourses.length === 1 ? '' : 'es'}</span>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                    ${termCourses.slice(0, 4).map(c => `<span class="text-[11px] px-2 py-0.5 rounded font-medium" style="background-color: ${c.color}20; color: ${c.color}; border: 1px solid ${c.color}40;">${c.code}</span>`).join('')}
+                    ${termCourses.length > 4 ? `<span class="text-[11px] text-zinc-400 px-1">+${termCourses.length - 4} more</span>` : ''}
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-2 text-right">Click to open &bull; Drag class here</p>
             </div>`;
     });
 }
+
+function renderAlphabeticals() {
+    const listEl = document.getElementById('alphabeticalCourseList');
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+    if (localCourses.length === 0) {
+        listEl.innerHTML = '<div class="p-4 text-sm text-zinc-500 text-center">No classes added yet.</div>';
+        return;
+    }
+
+    const sortedCourses = [...localCourses].sort((a, b) => a.code.localeCompare(b.code));
+
+    sortedCourses.forEach(course => {
+        const emoji = course.emoji || '📚';
+        const termBadge = course.term ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded font-bold">${course.term}</span>` : `<span class="text-xs bg-zinc-200 dark:bg-brand-700 text-zinc-500 px-2 py-0.5 rounded">Unassigned</span>`;
+        const opacity = course.is_completed ? 'opacity-50' : '';
+        const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
+
+        listEl.innerHTML += `
+            <div draggable="true" ondragstart="handleDragStart(event, '${course.id}')" onclick="openCourseModal('${course.id}')" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-zinc-800 dark:text-zinc-200">${course.code}</h4>
+                            ${termBadge}
+                        </div>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Drag card to move term &bull; Click to open coursework</p>
+                    </div>
+                </div>
+                <div>${checkIcon}</div>
+            </div>`;
+    });
+}
+
+// --- DRAG AND DROP HANDLERS ---
+window.handleDragStart = (e, courseId) => {
+    e.dataTransfer.setData('text/plain', courseId);
+};
+
+window.allowDrop = (e) => {
+    e.preventDefault();
+};
+
+window.handleDropToTerm = async (e, termName) => {
+    e.preventDefault();
+    const courseId = e.dataTransfer.getData('text/plain');
+    if (!courseId) return;
+
+    const newTerm = termName === 'Unassigned' ? null : termName;
+    await supabaseClient.from('courses').update({ term: newTerm }).eq('id', courseId);
+    
+    const course = localCourses.find(c => c.id === courseId);
+    if (course) course.term = newTerm;
+
+    renderTermFolders();
+    renderAlphabeticals();
+};
+
+window.createNewTermFolder = () => {
+    const input = document.getElementById('newTermInput');
+    const termVal = input ? input.value.trim() : '';
+    if (!termVal) return;
+    input.value = '';
+    openTermModal(termVal);
+};
+
+// --- TERM MODAL POP-UP ---
+function ensureTermModalExists() {
+    let modal = document.getElementById('termModal');
+    if (!modal) {
+        const div = document.createElement('div');
+        div.id = 'termModal';
+        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden';
+        div.innerHTML = `
+            <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-lg p-6 shadow-xl max-h-[85vh] flex flex-col">
+                <div class="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-brand-700">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">📁</span>
+                        <h3 id="termModalTitle" class="text-lg font-bold text-zinc-800 dark:text-zinc-200"></h3>
+                    </div>
+                    <button type="button" onclick="closeTermModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xl font-bold">✕</button>
+                </div>
+                <div id="termModalCourseList" class="py-4 space-y-3 overflow-y-auto flex-1"></div>
+                <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex justify-end">
+                    <button type="button" onclick="closeTermModal()" class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 font-bold rounded-lg text-sm transition">Close</button>
+                </div>
+            </div>`;
+        document.body.appendChild(div);
+    }
+}
+
+window.openTermModal = (termName) => {
+    ensureTermModalExists();
+    document.getElementById('termModalTitle').innerText = `Classes in ${termName}`;
+    
+    const listEl = document.getElementById('termModalCourseList');
+    const termCourses = localCourses.filter(c => {
+        const t = c.term ? c.term.trim() : 'Unassigned';
+        return t === termName;
+    });
+
+    listEl.innerHTML = '';
+    if (termCourses.length === 0) {
+        listEl.innerHTML = '<p class="text-sm text-zinc-500 text-center py-6">No classes in this term yet. Drag a class card here or assign one.</p>';
+    } else {
+        termCourses.forEach(course => {
+            const emoji = course.emoji || '📚';
+            listEl.innerHTML += `
+                <div onclick="closeTermModal(); openCourseModal('${course.id}')" class="cursor-pointer p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 transition flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
+                        <div>
+                            <h4 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">${course.code}</h4>
+                            <p class="text-xs text-zinc-500">Click to view coursework &rarr;</p>
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    document.getElementById('termModal').classList.remove('hidden');
+};
+
+window.closeTermModal = () => {
+    const modal = document.getElementById('termModal');
+    if (modal) modal.classList.add('hidden');
+};
 
 const cForm = document.getElementById('courseForm');
 if (cForm) {
@@ -463,7 +672,6 @@ window.parseSyllabusPDF = async () => {
             fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
-        // Check metadata-only checkbox first
         const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || 
                                document.getElementById('metadataOnly') || 
                                document.getElementById('syllabusMetadata') ||
@@ -498,7 +706,6 @@ window.parseSyllabusPDF = async () => {
             }
         }
 
-        // IRONCLAD SAFEGUARD: If metadata-only is ticked, stop completely here!
         if (isMetadataOnly) {
             statusMsg.textContent = "Successfully imported course description & objectives!";
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
@@ -779,7 +986,6 @@ async function loadAssignments(courseId, page = 1) {
         return new Date(a.due_date) - new Date(b.due_date);
     });
 
-    // Pagination configuration (6 items per page)
     const pageSize = 6;
     const totalPages = Math.ceil(assignments.length / pageSize);
     if (page > totalPages && totalPages > 0) page = totalPages;
@@ -837,7 +1043,6 @@ async function loadAssignments(courseId, page = 1) {
             </div>`;
     });
 
-    // Render pagination controls if multiple pages exist
     if (totalPages > 1) {
         listEl.innerHTML += `
             <div class="flex items-center justify-between pt-3 mt-2 border-t border-zinc-200 dark:border-brand-700 text-xs">
@@ -889,7 +1094,7 @@ function initCalendar() {
             right: 'dayGridMonth,timeGridWeek'
         },
         events: [],
-        dayMaxEvents: true, // Automatically collapses excess events into a clickable "+X more" popover link
+        dayMaxEvents: true,
         eventClick: async function(info) {
             if (info.event.extendedProps.isCustom) {
                 if(confirm(`Delete custom event "${info.event.title}"?`)) {
