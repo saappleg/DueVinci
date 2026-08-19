@@ -6,6 +6,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 let currentUser = null;
 let calendarInstance = null;
 let localCourses = [];
+let currentAssignmentPage = 1;
 
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
@@ -425,7 +426,8 @@ window.openCourseModal = (courseId) => {
     document.getElementById('syllabusFile').value = '';
     
     document.getElementById('courseModal').classList.remove('hidden');
-    loadAssignments(course.id);
+    currentAssignmentPage = 1;
+    loadAssignments(course.id, currentAssignmentPage);
 };
 
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
@@ -545,7 +547,7 @@ window.parseSyllabusPDF = async () => {
         statusMsg.className = "text-xs text-center mt-2 text-green-500";
         openCourseModal(courseId);
         loadCoursesPage();
-        loadAssignments(courseId);
+        loadAssignments(courseId, 1);
 
     } catch (err) {
         console.error(err);
@@ -626,7 +628,7 @@ window.parseLessonsImage = async (inputElement) => {
 
             statusMsg.textContent = "Successfully imported lessons via secure Edge Function!";
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
-            loadAssignments(courseId);
+            loadAssignments(courseId, 1);
 
         } catch (err) {
             console.error(err);
@@ -691,13 +693,13 @@ window.toggleAssignment = async (assignId, currentState, courseId) => {
     if (newState) fireConfetti();
     
     if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) loadDashboardStats();
-    else if (courseId) loadAssignments(courseId);
+    else if (courseId) loadAssignments(courseId, currentAssignmentPage);
 };
 
 window.updateAssignmentDate = async (assignId, newDate, courseId) => {
     if(!newDate) return;
     await supabaseClient.from('assignments').update({ due_date: newDate }).eq('id', assignId);
-    loadAssignments(courseId);
+    loadAssignments(courseId, currentAssignmentPage);
 };
 
 window.addSubItem = async (parentId, courseId) => {
@@ -716,10 +718,14 @@ window.addSubItem = async (parentId, courseId) => {
         unit_number: unitNum,
         due_date: dueDate
     }]);
-    loadAssignments(courseId);
+    loadAssignments(courseId, currentAssignmentPage);
 };
 
-async function loadAssignments(courseId) {
+window.changeAssignmentPage = (courseId, page) => {
+    loadAssignments(courseId, page);
+};
+
+async function loadAssignments(courseId, page = 1) {
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
     
     const listEl = document.getElementById('assignmentList');
@@ -763,8 +769,18 @@ async function loadAssignments(courseId) {
         
         return new Date(a.due_date) - new Date(b.due_date);
     });
+
+    // Pagination configuration (10 items per page)
+    const pageSize = 10;
+    const totalPages = Math.ceil(assignments.length / pageSize);
+    if (page > totalPages && totalPages > 0) page = totalPages;
+    if (page < 1) page = 1;
+    currentAssignmentPage = page;
+
+    const startIndex = (page - 1) * pageSize;
+    const paginatedAssignments = assignments.slice(startIndex, startIndex + pageSize);
     
-    assignments.forEach(assign => {
+    paginatedAssignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
         
@@ -797,7 +813,7 @@ async function loadAssignments(courseId) {
         }
         
         listEl.innerHTML += `
-            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm mb-2">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                         ${checkboxHtml}
@@ -811,6 +827,16 @@ async function loadAssignments(courseId) {
                 ${subItemForm}
             </div>`;
     });
+
+    // Render pagination controls if multiple pages exist
+    if (totalPages > 1) {
+        listEl.innerHTML += `
+            <div class="flex items-center justify-between pt-3 mt-2 border-t border-zinc-200 dark:border-brand-700 text-xs">
+                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page - 1})" ${page <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Previous</button>
+                <span class="text-zinc-500 dark:text-zinc-400 font-medium">Page ${page} of ${totalPages}</span>
+                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page + 1})" ${page >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Next</button>
+            </div>`;
+    }
 }
 
 const aForm = document.getElementById('addAssignmentForm');
@@ -830,13 +856,13 @@ if (aForm) {
         document.getElementById('assignTitle').value = '';
         document.getElementById('assignUnit').value = '';
         document.getElementById('assignDate').value = '';
-        loadAssignments(courseId);
+        loadAssignments(courseId, currentAssignmentPage);
     });
 }
 
 window.deleteAssignment = async (assignId, courseId) => {
     await supabaseClient.from('assignments').delete().eq('id', assignId);
-    loadAssignments(courseId);
+    loadAssignments(courseId, currentAssignmentPage);
 };
 
 // --- CALENDAR LOGIC ---
