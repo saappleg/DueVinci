@@ -22,7 +22,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=8" defer></script>
+    <script src="app.js?v=10" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -40,8 +40,8 @@
 
                 <div id="timerSettingsForm" class="hidden px-6 pb-4 text-sm text-zinc-600 dark:text-zinc-400 space-y-2">
                     <div class="flex justify-between items-center gap-2">
-                        <label class="flex-1">Focus (min): <input type="number" id="focusMinInput" class="w-16 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600" value="25"></label>
-                        <label class="flex-1">Break (min): <input type="number" id="breakMinInput" class="w-16 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600" value="5"></label>
+                        <label class="flex-1">Focus: <input type="number" id="focusMinInput" class="w-16 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600" value="25"></label>
+                        <label class="flex-1">Break: <input type="number" id="breakMinInput" class="w-16 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600" value="5"></label>
                     </div>
                     <button type="button" onclick="saveTimerSettings()" class="w-full bg-indigo-600 text-white font-bold py-1.5 rounded hover:bg-indigo-700 transition text-xs">Save Time</button>
                 </div>
@@ -139,22 +139,33 @@
                             </div>
                             <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
                         </form>
+                        <!-- Dynamic Course Metadata Display Box -->
+                        <div id="courseMetadataBox"></div>
                     </div>
 
-                    <!-- PDF Syllabus Import Box -->
-                    <div class="border-t border-zinc-200 dark:border-brand-700 pt-4">
-                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (Unit or Date Based)</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Upload your syllabus PDF. If it's a 6-month term course with weekly units (e.g. Unit 1, Unit 2), DueVinci will map them out over a 6-month relative timeline!</p>
-                        <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-3">
-                        <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Units & Deadlines</button>
+                    <!-- PDF Syllabus & Screenshot Import Box -->
+                    <div class="border-t border-zinc-200 dark:border-brand-700 pt-4 space-y-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Upload syllabus PDF to auto-extract course description & objectives.</p>
+                            <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-2">
+                            <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata</button>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📸 Import Lessons Screenshot</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Upload a screenshot of your course breakdown page to autopopulate weeks and lessons.</p>
+                            <input type="file" id="lessonImageFile" accept="image/*" onchange="parseLessonsImage(this)" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer">
+                        </div>
+
                         <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
                     </div>
 
-                    <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Assignments</button>
+                    <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Coursework</button>
                 </div>
 
                 <div class="flex flex-col h-full">
-                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Assignments / Units</h3>
+                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
                     <form id="addAssignmentForm" class="space-y-2 mb-4 bg-zinc-50 dark:bg-brand-900 p-3 rounded-xl border border-zinc-200 dark:border-brand-700">
                         <div class="flex gap-2">
                             <input type="text" id="assignTitle" placeholder="e.g. Unit 1: How the web works" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
@@ -162,7 +173,7 @@
                         </div>
                         <div class="flex gap-2">
                             <input type="date" id="assignDate" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
-                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Item</button>
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Unit</button>
                         </div>
                     </form>
                     <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto"></div>
