@@ -11,7 +11,7 @@ let localCourses = [];
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
-    if (themeValue === 'dark' || (themeValue === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (themeValue === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & UNIVERSAL SYLLABUS SCANNER LOGIC ---
+// --- COURSES PAGE & ADVANCED SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -322,7 +322,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Universal Syllabus Parser: Supports Date-based, Weekly Unit-based, and 6-Month Term windows
+// Universal Robust Syllabus Parser (Handles Unit-based, Weekly, Term-based, and Date-based structures)
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -336,7 +336,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Analyzing syllabus format...";
+    statusMsg.textContent = "Scanning syllabus units & milestones...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -349,35 +349,45 @@ window.parseSyllabusPDF = async () => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
+            // Preserve spacing tokens to catch fragmented unit headings
             fullText += textContent.items.map(item => item.str).join(" ") + "\n";
         }
 
-        const lines = fullText.split(/(?:\r\n|\r|\n)/).map(l => l.trim()).filter(l => l.length > 3 && !l.includes("Downloaded on"));
+        const lines = fullText.split(/(?:\r\n|\r|\n)/).map(l => l.trim()).filter(l => l.length > 2 && !l.includes("Downloaded on"));
         let addedCount = 0;
         let baseDate = new Date();
-
-        // Check for Unit / Module / Week structures (ideal for 6-month term & weekly models)
-        const unitRegex = /(?:Unit|Module|Week)\s*[-–—:]*\s*(\d+)[^\w\n]*([^\n]*)/gi;
-        let match;
         let extractedUnits = [];
 
-        for (let line of lines) {
-            while ((match = unitRegex.exec(line)) !== null) {
-                let uNum = parseInt(match[1]);
-                let uTitle = match[2] ? match[2].trim().replace(/^[:\-\–\—\s]+/, "").substring(0, 50) : `Unit ${uNum}`;
-                if (uTitle.length < 3) uTitle = `Unit ${uNum} Requirements`;
+        // Multi-pass scanner for Unit / Module / Week headings regardless of line wrapping splits
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let unitMatch = line.match(/(?:Unit|Module|Week)\s*(\d+)/i);
+            if (unitMatch) {
+                let uNum = parseInt(unitMatch[1]);
+                let titleDesc = "";
+                
+                // Look ahead 1-2 lines to gather the topic description if separated by layout spacing
+                if (lines[i + 1] && lines[i + 1].length > 3) titleDesc = lines[i + 1];
+                else if (lines[i + 2] && lines[i + 2].length > 3) titleDesc = lines[i + 2];
+
+                // Clean up title artifacts
+                titleDesc = titleDesc.replace(/^[:\-\–\—\|]+/, "").trim();
+                if (titleDesc.length < 3 || titleDesc.toLowerCase().includes("topics")) {
+                    titleDesc = `Core Unit ${uNum} Learning Material`;
+                }
+
                 if (!extractedUnits.some(e => e.unitNum === uNum)) {
-                    extractedUnits.push({ unitNum: uNum, title: uTitle });
+                    extractedUnits.push({ unitNum: uNum, title: titleDesc.substring(0, 55) });
                 }
             }
         }
 
         if (extractedUnits.length > 0) {
-            // For 6-month term or weekly courses, spread units logically across a balanced term schedule
+            // Map units across a 6-month term timeline (spaced 2 weeks apart per unit)
             for (let i = 0; i < extractedUnits.length; i++) {
                 let eu = extractedUnits[i];
                 let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 12)); // Spacing units across term pacing
+                targetDate.setDate(baseDate.getDate() + (i * 14));
 
                 await supabaseClient.from('assignments').insert([{
                     course_id: courseId,
@@ -389,7 +399,7 @@ window.parseSyllabusPDF = async () => {
                 addedCount++;
             }
         } else {
-            // Fallback for standard date-based courses
+            // Fallback for standard date-based syllabi
             for (let line of lines) {
                 const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}|\b\d{1,2}\/\d{1,2}/i);
                 if (dateMatch) {
@@ -411,11 +421,11 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} coursework milestones!`;
+            statusMsg.textContent = `Successfully imported ${addedCount} units/modules for your term!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "No standard structure detected. You can add requirements manually.";
+            statusMsg.textContent = "Could not parse units or dates. You can add requirements manually.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
