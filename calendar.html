@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DueVinci - Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js" defer></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans">
+
+    <!-- Screen blocks until authenticated in app.js -->
+    <div id="appScreen" class="hidden flex h-screen overflow-hidden">
+        
+        <!-- Navigation Sidebar -->
+        <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between">
+            <div class="p-6">
+                <h1 class="text-2xl font-bold text-indigo-400 mb-8">DueVinci</h1>
+                <nav class="space-y-2">
+                    <a href="index.html" class="block w-full text-left px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-lg transition">🏠 Dashboard</a>
+                    <a href="calendar.html" class="block w-full text-left px-4 py-3 bg-indigo-600 rounded-lg font-medium">📅 Calendar</a>
+                </nav>
+            </div>
+            <div class="p-6 border-t border-slate-800 space-y-3">
+                <button onclick="exportToICS()" class="w-full bg-slate-800 text-indigo-400 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-700 transition text-sm">
+                    Export (.ics)
+                </button>
+                <button onclick="logout()" class="w-full text-left px-4 py-2 text-slate-400 hover:text-white transition">🚪 Sign Out</button>
+            </div>
+        </aside>
+
+        <!-- Main Calendar View -->
+        <main class="flex-1 p-8 bg-white overflow-y-auto">
+            <div id='calendar' class="h-full"></div>
+        </main>
+    </div>
+
+</body>
+</html>
