@@ -472,9 +472,7 @@ window.parseSyllabusPDF = async () => {
         statusMsg.textContent = "Error parsing file or contacting Edge Function.";
         statusMsg.className = "text-xs text-center mt-2 text-red-500";
     }
-};
-
-// --- 2. EDGE FUNCTION SCREENSHOT PARSER ---
+};// --- 2. EDGE FUNCTION SCREENSHOT PARSER ---
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
@@ -503,4 +501,283 @@ window.parseLessonsImage = async (inputElement) => {
 
             const rawResponse = responseData.result;
             
-            const cleanJson = rawResponse.replace(/```json/g, '').replace(/
+            const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsedData = JSON.parse(cleanJson);
+
+            let baseDate = new Date();
+
+            if (parsedData.units && parsedData.units.length > 0) {
+                for (let i = 0; i < parsedData.units.length; i++) {
+                    let wk = parsedData.units[i];
+                    
+                    let targetDate = wk.dateStr ? new Date(wk.dateStr) : new Date(baseDate);
+                    if (!wk.dateStr) targetDate.setDate(baseDate.getDate() + (i * 7));
+
+                    const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
+                        course_id: courseId, user_id: currentUser.id,
+                        title: wk.title || `Week ${wk.num}`,
+                        unit_number: wk.num,
+                        due_date: targetDate.toISOString().split('T')[0]
+                    }]).select();
+
+                    if (insertedUnit && insertedUnit[0] && wk.lessons) {
+                        for (let l of wk.lessons) {
+                            await supabaseClient.from('assignments').insert([{
+                                course_id: courseId, user_id: currentUser.id,
+                                title: `↳ ${l}`,
+                                due_date: targetDate.toISOString().split('T')[0]
+                            }]);
+                        }
+                    }
+                }
+            }
+
+            statusMsg.textContent = "Successfully imported lessons via secure Edge Function!";
+            statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            loadAssignments(courseId);
+
+        } catch (err) {
+            console.error(err);
+            statusMsg.textContent = "Error scanning image with Edge Function.";
+            statusMsg.className = "text-xs text-center mt-2 text-red-500";
+        }
+    };
+};
+
+const eForm = document.getElementById('editCourseForm');
+if (eForm) {
+    eForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editCourseId').value;
+        const code = document.getElementById('editCourseCode').value;
+        const color = document.getElementById('editCourseColor').value;
+        const emoji = document.getElementById('editCourseEmoji').value;
+        
+        await supabaseClient.from('courses').update({ code, color, emoji }).eq('id', id);
+        closeCourseModal();
+        loadCoursesPage();
+    });
+}
+
+window.deleteCurrentCourse = async () => {
+    if (confirm('Delete this course and ALL its coursework?')) {
+        await supabaseClient.from('courses').delete().eq('id', document.getElementById('editCourseId').value);
+        closeCourseModal();
+        loadCoursesPage();
+    }
+};
+
+window.toggleCourseComplete = async (courseId, currentState) => {
+    await supabaseClient.from('courses').update({ is_completed: !currentState }).eq('id', courseId);
+    if (!currentState) fireConfetti();
+    closeCourseModal();
+    loadCoursesPage();
+};
+
+window.toggleAssignment = async (assignId, currentState, courseId) => {
+    await supabaseClient.from('assignments').update({ is_completed: !currentState }).eq('id', assignId);
+    if (!currentState) fireConfetti();
+    
+    if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) loadDashboardStats();
+    else if (courseId) loadAssignments(courseId);
+};
+
+window.updateAssignmentDate = async (assignId, newDate, courseId) => {
+    if(!newDate) return;
+    await supabaseClient.from('assignments').update({ due_date: newDate }).eq('id', assignId);
+    loadAssignments(courseId);
+};
+
+window.addSubItem = async (parentId, courseId) => {
+    const inputEl = document.getElementById(`subInput-${parentId}`);
+    const title = inputEl ? inputEl.value.trim() : "";
+    if(!title) return;
+    
+    await supabaseClient.from('assignments').insert([{
+        course_id: courseId, user_id: currentUser.id,
+        title: `↳ ${title}`, due_date: document.getElementById(`date-${parentId}`).value || new Date().toISOString().split('T')[0]
+    }]);
+    loadAssignments(courseId);
+};
+
+async function loadAssignments(courseId) {
+    const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId).order('due_date', { ascending: true });
+    
+    const listEl = document.getElementById('assignmentList');
+    listEl.innerHTML = '';
+    
+    if (!assignments || !assignments.length) {
+        listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>';
+        return;
+    }
+    
+    assignments.forEach(assign => {
+        const isSubItem = assign.title.startsWith('↳');
+        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
+        
+        const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
+        const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
+        
+        let subItemForm = '';
+        if (!isSubItem && assign.unit_number) {
+            subItemForm = `
+                <div class="mt-2 pl-8 flex gap-2">
+                    <input type="date" id="date-${assign.id}" value="${assign.due_date}" class="hidden">
+                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
+                </div>`;
+        }
+        
+        listEl.innerHTML += `
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                        <div class="flex flex-col min-w-0 flex-1">
+                            <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
+                            <input type="date" value="${assign.due_date}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500" title="Click to update target week date">
+                        </div>
+                    </div>
+                    <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
+                </div>
+                ${subItemForm}
+            </div>`;
+    });
+}
+
+const aForm = document.getElementById('addAssignmentForm');
+if (aForm) {
+    aForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const courseId = document.getElementById('editCourseId').value;
+        const unitNum = document.getElementById('assignUnit').value ? parseInt(document.getElementById('assignUnit').value) : null;
+        
+        await supabaseClient.from('assignments').insert([{
+            course_id: courseId, user_id: currentUser.id,
+            title: document.getElementById('assignTitle').value,
+            unit_number: unitNum,
+            due_date: document.getElementById('assignDate').value
+        }]);
+        
+        document.getElementById('assignTitle').value = '';
+        document.getElementById('assignUnit').value = '';
+        document.getElementById('assignDate').value = '';
+        loadAssignments(courseId);
+    });
+}
+
+window.deleteAssignment = async (assignId, courseId) => {
+    await supabaseClient.from('assignments').delete().eq('id', assignId);
+    loadAssignments(courseId);
+};
+
+// --- CALENDAR LOGIC ---
+function initCalendar() {
+    if (calendarInstance) return;
+    
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+    
+    calendarInstance = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        events: [],
+        eventClick: function(info) {
+            if (info.event.extendedProps.isCustom) {
+                if(confirm(`Delete custom event "${info.event.title}"?`)) {
+                    deleteCustomEvent(info.event.extendedProps.eventId);
+                }
+            }
+        }
+    });
+    calendarInstance.render();
+}
+
+async function loadCalendarCourses() {
+    const { data: courses } = await supabaseClient.from('courses').select('*');
+    const { data: assignments } = await supabaseClient.from('assignments').select('*');
+    const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
+    
+    let calendarEvents = [];
+    const courseMap = {};
+    if(courses) courses.forEach(c => courseMap[c.id] = c);
+    
+    if(assignments) assignments.forEach(assign => {
+        const course = courseMap[assign.course_id];
+        if(!course) return;
+        const prefix = assign.unit_number ? `[Wk ${assign.unit_number}] ` : '';
+        
+        calendarEvents.push({
+            title: `${course.emoji || '📚'} ${prefix}${assign.title}`,
+            start: assign.due_date,
+            color: assign.is_completed ? '#9ca3af' : course.color
+        });
+    });
+    
+    if(customEvents) customEvents.forEach(ev => {
+        calendarEvents.push({
+            title: ev.title,
+            start: ev.event_date,
+            color: ev.color,
+            extendedProps: { isCustom: true, eventId: ev.id }
+        });
+    });
+    
+    if (calendarInstance) {
+        calendarInstance.removeAllEvents();
+        calendarInstance.addEventSource(calendarEvents);
+    }
+}
+
+window.openEventModal = () => document.getElementById('eventModal').classList.remove('hidden');
+window.closeEventModal = () => document.getElementById('eventModal').classList.add('hidden');
+
+const customEventForm = document.getElementById('customEventForm');
+if(customEventForm) {
+    customEventForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = document.getElementById('evTitle').value;
+        const date = document.getElementById('evDate').value;
+        const color = document.getElementById('evColor').value;
+        
+        await supabaseClient.from('custom_events').insert([{
+            user_id: currentUser.id, title: title, event_date: date, color: color
+        }]);
+        
+        document.getElementById('evTitle').value = '';
+        closeEventModal();
+        loadCalendarCourses();
+    });
+}
+
+window.deleteCustomEvent = async (id) => {
+    await supabaseClient.from('custom_events').delete().eq('id', id);
+    loadCalendarCourses();
+};
+
+window.exportToICS = () => {
+    if(!calendarInstance) return;
+    
+    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
+    
+    calendarInstance.getEvents().forEach(ev => {
+        const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+        icsContent += "BEGIN:VEVENT\nSUMMARY:" + ev.title + "\nDTSTART:" + dateStr + "\nDTEND:" + dateStr + "\nEND:VEVENT\n";
+    });
+    
+    icsContent += "END:VCALENDAR";
+    
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', 'duevinci-schedule.ics');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+checkUser();
