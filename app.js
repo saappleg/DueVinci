@@ -20,7 +20,7 @@ window.playTimerAlarm = () => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
@@ -173,33 +173,6 @@ window.toggleAcademicsVisibility = (show) => {
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.injectAppearanceSettingsExtras, 400);
 });
-
-// --- PER-COURSE SCRATCHPAD ---
-window.renderCourseScratchpad = (courseId, containerId) => {
-    let container = document.getElementById(containerId);
-    if (!container) {
-        const targetModalBody = document.querySelector('#courseModal .overflow-y-auto > div:first-child');
-        if (targetModalBody) {
-            container = document.createElement('div');
-            container.id = containerId;
-            targetModalBody.appendChild(container);
-        } else {
-            return;
-        }
-    }
-
-    const savedNotes = localStorage.getItem(`scratchpad_${courseId}`) || '';
-    container.innerHTML = `
-        <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
-            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
-            <textarea oninput="saveCourseScratchpad('${courseId}', this.value)" rows="4" placeholder="Jot down quick lecture takeaways, code snippets, or reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">${savedNotes}</textarea>
-        </div>
-    `;
-};
-
-window.saveCourseScratchpad = (courseId, val) => {
-    localStorage.setItem(`scratchpad_${courseId}`, val);
-};
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -511,6 +484,9 @@ function handleAuth(session) {
         if (path.endsWith('calendar.html') && document.getElementById('calendar')) {
             initCalendar();
             loadCalendarCourses();
+        }
+        if (path.endsWith('grades.html') && document.getElementById('gradesContainer')) {
+            loadGradesPage();
         }
     } else {
         currentUser = null;
@@ -1018,7 +994,6 @@ window.openCourseModal = (courseId) => {
     const btn = document.getElementById('markCourseCompleteBtn');
     if (btn) {
         btn.onclick = () => toggleCourseComplete(course.id, course.is_completed);
-        
         if (course.is_completed) {
             btn.innerText = "↺ Mark as Incomplete";
             btn.className = "text-xs bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded font-bold transition";
@@ -1031,17 +1006,129 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
+    // Ensure Modal Tab Structure Exists
+    const modalContainer = document.querySelector('#courseModal .bg-white') || document.querySelector('#courseModal > div');
+    if (modalContainer && !document.getElementById('courseTabNav')) {
+        const bodyContent = modalContainer.querySelector('.overflow-y-auto');
+        if (bodyContent) {
+            const tabNav = document.createElement('div');
+            tabNav.id = 'courseTabNav';
+            tabNav.className = 'flex border-b border-zinc-200 dark:border-brand-700 mb-4 pb-2 gap-4';
+            tabNav.innerHTML = `
+                <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-1 border-b-2 border-indigo-500 text-indigo-500 transition">Coursework</button>
+                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
+            `;
+            bodyContent.parentNode.insertBefore(tabNav, bodyContent);
+        }
+    }
+
+    renderTabPanels(course);
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
-    if (typeof window.renderResourceLinksSection === 'function') window.renderResourceLinksSection(course.id, 'courseResourceSection');
-    if (typeof window.renderCourseScratchpad === 'function') window.renderCourseScratchpad(course.id, 'courseScratchpadSection');
 };
 
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
+window.switchCourseTab = (tabName) => {
+    ['coursework', 'resources', 'scratchpad'].forEach(t => {
+        const panel = document.getElementById(`panel-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (panel) panel.classList.toggle('hidden', t !== tabName);
+        if (btn) {
+            btn.className = t === tabName 
+                ? 'text-xs font-bold pb-1 border-b-2 border-indigo-500 text-indigo-500 transition' 
+                : 'text-xs font-bold pb-1 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
+        }
+    });
+};
 
-// --- 1. EDGE FUNCTION SYLLABUS PARSER ---
+function renderTabPanels(course) {
+    const modalBody = document.querySelector('#courseModal .overflow-y-auto');
+    if (!modalBody) return;
+
+    let cwPanel = document.getElementById('panel-coursework');
+    if (!cwPanel) {
+        const existingList = document.getElementById('assignmentList');
+        const addForm = document.getElementById('addAssignmentForm');
+        
+        modalBody.innerHTML = `
+            <div id="panel-coursework" class="space-y-4"></div>
+            <div id="panel-resources" class="hidden space-y-4"></div>
+            <div id="panel-scratchpad" class="hidden space-y-4"></div>
+        `;
+        if (addForm) document.getElementById('panel-coursework').appendChild(addForm);
+        if (existingList) document.getElementById('panel-coursework').appendChild(existingList);
+    }
+
+    let links = course.resources || [];
+    const resPanel = document.getElementById('panel-resources');
+    if (resPanel) {
+        resPanel.innerHTML = `
+            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">🔗 Resource & Note Links</h3>
+            <div id="linksList_${course.id}" class="space-y-2">
+                ${links.map((l, idx) => `
+                    <div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs">
+                        <a href="${l.url}" target="_blank" class="font-bold text-indigo-500 hover:underline truncate">${l.title}</a>
+                        <button onclick="removeResourceLink('${course.id}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="flex gap-2 mt-2">
+                <input type="text" id="resTitle_${course.id}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <input type="url" id="resUrl_${course.id}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <button onclick="addResourceLink('${course.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button>
+            </div>
+        `;
+    }
+
+    const scratchPanel = document.getElementById('panel-scratchpad');
+    if (scratchPanel) {
+        scratchPanel.innerHTML = `
+            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
+            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="6" placeholder="Jot down lecture notes or formula reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">${course.scratchpad || ''}</textarea>
+        `;
+    }
+}
+
+window.addResourceLink = async (courseId) => {
+    const titleInput = document.getElementById(`resTitle_${courseId}`);
+    const urlInput = document.getElementById(`resUrl_${courseId}`);
+    const title = titleInput ? titleInput.value.trim() : '';
+    const url = urlInput ? urlInput.value.trim() : '';
+    if (!title || !url) return;
+
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
+
+    let links = course.resources || [];
+    links.push({ title, url });
+    course.resources = links;
+
+    await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
+    renderTabPanels(course);
+};
+
+window.removeResourceLink = async (courseId, idx) => {
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
+
+    let links = course.resources || [];
+    links.splice(idx, 1);
+    course.resources = links;
+
+    await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
+    renderTabPanels(course);
+};
+
+window.saveCourseScratchpad = async (courseId, val) => {
+    const course = localCourses.find(c => c.id === courseId);
+    if (course) course.scratchpad = val;
+    await supabaseClient.from('courses').update({ scratchpad: val }).eq('id', courseId);
+};
+
+// --- EDGE FUNCTION SYLLABUS & SCREENSHOT PARSERS ---
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -1071,12 +1158,8 @@ window.parseSyllabusPDF = async () => {
             fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
-        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || 
-                               document.getElementById('metadataOnly') || 
-                               document.getElementById('syllabusMetadata') ||
-                               document.getElementById('metaOnly');
+        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || document.getElementById('metadataOnly');
         const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
-
         const apiCallType = isMetadataOnly ? 'syllabus_metadata' : 'syllabus';
 
         const { data: responseData, error: functionError } = await supabaseClient.functions.invoke('gemini-parser', {
@@ -1094,10 +1177,7 @@ window.parseSyllabusPDF = async () => {
         if (parsedData.objectives) updates.objectives = parsedData.objectives;
 
         if (Object.keys(updates).length > 0) {
-            const { error: updateError } = await supabaseClient.from('courses').update(updates).eq('id', courseId);
-            if (updateError) {
-                console.error("SUPABASE UPDATE FAILED:", updateError.message);
-            }
+            await supabaseClient.from('courses').update(updates).eq('id', courseId);
             const cachedCourse = localCourses.find(c => c.id === courseId);
             if (cachedCourse) {
                 if (parsedData.description) cachedCourse.description = parsedData.description;
@@ -1114,7 +1194,6 @@ window.parseSyllabusPDF = async () => {
         }
 
         let baseDate = new Date();
-
         if (parsedData.units && parsedData.units.length > 0) {
             parsedData.units.sort((a, b) => {
                 if (!a.dateStr || !b.dateStr) return 0;
@@ -1141,7 +1220,6 @@ window.parseSyllabusPDF = async () => {
                     let lessonNum = 1;
                     for (let lessonTitle of u.lessons) {
                         let formattedTitle = lessonTitle.toLowerCase().startsWith('lesson') ? lessonTitle : `Lesson ${lessonNum}: ${lessonTitle}`;
-                        
                         await supabaseClient.from('assignments').insert([{
                             course_id: courseId, user_id: currentUser.id,
                             title: `↳ ${formattedTitle}`,
@@ -1167,11 +1245,9 @@ window.parseSyllabusPDF = async () => {
     }
 };
 
-// --- 2. EDGE FUNCTION SCREENSHOT PARSER ---
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
-
     if (!inputElement.files || inputElement.files.length === 0) return;
 
     const file = inputElement.files[0];
@@ -1196,7 +1272,6 @@ window.parseLessonsImage = async (inputElement) => {
             const rawResponse = responseData.result;
             const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsedData = JSON.parse(cleanJson);
-
             let baseDate = new Date();
 
             if (parsedData.units && parsedData.units.length > 0) {
@@ -1207,7 +1282,6 @@ window.parseLessonsImage = async (inputElement) => {
 
                 for (let i = 0; i < parsedData.units.length; i++) {
                     let wk = parsedData.units[i];
-                    
                     let targetDate = wk.dateStr ? smartParseDate(wk.dateStr) : null;
                     if (!targetDate) {
                         let fallbackDate = new Date(baseDate);
@@ -1226,7 +1300,6 @@ window.parseLessonsImage = async (inputElement) => {
                         let lessonNum = 1;
                         for (let l of wk.lessons) {
                             let formattedTitle = l.toLowerCase().startsWith('lesson') ? l : `Lesson ${lessonNum}: ${l}`;
-                            
                             await supabaseClient.from('assignments').insert([{
                                 course_id: courseId, user_id: currentUser.id,
                                 title: `↳ ${formattedTitle}`,
@@ -1262,23 +1335,12 @@ if (eForm) {
         const description = document.getElementById('editCourseDescription')?.value || '';
         const objectives = document.getElementById('editCourseObjectives')?.value || '';
         
-        const { error: updateError } = await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
-        
-        if (updateError) {
-            console.error("COURSE EDIT UPDATE FAILED:", updateError.message);
-            alert(`Failed to save course: ${updateError.message}`);
-            return;
-        }
-        
+        await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
         const cached = localCourses.find(c => c.id === id);
         if (cached) {
-            cached.code = code;
-            cached.color = color;
-            cached.emoji = emoji;
-            cached.description = description;
-            cached.objectives = objectives;
+            cached.code = code; cached.color = color; cached.emoji = emoji;
+            cached.description = description; cached.objectives = objectives;
         }
-
         closeCourseModal();
         loadCoursesPage();
     });
@@ -1295,12 +1357,9 @@ window.deleteCurrentCourse = async () => {
 window.toggleCourseComplete = async (courseId, currentState) => {
     const newState = !currentState;
     await supabaseClient.from('courses').update({ is_completed: newState }).eq('id', courseId);
-    
     const course = localCourses.find(c => c.id === courseId);
     if (course) course.is_completed = newState;
-
     if (newState) fireConfetti();
-    
     openCourseModal(courseId);
     loadCoursesPage();
 };
@@ -1308,9 +1367,7 @@ window.toggleCourseComplete = async (courseId, currentState) => {
 window.toggleAssignment = async (assignId, currentState, courseId) => {
     const newState = !currentState;
     await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
-
     if (newState) fireConfetti();
-    
     if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) loadDashboardStats();
     else if (courseId) loadAssignments(courseId, currentAssignmentPage);
 };
@@ -1332,11 +1389,8 @@ window.addSubItem = async (parentId, courseId) => {
     const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
 
     await supabaseClient.from('assignments').insert([{
-        course_id: courseId, 
-        user_id: currentUser.id,
-        title: `↳ ${title}`, 
-        unit_number: unitNum,
-        due_date: dueDate
+        course_id: courseId, user_id: currentUser.id,
+        title: `↳ ${title}`, unit_number: unitNum, due_date: dueDate
     }]);
     loadAssignments(courseId, currentAssignmentPage);
 };
@@ -1347,8 +1401,8 @@ window.changeAssignmentPage = (courseId, page) => {
 
 async function loadAssignments(courseId, page = 1) {
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
-    
     const listEl = document.getElementById('assignmentList');
+    if (!listEl) return;
     listEl.innerHTML = '';
     
     if (!assignments || !assignments.length) {
@@ -1359,36 +1413,10 @@ async function loadAssignments(courseId, page = 1) {
     const getUnitNum = (item) => {
         if (item.unit_number) return parseInt(item.unit_number) || 0;
         const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        return 0;
+        return match ? parseInt(match[1]) || 0 : 0;
     };
 
-    const getLessonNum = (item) => {
-        const match = item.title.match(/lesson\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        const numMatch = item.title.replace(/[^0-9]/g, '');
-        return numMatch ? parseInt(numMatch) : 999;
-    };
-
-    assignments.sort((a, b) => {
-        let unitA = getUnitNum(a);
-        let unitB = getUnitNum(b);
-        if (unitA !== unitB) return unitA - unitB;
-        
-        let isSubA = a.title.startsWith('↳');
-        let isSubB = b.title.startsWith('↳');
-        
-        if (!isSubA && isSubB) return -1;
-        if (isSubA && !isSubB) return 1;
-        
-        if (isSubA && isSubB) {
-            let lessonA = getLessonNum(a);
-            let lessonB = getLessonNum(b);
-            if (lessonA !== lessonB) return lessonA - lessonB;
-        }
-        
-        return new Date(a.due_date) - new Date(b.due_date);
-    });
+    assignments.sort((a, b) => getUnitNum(a) - getUnitNum(b) || new Date(a.due_date) - new Date(b.due_date));
 
     const pageSize = 6;
     const totalPages = Math.ceil(assignments.length / pageSize);
@@ -1412,7 +1440,7 @@ async function loadAssignments(courseId, page = 1) {
             const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && a.title.startsWith('↳'));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
             const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
-            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}" title="Automatically completed when all unit lessons are done"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
             
             if (assign.is_completed !== allDone) {
                 supabaseClient.from('assignments').update({ is_completed: allDone }).eq('id', assign.id);
@@ -1421,16 +1449,11 @@ async function loadAssignments(courseId, page = 1) {
         }
 
         const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
-        
-        let subItemForm = '';
-        if (!isSubItem && assign.unit_number) {
-            subItemForm = `
-                <div class="mt-2 pl-8 flex gap-2">
-                    <input type="text" id="date-${assign.id}" value="${formattedDate}" placeholder="YYYY-MM-DD" class="hidden">
-                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
-                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
-                </div>`;
-        }
+        let subItemForm = !isSubItem && assign.unit_number ? `
+            <div class="mt-2 pl-8 flex gap-2">
+                <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
+            </div>` : '';
         
         listEl.innerHTML += `
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm mb-2">
@@ -1439,43 +1462,13 @@ async function loadAssignments(courseId, page = 1) {
                         ${checkboxHtml}
                         <div class="flex flex-col min-w-0 flex-1">
                             <span class="font-bold transition-all truncate ${tClass}">${unitBadge}${assign.title}</span>
-                            <input type="text" value="${formattedDate}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono" title="Type date matching your format preference">
+                            <input type="text" value="${formattedDate}" placeholder="YYYY-MM-DD" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="text-xs text-zinc-500 dark:text-zinc-400 bg-transparent border border-transparent hover:border-zinc-300 dark:hover:border-brand-600 rounded px-1 py-0.5 mt-0.5 w-32 cursor-pointer focus:outline-none focus:border-indigo-500 font-mono">
                         </div>
                     </div>
                     <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2 shrink-0">✕</button>
                 </div>
                 ${subItemForm}
             </div>`;
-    });
-
-    if (totalPages > 1) {
-        listEl.innerHTML += `
-            <div class="flex items-center justify-between pt-3 mt-2 border-t border-zinc-200 dark:border-brand-700 text-xs">
-                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page - 1})" ${page <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Previous</button>
-                <span class="text-zinc-500 dark:text-zinc-400 font-medium">Page ${page} of ${totalPages}</span>
-                <button type="button" onclick="changeAssignmentPage('${courseId}', ${page + 1})" ${page >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 rounded font-bold text-zinc-600 dark:text-zinc-300"' : 'class="px-2.5 py-1 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded font-bold text-zinc-700 dark:text-zinc-200 transition"'}>Next</button>
-            </div>`;
-    }
-}
-
-const aForm = document.getElementById('addAssignmentForm');
-if (aForm) {
-    aForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const courseId = document.getElementById('editCourseId').value;
-        const unitNum = document.getElementById('assignUnit').value ? parseInt(document.getElementById('assignUnit').value) : null;
-        
-        await supabaseClient.from('assignments').insert([{
-            course_id: courseId, user_id: currentUser.id,
-            title: document.getElementById('assignTitle').value,
-            unit_number: unitNum,
-            due_date: document.getElementById('assignDate').value
-        }]);
-        
-        document.getElementById('assignTitle').value = '';
-        document.getElementById('assignUnit').value = '';
-        document.getElementById('assignDate').value = '';
-        loadAssignments(courseId, currentAssignmentPage);
     });
 }
 
@@ -1484,41 +1477,123 @@ window.deleteAssignment = async (assignId, courseId) => {
     loadAssignments(courseId, currentAssignmentPage);
 };
 
+// --- GRADES PAGE LOGIC ---
+async function loadGradesPage() {
+    const container = document.getElementById('gradesContainer');
+    if (!container) return;
+
+    const { data: courses } = await supabaseClient.from('courses').select('*');
+    const { data: assignments } = await supabaseClient.from('assignments').select('*');
+    if (!courses || !assignments) return;
+
+    container.innerHTML = '';
+    let totalGradePoints = 0;
+    let gradedCount = 0;
+
+    courses.forEach(course => {
+        const cAssignments = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
+        const unitsMap = {};
+        cAssignments.forEach(a => {
+            const uNum = a.unit_number || 1;
+            if (!unitsMap[uNum]) unitsMap[uNum] = [];
+            unitsMap[uNum].push(a);
+        });
+
+        let courseTotal = 0;
+        let courseGraded = 0;
+        let unitsHtml = '';
+
+        Object.keys(unitsMap).sort((a,b) => a-b).forEach(uNum => {
+            let lessonsHtml = '';
+            unitsMap[uNum].forEach(item => {
+                if (item.grade !== null && item.grade !== undefined && !item.exclude_from_gpa) {
+                    courseTotal += parseFloat(item.grade);
+                    courseGraded++;
+                }
+                lessonsHtml += `
+                    <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
+                        <span class="font-bold truncate flex-1">${item.title}</span>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-1.5 text-[11px] text-zinc-400 cursor-pointer">
+                                <input type="checkbox" ${item.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa('${item.id}', this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <input type="number" min="0" max="100" value="${item.grade !== null && item.grade !== undefined ? item.grade : ''}" placeholder="--" onchange="updateAssignmentGrade('${item.id}', this.value)" class="w-16 text-center text-xs font-bold p-1 rounded border dark:bg-brand-800 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                                <span class="text-zinc-400">%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            unitsHtml += `
+                <div class="mb-4">
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Unit ${uNum}</h5>
+                    <div class="space-y-2">${lessonsHtml}</div>
+                </div>
+            `;
+        });
+
+        const courseAvg = courseGraded > 0 ? (courseTotal / courseGraded).toFixed(1) : 'N/A';
+        if (courseGraded > 0) {
+            totalGradePoints += parseFloat(courseAvg);
+            gradedCount++;
+        }
+
+        container.innerHTML += `
+            <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-brand-700">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${course.emoji || '📚'}</span>
+                        <h3 class="font-bold text-base text-zinc-800 dark:text-zinc-100">${course.code}</h3>
+                    </div>
+                    <span class="text-sm font-extrabold px-3 py-1 bg-indigo-500/10 text-indigo-500 rounded-lg">Course Average: ${courseAvg}%</span>
+                </div>
+                ${unitsHtml || '<p class="text-xs text-zinc-400">No graded coursework in this class yet.</p>'}
+            </div>
+        `;
+    });
+
+    const cumulativeEl = document.getElementById('cumulativeGpaVal');
+    if (cumulativeEl && gradedCount > 0) {
+        const avgPct = totalGradePoints / gradedCount;
+        const scaleTarget = parseFloat(localStorage.getItem('duevinci_gpa_scale') || '4.0');
+        const gpa = ((avgPct / 100) * scaleTarget).toFixed(2);
+        cumulativeEl.innerText = `${gpa} / ${scaleTarget.toFixed(1)}`;
+    }
+}
+
+window.updateAssignmentGrade = async (assignId, gradeVal) => {
+    const val = gradeVal === '' ? null : parseFloat(gradeVal);
+    await supabaseClient.from('assignments').update({ grade: val }).eq('id', assignId);
+    loadGradesPage();
+};
+
+window.toggleExcludeGpa = async (assignId, excluded) => {
+    await supabaseClient.from('assignments').update({ exclude_from_gpa: excluded }).eq('id', assignId);
+    loadGradesPage();
+};
+
 // --- CALENDAR LOGIC ---
 function initCalendar() {
     if (calendarInstance) return;
-    
     const calendarEl = document.getElementById('calendar');
     if (!calendarEl) return;
     
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         timeZone: 'local',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek'
-        },
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
         events: [],
         dayMaxEvents: true,
         eventClick: async function(info) {
             if (info.event.extendedProps.isCustom) {
-                if(confirm(`Delete custom event "${info.event.title}"?`)) {
-                    deleteCustomEvent(info.event.extendedProps.eventId);
-                }
+                if(confirm(`Delete custom event "${info.event.title}"?`)) deleteCustomEvent(info.event.extendedProps.eventId);
             } else if (info.event.extendedProps.isAssignment) {
                 const assignId = info.event.extendedProps.assignmentId;
-                const currentState = info.event.extendedProps.isCompleted;
-                const newState = !currentState;
-                
+                const newState = !info.event.extendedProps.isCompleted;
                 await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
                 if (newState) fireConfetti();
                 loadCalendarCourses();
-            }
-        },
-        eventDidMount: function(info) {
-            if (info.event.extendedProps.isAssignment && info.event.extendedProps.isCompleted) {
-                info.el.style.textDecoration = 'line-through';
             }
         }
     });
@@ -1538,26 +1613,16 @@ async function loadCalendarCourses() {
         const course = courseMap[assign.course_id];
         if(!course) return;
         const prefix = assign.unit_number ? `[Wk ${assign.unit_number}] ` : '';
-        
         calendarEvents.push({
             title: `${course.emoji || '📚'} ${prefix}${assign.title}`,
             start: assign.due_date,
             color: assign.is_completed ? '#9ca3af' : course.color,
-            extendedProps: { 
-                isAssignment: true, 
-                assignmentId: assign.id, 
-                isCompleted: assign.is_completed 
-            }
+            extendedProps: { isAssignment: true, assignmentId: assign.id, isCompleted: assign.is_completed }
         });
     });
     
     if(customEvents) customEvents.forEach(ev => {
-        calendarEvents.push({
-            title: ev.title,
-            start: ev.event_date,
-            color: ev.color,
-            extendedProps: { isCustom: true, eventId: ev.id }
-        });
+        calendarEvents.push({ title: ev.title, start: ev.event_date, color: ev.color, extendedProps: { isCustom: true, eventId: ev.id } });
     });
     
     if (calendarInstance) {
@@ -1573,14 +1638,10 @@ const customEventForm = document.getElementById('customEventForm');
 if(customEventForm) {
     customEventForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const title = document.getElementById('evTitle').value;
-        const date = document.getElementById('evDate').value;
-        const color = document.getElementById('evColor').value;
-        
         await supabaseClient.from('custom_events').insert([{
-            user_id: currentUser.id, title: title, event_date: date, color: color
+            user_id: currentUser.id, title: document.getElementById('evTitle').value,
+            event_date: document.getElementById('evDate').value, color: document.getElementById('evColor').value
         }]);
-        
         document.getElementById('evTitle').value = '';
         closeEventModal();
         loadCalendarCourses();
@@ -1594,16 +1655,12 @@ window.deleteCustomEvent = async (id) => {
 
 window.exportToICS = () => {
     if(!calendarInstance) return;
-    
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
-    
     calendarInstance.getEvents().forEach(ev => {
         const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
         icsContent += "BEGIN:VEVENT\nSUMMARY:" + ev.title + "\nDTSTART:" + dateStr + "\nDTEND:" + dateStr + "\nEND:VEVENT\n";
     });
-    
     icsContent += "END:VCALENDAR";
-    
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
