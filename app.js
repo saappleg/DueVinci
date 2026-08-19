@@ -10,6 +10,7 @@ let currentAssignmentPage = 1;
 let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
 let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
+let lastProcessedSessionToken = null; // Guard to prevent double execution on load
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -287,6 +288,10 @@ async function checkUser() {
 }
 
 function handleAuth(session) {
+    const token = session?.access_token || null;
+    if (token === lastProcessedSessionToken) return; // Prevent duplicate execution from getSession + onAuthStateChange race condition
+    lastProcessedSessionToken = token;
+
     if (session) {
         currentUser = session.user;
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
@@ -528,7 +533,7 @@ async function loadCoursesPage() {
                     <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
                     <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                 </div>
-            </div>`;
+            `;
     }
 
     renderTermFolders();
