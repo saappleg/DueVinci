@@ -67,7 +67,7 @@ function fireConfetti() {
     }
 }
 
-// --- TOP TITLE BAR INJECTOR (RESTORED FULL TITLE & SUBTITLE) ---
+// --- TOP TITLE BAR INJECTOR & SIDEBAR TOGGLE ---
 function ensureTopTitleBar() {
     const appScreen = document.getElementById('appScreen');
     if (!appScreen) return;
@@ -80,6 +80,9 @@ function ensureTopTitleBar() {
             logoDiv.id = 'headerLogoSection';
             logoDiv.className = 'flex items-center gap-3';
             logoDiv.innerHTML = `
+                <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
                 <div>
                     <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
@@ -90,6 +93,12 @@ function ensureTopTitleBar() {
         }
     }
 }
+
+window.toggleSidebar = () => {
+    const aside = document.querySelector('aside');
+    if (!aside) return;
+    aside.classList.toggle('hidden');
+};
 
 // --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
