@@ -9,6 +9,7 @@ let localCourses = [];
 let currentAssignmentPage = 1;
 let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
 let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
+let floatingTimerDismissed = false;
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -125,7 +126,7 @@ function updateTimerDisplay() {
 
 function updateFloatingTimer() {
     let floatWidget = document.getElementById('floatingTimerWidget');
-    if (!timerInterval) {
+    if (!timerInterval || floatingTimerDismissed) {
         if (floatWidget) floatWidget.classList.add('hidden');
         return;
     }
@@ -142,7 +143,7 @@ function updateFloatingTimer() {
     floatWidget.innerHTML = `
         <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
             <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
-            <button onclick="document.getElementById('floatingTimerWidget').classList.add('hidden')" class="text-zinc-400 hover:text-white text-xs">✕</button>
+            <button onclick="dismissFloatingTimer()" class="text-zinc-400 hover:text-white text-xs">✕</button>
         </div>
         <div class="flex justify-between items-center">
             <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
@@ -151,6 +152,12 @@ function updateFloatingTimer() {
     `;
 }
 
+window.dismissFloatingTimer = () => {
+    floatingTimerDismissed = true;
+    const floatWidget = document.getElementById('floatingTimerWidget');
+    if (floatWidget) floatWidget.classList.add('hidden');
+};
+
 window.toggleTimer = () => {
     const btn = document.getElementById('timerPlayBtn');
     if (timerInterval) {
@@ -158,6 +165,7 @@ window.toggleTimer = () => {
         timerInterval = null;
         btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
     } else {
+        floatingTimerDismissed = false; // Reset dismissal so floating timer displays again when playing
         btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
         timerInterval = setInterval(() => {
             if (timeLeft > 0) {
