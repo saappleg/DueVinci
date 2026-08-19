@@ -24,11 +24,11 @@ DueVinci is a modern, modular student planner web application designed to help s
 
 ---
 
-**## 📂 Project Structure
+## 📂 Project Structure
 
+```text
 DueVinci/
 ├── index.html       # Main student dashboard (Up Next & Goals)
 ├── courses.html     # Class management & PDF syllabus parser
 ├── calendar.html    # FullCalendar view & custom event manager
 └── app.js           # Core business logic, Supabase hooks, and UI controllers
-**
