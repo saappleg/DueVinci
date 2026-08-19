@@ -16,22 +16,19 @@
         if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
         else { document.documentElement.classList.remove('dark'); }
     </script>
-    <!-- PDF.js CDN Scripts for Syllabus Parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=7" defer></script>
+    <script src="app.js?v=8" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         
-        <!-- Navigation Sidebar -->
         <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto">
-            
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>
@@ -61,14 +58,9 @@
                         <button type="button" onclick="toggleTimer()" id="timerPlayBtn" class="bg-white dark:bg-zinc-100 text-zinc-900 p-3 rounded-lg shadow-sm hover:scale-105 transition"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
                         <button type="button" onclick="skipTimer()" class="hover:text-zinc-800 dark:hover:text-white transition"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 4v16M9 4l10 8-10 8V4z"/></svg></button>
                     </div>
-
-                    <button type="button" onclick="alert('Lecture recording feature coming soon!')" class="w-full bg-white dark:bg-brand-900 border border-zinc-200 dark:border-brand-600 text-zinc-800 dark:text-zinc-200 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-brand-700 transition shadow-sm text-sm">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg> Record Lecture
-                    </button>
                 </div>
             </div>
 
-            <!-- Navigation Links -->
             <div class="p-4 flex-1">
                 <nav class="space-y-1">
                     <a href="index.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard</a>
@@ -84,7 +76,6 @@
             </div>
         </aside>
 
-        <!-- Main Content Area -->
         <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-end px-8 gap-4 bg-white dark:bg-brand-900">
                 <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
@@ -104,7 +95,7 @@
                     <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 flex items-center justify-between gap-4">
                         <form id="courseForm" class="flex-1 flex gap-3 items-center">
                             <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
-                            <input type="text" id="courseCode" placeholder="Add a new class (e.g. CS101)" required class="flex-1 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
+                            <input type="text" id="courseCode" placeholder="Add a new class (e.g. BE101)" required class="flex-1 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
                             <div class="relative w-10 h-10 rounded-lg border border-zinc-300 dark:border-brand-600 overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-brand-900">
                                 <input type="color" id="courseColor" value="#4f46e5" class="absolute -inset-2 w-16 h-16 cursor-pointer bg-transparent">
                             </div>
@@ -123,7 +114,7 @@
 
     <!-- Course Settings Modal -->
     <div id="courseModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50">
                 <h2 class="text-xl font-bold dark:text-white flex items-center gap-2" id="modalCourseTitle"><span>📚</span> Course Settings</h2>
                 <div class="flex items-center gap-3">
@@ -133,7 +124,6 @@
             </div>
 
             <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Left Side: Info & PDF Syllabus Upload -->
                 <div class="space-y-6">
                     <div>
                         <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
@@ -153,73 +143,29 @@
 
                     <!-- PDF Syllabus Import Box -->
                     <div class="border-t border-zinc-200 dark:border-brand-700 pt-4">
-                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Upload your syllabus PDF to auto-extract text and deadlines.</p>
+                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (Unit or Date Based)</h3>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Upload your syllabus PDF. If it's a 6-month term course with weekly units (e.g. Unit 1, Unit 2), DueVinci will map them out over a 6-month relative timeline!</p>
                         <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-3">
-                        <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan & Import Assignments</button>
+                        <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Units & Deadlines</button>
                         <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
                     </div>
 
                     <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Assignments</button>
                 </div>
 
-                <!-- Right Side: Assignments -->
                 <div class="flex flex-col h-full">
-                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Assignments</h3>
-                    <form id="addAssignmentForm" class="flex gap-2 mb-4">
-                        <input type="text" id="assignTitle" placeholder="e.g. Midterm Essay" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
-                        <input type="date" id="assignDate" required class="w-32 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
-                        <button type="submit" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">+</button>
+                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Assignments / Units</h3>
+                    <form id="addAssignmentForm" class="space-y-2 mb-4 bg-zinc-50 dark:bg-brand-900 p-3 rounded-xl border border-zinc-200 dark:border-brand-700">
+                        <div class="flex gap-2">
+                            <input type="text" id="assignTitle" placeholder="e.g. Unit 1: How the web works" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
+                            <input type="number" id="assignUnit" placeholder="Unit #" class="w-20 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="date" id="assignDate" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Item</button>
+                        </div>
                     </form>
                     <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modular Settings Modal -->
-    <div id="settingsModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
-            <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
-                <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
-                <nav class="space-y-1">
-                    <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
-                    <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
-                </nav>
-            </div>
-            <div class="flex-1 p-6 relative">
-                <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                <div id="content-profile" class="block space-y-6">
-                    <div>
-                        <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
-                    </div>
-                    <form id="settingsForm" class="max-w-sm space-y-4">
-                        <div>
-                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
-                            <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
-                            <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
-                        <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
-                    </form>
-                </div>
-                <div id="content-appearance" class="hidden space-y-6">
-                    <div>
-                        <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
-                    </div>
-                    <div class="max-w-sm">
-                        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
-                        <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
-                            <option value="system">💻 Follow System</option>
-                            <option value="light">☀️ Light Mode</option>
-                            <option value="dark">🌙 Dark Mode</option>
-                        </select>
-                    </div>
                 </div>
             </div>
         </div>
