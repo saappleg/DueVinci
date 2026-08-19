@@ -8,7 +8,7 @@ let currentUser = null;
 let calendarInstance = null;
 let localCourses = []; 
 
-// --- THEME LOGIC (Cycle Icon) ---
+// --- THEME LOGIC ---
 const moonIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
 const sunIcon = `<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>`;
 
@@ -35,10 +35,22 @@ window.cycleTheme = () => {
 
 document.addEventListener('DOMContentLoaded', updateThemeIcon);
 
+// --- CONFETTI LOGIC ---
+function fireConfetti() {
+    if (typeof confetti !== 'undefined') {
+        confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6']
+        });
+    }
+}
+
 // --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
-let timeLeft = 25 * 60; // 25 minutes
-let isWorking = true; // Focus vs Break
+let timeLeft = 25 * 60; 
+let isWorking = true; 
 
 function updateTimerDisplay() {
     const min = Math.floor(timeLeft / 60);
@@ -50,7 +62,7 @@ function updateTimerDisplay() {
     
     if(circle) {
         const total = isWorking ? (25 * 60) : (5 * 60);
-        const percent = ((total - timeLeft) / total) * 301.59; // 301.59 is the stroke-dasharray (circumference of r=48)
+        const percent = ((total - timeLeft) / total) * 301.59; 
         circle.style.strokeDashoffset = percent;
     }
 }
@@ -58,19 +70,17 @@ function updateTimerDisplay() {
 window.toggleTimer = () => {
     const btn = document.getElementById('timerPlayBtn');
     if (timerInterval) {
-        // Pause
         clearInterval(timerInterval);
         timerInterval = null;
         btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
     } else {
-        // Play
         btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
         timerInterval = setInterval(() => {
             if (timeLeft > 0) {
                 timeLeft--;
                 updateTimerDisplay();
             } else {
-                skipTimer(); // Auto switch
+                skipTimer(); 
             }
         }, 1000);
     }
@@ -86,7 +96,6 @@ window.skipTimer = () => {
     document.getElementById('timerLabel').innerText = isWorking ? "Focus" : "Break";
     timeLeft = isWorking ? (25 * 60) : (5 * 60);
     updateTimerDisplay();
-    // Keep playing if it was playing
     if(timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
@@ -94,7 +103,7 @@ window.skipTimer = () => {
     }
 };
 
-// --- AUTH LOGIC ---
+// --- AUTH & ROUTING LOGIC ---
 async function checkUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     handleAuth(session);
@@ -107,9 +116,15 @@ function handleAuth(session) {
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
         
-        if (document.getElementById('calendar')) initCalendar();
-        if (document.getElementById('dashboardGrid')) loadDashboardCourses();
-        if (document.getElementById('calendar')) loadCalendarCourses();
+        const currentPath = window.location.pathname;
+        const isIndex = currentPath.endsWith('index.html') || currentPath.endsWith('/') || currentPath.includes('DueVinci');
+        const isCourses = currentPath.endsWith('courses.html');
+        const isCalendar = currentPath.endsWith('calendar.html');
+
+        if (isIndex && document.getElementById('dashboardGrid')) loadDashboardStats();
+        if (isCourses && document.getElementById('coursesGrid')) loadCoursesPage();
+        if (isCalendar && document.getElementById('calendar')) loadCalendarCourses();
+
     } else {
         currentUser = null;
         const currentPath = window.location.pathname;
@@ -135,7 +150,6 @@ window.signUpWithEmail = async () => {
     const email = document.getElementById('authEmail').value;
     const password = document.getElementById('authPassword').value;
     if (!email || !password) return showAuthMessage("Please enter an email and password.");
-    
     const { error } = await supabaseClient.auth.signUp({ email, password });
     if (error) showAuthMessage(error.message);
     else showAuthMessage("Account created! You are now logged in.", "text-green-500");
@@ -145,7 +159,6 @@ window.signInWithEmail = async () => {
     const email = document.getElementById('authEmail').value;
     const password = document.getElementById('authPassword').value;
     if (!email || !password) return showAuthMessage("Please enter your email and password.");
-
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) showAuthMessage(error.message);
 };
@@ -155,8 +168,79 @@ window.logout = async () => {
     window.location.href = 'index.html'; 
 };
 
-// --- DASHBOARD LOGIC ---
-async function loadDashboardCourses() {
+// --- DASHBOARD (index.html) LOGIC ---
+async function loadDashboardStats() {
+    const { data: courses } = await supabaseClient.from('courses').select('*');
+    const { data: assignments } = await supabaseClient.from('assignments').select('*').order('due_date', { ascending: true });
+
+    if (!courses || !assignments) return;
+
+    // Populating Up Next
+    const upNextListEl = document.getElementById('upNextList');
+    if (upNextListEl) {
+        upNextListEl.innerHTML = '';
+        const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
+
+        if (upcoming.length === 0) {
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming assignments. You\'re all caught up!</p>';
+        } else {
+            upcoming.forEach(assign => {
+                const course = courses.find(c => c.id === assign.course_id);
+                if (!course) return;
+                const dateObj = new Date(assign.due_date + 'T12:00:00'); 
+                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                upNextListEl.innerHTML += `
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700">
+                        <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                        </button>
+                        <div>
+                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${assign.title}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Due: ${dateStr}</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    // Populating Goals
+    const goalsListEl = document.getElementById('goalsList');
+    if (goalsListEl) {
+        goalsListEl.innerHTML = '';
+        if(courses.length === 0) {
+            goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking your progress.</p>';
+        } else {
+            courses.forEach(course => {
+                const courseAssignments = assignments.filter(a => a.course_id === course.id);
+                const completedCount = courseAssignments.filter(a => a.is_completed).length;
+                let percent = 0;
+                
+                if (course.is_completed) {
+                    percent = 100;
+                } else if (courseAssignments.length > 0) {
+                    percent = Math.round((completedCount / courseAssignments.length) * 100);
+                }
+
+                goalsListEl.innerHTML += `
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-bold text-zinc-700 dark:text-zinc-300">${course.emoji} ${course.code}</span>
+                            <span class="font-bold" style="color: ${course.color}">${percent}%</span>
+                        </div>
+                        <div class="w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-2.5 overflow-hidden">
+                            <div class="h-2.5 rounded-full transition-all duration-500" style="width: ${percent}%; background-color: ${course.color}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+}
+
+// --- COURSES PAGE (courses.html) LOGIC ---
+async function loadCoursesPage() {
     const { data: courses, error } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     if (error) return console.error('Error loading courses:', error);
 
@@ -167,9 +251,11 @@ async function loadDashboardCourses() {
 
     courses.forEach(course => {
         const emoji = course.emoji || '📚';
-        // Redesigned course card to match new aesthetic
+        const opacityStyle = course.is_completed ? 'opacity-50' : '';
+        const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
+
         courseListEl.innerHTML += `
-            <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex items-center justify-between">
+            <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex flex-col justify-between ${opacityStyle} min-h-[100px]">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">
                         ${emoji}
@@ -179,12 +265,14 @@ async function loadDashboardCourses() {
                         <p class="text-xs text-zinc-500 dark:text-zinc-400">View assignments &rarr;</p>
                     </div>
                 </div>
+                <div class="mt-3 flex justify-end">
+                    ${checkIcon}
+                </div>
             </div>
         `;
     });
 }
 
-// Add Main Course
 const courseForm = document.getElementById('courseForm');
 if (courseForm) {
     courseForm.addEventListener('submit', async (e) => {
@@ -198,14 +286,12 @@ if (courseForm) {
         if (!error) {
             document.getElementById('courseCode').value = '';
             document.getElementById('courseEmoji').value = '';
-            loadDashboardCourses();
-        } else {
-            alert('Error adding course: ' + error.message);
+            loadCoursesPage();
         }
     });
 }
 
-// --- COURSE SETTINGS MODAL & ASSIGNMENTS ---
+// --- COURSE MODAL & COMPLETION LOGIC ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -215,6 +301,15 @@ window.openCourseModal = (courseId) => {
     document.getElementById('editCourseEmoji').value = course.emoji || '📚';
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
+
+    const completeBtn = document.getElementById('markCourseCompleteBtn');
+    if (completeBtn) {
+        completeBtn.onclick = () => toggleCourseComplete(course.id, course.is_completed);
+        completeBtn.innerText = course.is_completed ? "Undo Completion" : "✔ Mark Complete";
+        completeBtn.className = course.is_completed 
+            ? "text-xs bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-brand-700 dark:text-zinc-400 px-3 py-1.5 rounded font-bold transition"
+            : "text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition";
+    }
 
     document.getElementById('courseModal').classList.remove('hidden');
     loadAssignments(course.id);
@@ -236,7 +331,7 @@ if (editCourseForm) {
         const { error } = await supabaseClient.from('courses').update({ code, color, emoji }).eq('id', id);
         if (!error) {
             closeCourseModal();
-            loadDashboardCourses();
+            loadCoursesPage();
         }
     });
 }
@@ -247,8 +342,26 @@ window.deleteCurrentCourse = async () => {
         const { error } = await supabaseClient.from('courses').delete().eq('id', id);
         if (!error) {
             closeCourseModal();
-            loadDashboardCourses();
+            loadCoursesPage();
         }
+    }
+};
+
+window.toggleCourseComplete = async (courseId, currentState) => {
+    await supabaseClient.from('courses').update({ is_completed: !currentState }).eq('id', courseId);
+    if (!currentState) fireConfetti(); // Confetti on completion!
+    closeCourseModal();
+    loadCoursesPage();
+};
+
+window.toggleAssignment = async (assignId, currentState, courseId) => {
+    await supabaseClient.from('assignments').update({ is_completed: !currentState }).eq('id', assignId);
+    if (!currentState) fireConfetti(); 
+
+    if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) {
+        loadDashboardStats();
+    } else if (courseId) {
+        loadAssignments(courseId);
     }
 };
 
@@ -271,13 +384,24 @@ async function loadAssignments(courseId) {
         const dateObj = new Date(assign.due_date + 'T12:00:00'); 
         const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         
+        const checkedClass = assign.is_completed 
+            ? "bg-indigo-500 text-white border-indigo-500" 
+            : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
+        
+        const titleStyle = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
+
         listEl.innerHTML += `
             <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
-                <div class="flex flex-col">
-                    <span class="font-bold text-zinc-800 dark:text-zinc-200">${assign.title}</span>
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Due: ${dateStr}</span>
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${checkedClass}">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                    </button>
+                    <div class="flex flex-col">
+                        <span class="font-bold transition-all ${titleStyle}">${assign.title}</span>
+                        <span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Due: ${dateStr}</span>
+                    </div>
                 </div>
-                <button onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2">✕</button>
+                <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2">✕</button>
             </div>
         `;
     });
@@ -341,7 +465,7 @@ async function loadCalendarCourses() {
         calendarEvents.push({
             title: `${course.emoji || '📚'} ${assign.title}`,
             start: assign.due_date,
-            color: course.color
+            color: assign.is_completed ? '#9ca3af' : course.color // Grey out on calendar if done
         });
     });
 
