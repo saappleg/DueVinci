@@ -752,30 +752,7 @@ async function loadCoursesPage() {
     });
     localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
     
-    const coursesGridEl = document.getElementById('coursesGrid') || document.getElementById('courseList')?.parentElement;
-    if (!coursesGridEl) return;
-
-    let container = document.getElementById('coursesMainContainer');
-    if (!container) {
-        coursesGridEl.innerHTML = `
-            <div id="coursesMainContainer" class="space-y-8">
-                <div>
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
-                        <div class="flex gap-2">
-                            <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
-                            <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
-                        </div>
-                    </div>
-                    <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
-                </div>
-                <div class="pt-6 border-t border-zinc-200 dark:border-brand-700">
-                    <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
-                    <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
-                </div>
-            `;
-    }
-
+    // Safely populate the grids without overwriting the static HTML form
     renderTermFolders();
     renderAlphabeticals();
 }
