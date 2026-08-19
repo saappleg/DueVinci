@@ -1028,7 +1028,6 @@ window.openCourseModal = (courseId) => {
             <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
             <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
         `;
-        // Insert right below modal header title area
         const headerArea = modalContentWrapper.querySelector('.flex.items-center.justify-between');
         if (headerArea) {
             headerArea.insertAdjacentElement('afterend', tabNav);
@@ -1043,7 +1042,10 @@ window.openCourseModal = (courseId) => {
     loadAssignments(course.id, currentAssignmentPage);
 };
 
-window.closeCourseModal = () => document.getElementById('courseModal'].classList.add('hidden');
+window.closeCourseModal = () => {
+    const m = document.getElementById('courseModal');
+    if (m) m.classList.add('hidden');
+};
 
 window.switchCourseTab = (tabName) => {
     ['overview', 'coursework', 'resources', 'scratchpad'].forEach(t => {
@@ -1064,12 +1066,10 @@ function renderCourseModalPanels(course) {
 
     let overviewPanel = document.getElementById('panel-overview');
     if (!overviewPanel) {
-        // Grab existing edit form, metadata box, and PDF/screenshot uploaders
         const editForm = document.getElementById('editCourseForm');
         const metadataBox = document.getElementById('courseMetadataBox');
         const pdfImportSection = document.getElementById('syllabusFile')?.closest('.border') || document.querySelector('#courseModal input[type="file"]')?.closest('div');
 
-        // Create container wrappers for all 4 tabs
         const panelsWrapper = document.createElement('div');
         panelsWrapper.id = 'coursePanelsWrapper';
         panelsWrapper.className = 'mt-4 max-h-[65vh] overflow-y-auto pr-1';
@@ -1081,13 +1081,11 @@ function renderCourseModalPanels(course) {
         `;
         modalContent.appendChild(panelsWrapper);
 
-        // Move Overview items into overview panel
         const ovPanel = document.getElementById('panel-overview');
         if (metadataBox) ovPanel.appendChild(metadataBox);
         if (editForm) ovPanel.appendChild(editForm);
         if (pdfImportSection) ovPanel.appendChild(pdfImportSection);
 
-        // Move Coursework items into coursework panel
         const cwPanel = document.getElementById('panel-coursework');
         const addAssignForm = document.getElementById('addAssignmentForm');
         const assignList = document.getElementById('assignmentList');
@@ -1095,7 +1093,6 @@ function renderCourseModalPanels(course) {
         if (assignList) cwPanel.appendChild(assignList);
     }
 
-    // Render Resources
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1117,7 +1114,6 @@ function renderCourseModalPanels(course) {
         `;
     }
 
-    // Render Scratchpad
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
