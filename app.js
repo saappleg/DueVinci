@@ -6,30 +6,93 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 let currentUser = null;
 let calendarInstance = null;
-let localCourses = []; // Keep a local copy of courses to easily populate the modal
+let localCourses = []; 
 
-// --- THEME LOGIC ---
-window.changeTheme = (theme) => {
-    localStorage.setItem('theme', theme);
-    if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
+// --- THEME LOGIC (Cycle Icon) ---
+const moonIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+const sunIcon = `<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>`;
+
+function updateThemeIcon() {
+    const iconEl = document.getElementById('themeIcon');
+    if (!iconEl) return;
+    if (document.documentElement.classList.contains('dark')) {
+        iconEl.innerHTML = sunIcon;
     } else {
+        iconEl.innerHTML = moonIcon;
+    }
+}
+
+window.cycleTheme = () => {
+    if (document.documentElement.classList.contains('dark')) {
         document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+    }
+    updateThemeIcon();
+};
+
+document.addEventListener('DOMContentLoaded', updateThemeIcon);
+
+// --- POMODORO TIMER LOGIC ---
+let timerInterval = null;
+let timeLeft = 25 * 60; // 25 minutes
+let isWorking = true; // Focus vs Break
+
+function updateTimerDisplay() {
+    const min = Math.floor(timeLeft / 60);
+    const sec = timeLeft % 60;
+    const display = document.getElementById('timerDisplay');
+    const circle = document.getElementById('timerProgress');
+    
+    if(display) display.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    
+    if(circle) {
+        const total = isWorking ? (25 * 60) : (5 * 60);
+        const percent = ((total - timeLeft) / total) * 301.59; // 301.59 is the stroke-dasharray (circumference of r=48)
+        circle.style.strokeDashoffset = percent;
+    }
+}
+
+window.toggleTimer = () => {
+    const btn = document.getElementById('timerPlayBtn');
+    if (timerInterval) {
+        // Pause
+        clearInterval(timerInterval);
+        timerInterval = null;
+        btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+    } else {
+        // Play
+        btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        timerInterval = setInterval(() => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                updateTimerDisplay();
+            } else {
+                skipTimer(); // Auto switch
+            }
+        }, 1000);
     }
 };
 
-// Listen for system theme changes in case 'system' is selected
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if(localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
-        changeTheme('system');
-    }
-});
+window.resetTimer = () => {
+    timeLeft = isWorking ? (25 * 60) : (5 * 60);
+    updateTimerDisplay();
+};
 
-// Sync dropdown UI with stored value on load
-document.addEventListener('DOMContentLoaded', () => {
-    const themeSelect = document.getElementById('themeSelect');
-    if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
-});
+window.skipTimer = () => {
+    isWorking = !isWorking;
+    document.getElementById('timerLabel').innerText = isWorking ? "Focus" : "Break";
+    timeLeft = isWorking ? (25 * 60) : (5 * 60);
+    updateTimerDisplay();
+    // Keep playing if it was playing
+    if(timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        window.toggleTimer();
+    }
+};
 
 // --- AUTH LOGIC ---
 async function checkUser() {
@@ -97,22 +160,25 @@ async function loadDashboardCourses() {
     const { data: courses, error } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     if (error) return console.error('Error loading courses:', error);
 
-    localCourses = courses; // Cache for modal
+    localCourses = courses; 
     const courseListEl = document.getElementById('courseList');
     if (!courseListEl) return;
     courseListEl.innerHTML = '';
 
     courses.forEach(course => {
         const emoji = course.emoji || '📚';
-        // Now fully clickable to open settings
+        // Redesigned course card to match new aesthetic
         courseListEl.innerHTML += `
-            <div onclick="openCourseModal('${course.id}')" class="cursor-pointer flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-600 transition hover:border-indigo-400 dark:hover:border-indigo-500 group">
-                <div class="flex items-center gap-3">
-                    <span class="text-xl">${emoji}</span>
-                    <span class="w-3 h-3 rounded-full inline-block shadow-sm" style="background-color: ${course.color};"></span>
-                    <span class="font-bold text-sm text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</span>
+            <div onclick="openCourseModal('${course.id}')" class="cursor-pointer group bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">
+                        ${emoji}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${course.code}</h4>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">View assignments &rarr;</p>
+                    </div>
                 </div>
-                <span class="text-slate-300 dark:text-slate-500 text-sm">⚙️</span>
             </div>
         `;
     });
@@ -158,7 +224,6 @@ window.closeCourseModal = () => {
     document.getElementById('courseModal').classList.add('hidden');
 };
 
-// Update Course Data
 const editCourseForm = document.getElementById('editCourseForm');
 if (editCourseForm) {
     editCourseForm.addEventListener('submit', async (e) => {
@@ -187,7 +252,6 @@ window.deleteCurrentCourse = async () => {
     }
 };
 
-// Load Assignments for Modal
 async function loadAssignments(courseId) {
     const { data: assignments, error } = await supabaseClient
         .from('assignments')
@@ -199,27 +263,26 @@ async function loadAssignments(courseId) {
     listEl.innerHTML = '';
 
     if (error || !assignments.length) {
-        listEl.innerHTML = '<p class="text-xs text-slate-400 italic">No assignments yet.</p>';
+        listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No assignments yet.</p></div>';
         return;
     }
 
     assignments.forEach(assign => {
-        const dateObj = new Date(assign.due_date + 'T12:00:00'); // Force local timezone interpretation
+        const dateObj = new Date(assign.due_date + 'T12:00:00'); 
         const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         
         listEl.innerHTML += `
-            <div class="flex items-center justify-between p-2 bg-white dark:bg-slate-700/50 rounded border border-slate-100 dark:border-slate-600 text-sm">
+            <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-sm">
                 <div class="flex flex-col">
-                    <span class="font-semibold text-slate-700 dark:text-slate-200">${assign.title}</span>
-                    <span class="text-xs text-indigo-500 font-medium">Due: ${dateStr}</span>
+                    <span class="font-bold text-zinc-800 dark:text-zinc-200">${assign.title}</span>
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Due: ${dateStr}</span>
                 </div>
-                <button onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-red-400 hover:text-red-600 transition px-2">✕</button>
+                <button onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-red-500 transition px-2">✕</button>
             </div>
         `;
     });
 }
 
-// Add New Assignment
 const addAssignmentForm = document.getElementById('addAssignmentForm');
 if (addAssignmentForm) {
     addAssignmentForm.addEventListener('submit', async (e) => {
@@ -263,15 +326,11 @@ function initCalendar() {
 }
 
 async function loadCalendarCourses() {
-    // Fetch courses to get colors
     const { data: courses } = await supabaseClient.from('courses').select('*');
-    // Fetch all assignments
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
     if (!courses || !assignments) return;
 
     let calendarEvents = [];
-    
-    // Create map for easy color lookup
     const courseMap = {};
     courses.forEach(c => courseMap[c.id] = c);
 
