@@ -357,12 +357,18 @@ window.openCourseModal = (courseId) => {
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
     
+    // Populate description and objectives in edit form inputs if present
+    const descInput = document.getElementById('editCourseDescription');
+    if (descInput) descInput.value = course.description || '';
+    const objInput = document.getElementById('editCourseObjectives');
+    if (objInput) objInput.value = course.objectives || '';
+    
     const metaBox = document.getElementById('courseMetadataBox');
     if(metaBox) {
         let metaHtml = '';
         if (course.description) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400 mb-1.5"><strong>Description:</strong> ${course.description}</p>`;
         if (course.objectives) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400"><strong>Objectives:</strong> ${course.objectives}</p>`;
-        metaBox.innerHTML = metaHtml ? `<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700">${metaHtml}</div>` : '';
+        metaBox.innerHTML = metaHtml ? `<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700">${metaHtml}</div>` : '<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs text-zinc-500">No course description or objectives provided yet. Upload a syllabus or edit below.</div>';
     }
 
     const btn = document.getElementById('markCourseCompleteBtn');
@@ -434,6 +440,18 @@ window.parseSyllabusPDF = async () => {
 
         if (Object.keys(updates).length > 0) {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
+        }
+
+        // Check if metadata-only checkbox is ticked
+        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly');
+        const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
+
+        if (isMetadataOnly) {
+            statusMsg.textContent = "Successfully imported course description & objectives!";
+            statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            openCourseModal(courseId);
+            loadCoursesPage();
+            return; // Skip parsing/inserting units and lessons entirely
         }
 
         let baseDate = new Date();
@@ -578,8 +596,10 @@ if (eForm) {
         const code = document.getElementById('editCourseCode').value;
         const color = document.getElementById('editCourseColor').value;
         const emoji = document.getElementById('editCourseEmoji').value;
+        const description = document.getElementById('editCourseDescription')?.value || '';
+        const objectives = document.getElementById('editCourseObjectives')?.value || '';
         
-        await supabaseClient.from('courses').update({ code, color, emoji }).eq('id', id);
+        await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
         closeCourseModal();
         loadCoursesPage();
     });
@@ -603,10 +623,8 @@ window.toggleCourseComplete = async (courseId, currentState) => {
 window.toggleAssignment = async (assignId, currentState, courseId, unitNumber) => {
     const newState = !currentState;
     
-    // Update the clicked item
     await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
     
-    // If it's a main weekly unit, cascade the completion state to all its child lessons
     if (unitNumber) {
         const { data: allAssignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
         if (allAssignments) {
@@ -634,7 +652,6 @@ window.addSubItem = async (parentId, courseId) => {
     const title = inputEl ? inputEl.value.trim() : "";
     if(!title) return;
     
-    // Find the parent assignment to inherit its unit_number
     const { data: parentAssign } = await supabaseClient.from('assignments').select('unit_number, due_date').eq('id', parentId).single();
     const unitNum = parentAssign ? parentAssign.unit_number : null;
     const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
@@ -660,7 +677,7 @@ async function loadAssignments(courseId) {
         return;
     }
     
-    // Strict numeric and chronological sorting: Unit -> Main Unit Header -> Numeric Sub-lessons
+    // Strict numeric and chronological sorting
     assignments.sort((a, b) => {
         let unitA = a.unit_number || 0;
         let unitB = b.unit_number || 0;
