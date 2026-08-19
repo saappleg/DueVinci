@@ -12,6 +12,38 @@ let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
 let lastProcessedSessionToken = null;
 
+// --- WEB AUDIO API TIMER ALARM ---
+window.playTimerAlarm = () => {
+    if (localStorage.getItem('duevinci_mute_alarm') === 'true') return;
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.6);
+    } catch (e) {
+        console.error("Audio playback error:", e);
+    }
+};
+
+// --- GLOBAL KEYBOARD SHORTCUTS ---
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        if (typeof window.toggleTimer === 'function') window.toggleTimer();
+    }
+    if (e.code === 'Escape') {
+        if (typeof window.closeSettingsModal === 'function') window.closeSettingsModal();
+        if (typeof window.closeCourseModal === 'function') window.closeCourseModal();
+        if (typeof window.closeTermModal === 'function') window.closeTermModal();
+    }
+});
+
 // --- SMART DATE PARSER WITH YEAR CROSSOVER SAFEGUARD ---
 function smartParseDate(dateStr) {
     if (!dateStr) return null;
@@ -23,7 +55,6 @@ function smartParseDate(dateStr) {
     let day = d.getDate();
     let year = now.getFullYear();
     
-    // Handle year crossover (e.g., late fall into early winter/spring)
     if (now.getMonth() >= 10 && month <= 1) {
         year = now.getFullYear() + 1;
     } else if (now.getMonth() <= 1 && month >= 10) {
@@ -42,13 +73,9 @@ window.formatDate = (dateString) => {
     const [year, month, day] = parts;
     const format = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
     
-    if (format === 'MM-DD-YYYY') {
-        return `${month}-${day}-${year}`;
-    } else if (format === 'DD-MM-YYYY') {
-        return `${day}-${month}-${year}`;
-    } else {
-        return `${year}-${month}-${day}`;
-    }
+    if (format === 'MM-DD-YYYY') return `${month}-${day}-${year}`;
+    if (format === 'DD-MM-YYYY') return `${day}-${month}-${year}`;
+    return `${year}-${month}-${day}`;
 };
 
 function parseInputDate(dateStr) {
@@ -74,28 +101,46 @@ function parseInputDate(dateStr) {
     return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
-// --- INJECT DATE FORMAT SETTING INTO APPEARANCE TAB ---
-window.injectDateFormatSettings = () => {
+// --- INJECT APPEARANCE & PREFERENCE SETTINGS ---
+window.injectAppearanceSettingsExtras = () => {
     const appearanceTab = document.getElementById('content-appearance');
-    if (!appearanceTab || document.getElementById('dateFormatContainer')) return;
+    if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
 
-    const formatDiv = document.createElement('div');
-    formatDiv.id = 'dateFormatContainer';
-    formatDiv.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700';
+    const container = document.createElement('div');
+    container.id = 'appearanceExtrasContainer';
+    container.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700 space-y-4';
     
     const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
-    formatDiv.innerHTML = `
-        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Date Format</label>
-        <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">Preferred display format</span>
-            <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="text-xs px-2.5 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+    const isMuted = localStorage.getItem('duevinci_mute_alarm') === 'true';
+    const currentGpaScale = localStorage.getItem('duevinci_gpa_scale') || '4.0';
+    const isAcademicsHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
+
+    container.innerHTML = `
+        <div>
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format</label>
+            <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
                 <option value="YYYY-MM-DD" ${currentFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
                 <option value="MM-DD-YYYY" ${currentFormat === 'MM-DD-YYYY' ? 'selected' : ''}>MM-DD-YYYY</option>
                 <option value="DD-MM-YYYY" ${currentFormat === 'DD-MM-YYYY' ? 'selected' : ''}>DD-MM-YYYY</option>
             </select>
         </div>
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Mute Timer Alarm Sound</span>
+            <input type="checkbox" id="muteAlarmSwitch" ${isMuted ? 'checked' : ''} onchange="toggleMuteAlarm(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
+        </div>
+        <div>
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">GPA Scale Target</label>
+            <select id="gpaScaleSelect" onchange="updateGpaScale(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="4.0" ${currentGpaScale === '4.0' ? 'selected' : ''}>4.0 Scale</option>
+                <option value="5.0" ${currentGpaScale === '5.0' ? 'selected' : ''}>5.0 Scale</option>
+            </select>
+        </div>
+        <div class="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-brand-800">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Show Dashboard Academics Widget</span>
+            <input type="checkbox" id="academicsSwitch" ${!isAcademicsHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
+        </div>
     `;
-    appearanceTab.appendChild(formatDiv);
+    appearanceTab.appendChild(container);
 };
 
 window.updateDateFormat = (format) => {
@@ -104,9 +149,57 @@ window.updateDateFormat = (format) => {
     if (typeof loadCoursesPage === 'function') loadCoursesPage();
 };
 
+window.toggleMuteAlarm = (muted) => {
+    localStorage.setItem('duevinci_mute_alarm', muted);
+};
+
+window.updateGpaScale = (scale) => {
+    localStorage.setItem('duevinci_gpa_scale', scale);
+    if (typeof loadDashboardStats === 'function') loadDashboardStats();
+};
+
+window.toggleAcademicsVisibility = (show) => {
+    if (show) {
+        localStorage.removeItem('duevinci_hide_academics');
+        if (typeof window.renderAcademicsDashboardWidget === 'function') {
+            window.renderAcademicsDashboardWidget('dashboardGrid');
+        }
+    } else {
+        localStorage.setItem('duevinci_hide_academics', 'true');
+        document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(window.injectDateFormatSettings, 400);
+    setTimeout(window.injectAppearanceSettingsExtras, 400);
 });
+
+// --- PER-COURSE SCRATCHPAD ---
+window.renderCourseScratchpad = (courseId, containerId) => {
+    let container = document.getElementById(containerId);
+    if (!container) {
+        const targetModalBody = document.querySelector('#courseModal .overflow-y-auto > div:first-child');
+        if (targetModalBody) {
+            container = document.createElement('div');
+            container.id = containerId;
+            targetModalBody.appendChild(container);
+        } else {
+            return;
+        }
+    }
+
+    const savedNotes = localStorage.getItem(`scratchpad_${courseId}`) || '';
+    container.innerHTML = `
+        <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
+            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
+            <textarea oninput="saveCourseScratchpad('${courseId}', this.value)" rows="4" placeholder="Jot down quick lecture takeaways, code snippets, or reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">${savedNotes}</textarea>
+        </div>
+    `;
+};
+
+window.saveCourseScratchpad = (courseId, val) => {
+    localStorage.setItem(`scratchpad_${courseId}`, val);
+};
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -297,6 +390,7 @@ window.toggleTimer = () => {
                 timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                 updateTimerDisplay();
             } else {
+                playTimerAlarm();
                 skipTimer();
             }
         }, 1000);
@@ -380,6 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                 updateTimerDisplay();
             } else {
+                playTimerAlarm();
                 skipTimer();
             }
         }, 1000);
@@ -564,7 +659,6 @@ async function loadDashboardStats() {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
         
-        // Show lessons and upcoming exams, finals, tests, or reviews in Up Next (excluding generic unit headers)
         const upcoming = assignments.filter(a => !a.is_completed && (
             a.title.includes('↳') || 
             /lesson|exam|final|midterm|test|review/i.test(a.title)
@@ -598,7 +692,6 @@ async function loadDashboardStats() {
         if(courses.length === 0) goalsListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add classes to start tracking weekly progress.</p>';
         else {
             courses.forEach(course => {
-                // Count only lessons and exams/reviews, excluding generic unit headers for accurate progress
                 const cAssign = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
                 const complete = cAssign.filter(a => a.is_completed).length;
                 let pct = course.is_completed ? 100 : (cAssign.length ? Math.round((complete/cAssign.length)*100) : 0);
@@ -942,6 +1035,7 @@ window.openCourseModal = (courseId) => {
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
     if (typeof window.renderResourceLinksSection === 'function') window.renderResourceLinksSection(course.id, 'courseResourceSection');
+    if (typeof window.renderCourseScratchpad === 'function') window.renderCourseScratchpad(course.id, 'courseScratchpadSection');
 };
 
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
