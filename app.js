@@ -174,6 +174,42 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.injectAppearanceSettingsExtras, 400);
 });
 
+// --- INJECT CALENDAR DARK MODE FIX STYLES ---
+const calendarDarkFixStyle = document.createElement('style');
+calendarDarkFixStyle.innerHTML = `
+    .dark .fc-popover {
+        background-color: #18181b !important;
+        border-color: #27272a !important;
+        color: #f4f4f5 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+    .dark .fc-popover-header {
+        background-color: #27272a !important;
+        color: #f4f4f5 !important;
+        padding: 10px 14px !important;
+        border-bottom: 1px solid #3f3f46 !important;
+    }
+    .dark .fc-popover-title {
+        color: #f4f4f5 !important;
+        font-weight: 700 !important;
+        font-size: 0.875rem !important;
+    }
+    .dark .fc-popover-close {
+        color: #a1a1aa !important;
+        opacity: 0.9 !important;
+        cursor: pointer;
+    }
+    .dark .fc-popover-close:hover {
+        color: #ffffff !important;
+    }
+    .dark .fc-popover-body {
+        padding: 8px !important;
+    }
+`;
+document.head.appendChild(calendarDarkFixStyle);
+
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
@@ -246,7 +282,8 @@ let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
 let isWorking = localStorage.getItem('timerIsWorking') !== 'false';
 
 let timerEndTime = parseInt(localStorage.getItem('timerEndTime')) || 0;
-let timerRunning = localStorage.getItem('timerRunning'] === 'true';
+// FIXED SYNTAX ERROR HERE
+let timerRunning = localStorage.getItem('timerRunning') === 'true';
 let timeLeft = parseInt(localStorage.getItem('timeLeft')) || (focusMinutes * 60);
 
 if (timerRunning && timerEndTime > Date.now()) {
@@ -1012,8 +1049,9 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
+    // Default to Overview tab when opening
     switchCourseTab('overview');
-    renderStaticCoursePanels(course);
+    renderDynamicCoursePanels(course);
 
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
@@ -1038,7 +1076,17 @@ window.switchCourseTab = (tabName) => {
     });
 };
 
-function renderStaticCoursePanels(course) {
+function renderDynamicCoursePanels(course) {
+    // Populate Coursework tab
+    const cwPanel = document.getElementById('panel-coursework');
+    if (cwPanel && !document.getElementById('activeAssignListWrapper')) {
+        cwPanel.innerHTML = `
+            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
+            <div id="activeAssignListWrapper"></div>
+        `;
+    }
+
+    // Populate Resources tab
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1060,6 +1108,7 @@ function renderStaticCoursePanels(course) {
         `;
     }
 
+    // Populate Scratchpad tab
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
@@ -1084,7 +1133,7 @@ window.addResourceLink = async (courseId) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderStaticCoursePanels(course);
+    renderDynamicCoursePanels(course);
 };
 
 window.removeResourceLink = async (courseId, idx) => {
@@ -1096,7 +1145,7 @@ window.removeResourceLink = async (courseId, idx) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    renderStaticCoursePanels(course);
+    renderDynamicCoursePanels(course);
 };
 
 window.saveCourseScratchpad = async (courseId, val) => {
