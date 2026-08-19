@@ -16,9 +16,14 @@
         if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
         else { document.documentElement.classList.remove('dark'); }
     </script>
+    <!-- PDF.js CDN Scripts for Syllabus Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=6" defer></script>
+    <script src="app.js?v=7" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -27,7 +32,6 @@
         <!-- Navigation Sidebar -->
         <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto">
             
-            <!-- Timer & Actions Section -->
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>
@@ -119,7 +123,7 @@
 
     <!-- Course Settings Modal -->
     <div id="courseModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50">
                 <h2 class="text-xl font-bold dark:text-white flex items-center gap-2" id="modalCourseTitle"><span>📚</span> Course Settings</h2>
                 <div class="flex items-center gap-3">
@@ -129,23 +133,37 @@
             </div>
 
             <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
-                    <form id="editCourseForm" class="space-y-3">
-                        <input type="hidden" id="editCourseId">
-                        <div class="flex items-center gap-2">
-                            <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
-                            <input type="text" id="editCourseCode" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <div class="flex items-center justify-between border border-zinc-200 dark:border-brand-700 rounded-lg p-2 dark:bg-brand-900">
-                            <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
-                            <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
-                        </div>
-                        <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
-                    </form>
-                    <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-6 hover:underline">Delete Class & Assignments</button>
+                <!-- Left Side: Info & PDF Syllabus Upload -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
+                        <form id="editCourseForm" class="space-y-3">
+                            <input type="hidden" id="editCourseId">
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="editCourseCode" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div class="flex items-center justify-between border border-zinc-200 dark:border-brand-700 rounded-lg p-2 dark:bg-brand-900">
+                                <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
+                                <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+                            </div>
+                            <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
+                        </form>
+                    </div>
+
+                    <!-- PDF Syllabus Import Box -->
+                    <div class="border-t border-zinc-200 dark:border-brand-700 pt-4">
+                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Upload your syllabus PDF to auto-extract text and deadlines.</p>
+                        <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-3">
+                        <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan & Import Assignments</button>
+                        <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
+                    </div>
+
+                    <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Assignments</button>
                 </div>
 
+                <!-- Right Side: Assignments -->
                 <div class="flex flex-col h-full">
                     <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Assignments</h3>
                     <form id="addAssignmentForm" class="flex gap-2 mb-4">
@@ -162,8 +180,6 @@
     <!-- Modular Settings Modal -->
     <div id="settingsModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
-            
-            <!-- Settings Sidebar -->
             <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
                 <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
                 <nav class="space-y-1">
@@ -171,12 +187,8 @@
                     <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                 </nav>
             </div>
-
-            <!-- Settings Content Area -->
             <div class="flex-1 p-6 relative">
                 <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                
-                <!-- Profile Tab Content -->
                 <div id="content-profile" class="block space-y-6">
                     <div>
                         <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
@@ -195,8 +207,6 @@
                         <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
                     </form>
                 </div>
-
-                <!-- Appearance Tab Content -->
                 <div id="content-appearance" class="hidden space-y-6">
                     <div>
                         <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
@@ -211,7 +221,6 @@
                         </select>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
