@@ -779,8 +779,8 @@ async function loadAssignments(courseId, page = 1) {
         return new Date(a.due_date) - new Date(b.due_date);
     });
 
-    // Pagination configuration (8 items per page)
-    const pageSize = 8;
+    // Pagination configuration (6 items per page)
+    const pageSize = 6;
     const totalPages = Math.ceil(assignments.length / pageSize);
     if (page > totalPages && totalPages > 0) page = totalPages;
     if (page < 1) page = 1;
@@ -889,6 +889,7 @@ function initCalendar() {
             right: 'dayGridMonth,timeGridWeek'
         },
         events: [],
+        dayMaxEvents: true, // Automatically collapses excess events into a clickable "+X more" popover link
         eventClick: async function(info) {
             if (info.event.extendedProps.isCustom) {
                 if(confirm(`Delete custom event "${info.event.title}"?`)) {
