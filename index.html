@@ -75,21 +75,22 @@
     </div>
 
     <script>
-        // TODO: Replace with your actual Supabase Project URL and Anon Key
+        // Supabase Project URL and Anon Key
         const SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // FIXED: Renamed to 'supabaseClient' to avoid clashing with the CDN
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentUser = null;
         let calendarInstance = null;
 
         // Check authentication state on page load
         async function checkUser() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
             handleAuth(session);
 
-            supabase.auth.onAuthStateChange((_event, session) => {
+            supabaseClient.auth.onAuthStateChange((_event, session) => {
                 handleAuth(session);
             });
         }
@@ -109,7 +110,7 @@
         }
 
         window.loginWithGoogle = async () => {
-            await supabase.auth.signInWithOAuth({
+            await supabaseClient.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: window.location.href
@@ -118,7 +119,7 @@
         };
 
         window.logout = async () => {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
         };
 
         function initCalendar() {
@@ -139,7 +140,7 @@
 
         // Fetch Courses from Supabase Database
         async function loadCourses() {
-            const { data: courses, error } = await supabase
+            const { data: courses, error } = await supabaseClient
                 .from('courses')
                 .select('*')
                 .order('created_at', { ascending: false });
@@ -187,7 +188,7 @@
             const code = document.getElementById('courseCode').value;
             const color = document.getElementById('courseColor').value;
 
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('courses')
                 .insert([{ code, color, user_id: currentUser.id }]);
 
@@ -201,7 +202,7 @@
 
         window.deleteCourse = async (id) => {
             if (confirm('Delete this course?')) {
-                const { error } = await supabase.from('courses').delete().eq('id', id);
+                const { error } = await supabaseClient.from('courses').delete().eq('id', id);
                 if (!error) loadCourses();
             }
         };
