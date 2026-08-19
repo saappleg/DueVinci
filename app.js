@@ -8,6 +8,7 @@ let calendarInstance = null;
 let localCourses = [];
 let currentAssignmentPage = 1;
 let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
+let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -100,7 +101,7 @@ window.toggleSidebar = () => {
     aside.classList.toggle('hidden');
 };
 
-// --- POMODORO TIMER LOGIC ---
+// --- POMODORO TIMER LOGIC & FLOATING WIDGET ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
@@ -119,6 +120,35 @@ function updateTimerDisplay() {
         const percent = ((total - timeLeft) / total) * 301.59;
         circle.style.strokeDashoffset = percent;
     }
+    updateFloatingTimer();
+}
+
+function updateFloatingTimer() {
+    let floatWidget = document.getElementById('floatingTimerWidget');
+    if (!timerInterval) {
+        if (floatWidget) floatWidget.classList.add('hidden');
+        return;
+    }
+    if (!floatWidget) {
+        floatWidget = document.createElement('div');
+        floatWidget.id = 'floatingTimerWidget';
+        floatWidget.className = 'fixed bottom-5 right-5 z-[9999] bg-zinc-900/95 dark:bg-brand-800 text-white p-4 rounded-2xl shadow-2xl border border-zinc-700 backdrop-blur-md w-64 transition-all';
+        document.body.appendChild(floatWidget);
+    }
+    floatWidget.classList.remove('hidden');
+    const min = Math.floor(timeLeft / 60);
+    const sec = timeLeft % 60;
+    const label = isWorking ? 'Focus Session' : 'Break Time';
+    floatWidget.innerHTML = `
+        <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
+            <button onclick="document.getElementById('floatingTimerWidget').classList.add('hidden')" class="text-zinc-400 hover:text-white text-xs">✕</button>
+        </div>
+        <div class="flex justify-between items-center">
+            <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
+            <button onclick="toggleTimer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-bold transition">⏸ Pause</button>
+        </div>
+    `;
 }
 
 window.toggleTimer = () => {
@@ -138,6 +168,7 @@ window.toggleTimer = () => {
             }
         }, 1000);
     }
+    updateFloatingTimer();
 };
 
 window.resetTimer = () => {
@@ -463,10 +494,14 @@ function renderTermFolders() {
 
     const termsMap = {};
     customTerms.forEach(t => { termsMap[t] = []; });
-    if (!termsMap['Unassigned']) termsMap['Unassigned'] = [];
+    
+    if (!hideUnassignedFolder) {
+        if (!termsMap['Unassigned']) termsMap['Unassigned'] = [];
+    }
 
     localCourses.forEach(c => {
-        const t = c.term ? c.term.trim() : 'Unassigned';
+        const t = (c.term && c.term.trim() !== '') ? c.term.trim() : 'Unassigned';
+        if (t === 'Unassigned' && hideUnassignedFolder) return;
         if (!termsMap[t]) termsMap[t] = [];
         termsMap[t].push(c);
     });
@@ -550,6 +585,11 @@ window.handleDropToTerm = async (e, termName) => {
     if (newTerm && !customTerms.includes(newTerm)) {
         customTerms.push(newTerm);
         localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    }
+    
+    if (termName === 'Unassigned') {
+        hideUnassignedFolder = false;
+        localStorage.removeItem('hideUnassigned');
     }
 
     await supabaseClient.from('courses').update({ term: newTerm }).eq('id', courseId);
@@ -648,6 +688,8 @@ window.deleteCurrentTermFolder = async () => {
                 await supabaseClient.from('courses').delete().eq('id', c.id);
             }
             localCourses = localCourses.filter(c => c.term && c.term.trim() !== '' && c.term.trim() !== 'Unassigned');
+            hideUnassignedFolder = true;
+            localStorage.setItem('hideUnassigned', 'true');
             closeTermModal();
             renderTermFolders();
             renderAlphabeticals();
@@ -656,6 +698,9 @@ window.deleteCurrentTermFolder = async () => {
     }
     
     if (confirm(`Delete term folder "${activeTermModalName}"? Classes inside will be moved to Unassigned.`)) {
+        hideUnassignedFolder = false;
+        localStorage.removeItem('hideUnassigned');
+        
         const termCourses = localCourses.filter(c => c.term && c.term.trim() === activeTermModalName);
         for (let c of termCourses) {
             await supabaseClient.from('courses').update({ term: null }).eq('id', c.id);
