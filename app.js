@@ -446,39 +446,45 @@ window.parseLessonsImage = async (inputElement) => {
 
     statusMsg.textContent = `Analyzing screenshot for week & lessons (${file.name})...`;
     statusMsg.className = "text-xs text-center mt-2 text-emerald-500";
-    statusMsg.classList.add('hidden');
-    statusMsg.classList.remove('hidden');
 
     try {
         const { data: { text } } = await Tesseract.recognize(file, 'eng');
+
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
         // 1. Extract exact Week Number (= Unit number)
         let weekNumMatch = text.match(/Week\s*0?(\d+)/i);
         let weekNum = weekNumMatch ? parseInt(weekNumMatch[1]) : 8;
 
         // 2. Extract Date Range (e.g. "Aug 24 - Aug 31") and use the LAST date as the due date for the unit & all lessons
-        let dateMatch = text.match(/([A-Z][a-z]{2}\s+\d{1,2}\s*-\s*([A-Z][a-z]{2}\s+\d{1,2}))/);
+        let dateMatch = text.match(/([A-Z][a-z]{2})\s+(\d{1,2})\s*[-–—]\s*([A-Z][a-z]{2})\s+(\d{1,2})/);
         let dueDateStr = new Date().toISOString().split('T')[0];
 
-        if (dateMatch && dateMatch[2]) {
-            let lastDatePart = dateMatch[2].trim(); // e.g. "Aug 31"
-            let parsedEndDate = new Date(lastDatePart + " " + new Date().getFullYear());
+        if (dateMatch && dateMatch[4]) {
+            const year = new Date().getFullYear();
+            const parsedEndDate = new Date(`${dateMatch[3]} ${dateMatch[4]}, ${year}`);
             if (!isNaN(parsedEndDate.getTime())) {
                 dueDateStr = parsedEndDate.toISOString().split('T')[0];
             }
         }
 
-        // 3. Extract Module Theme Title
-        let titleMatch = text.match(/(?:Week\s*\d+\s*)?[—\-–]?\s*([A-Za-z0-9\s,()\-\–\—]+)/);
-        let weekTitle = titleMatch && titleMatch[1].trim().length > 3 ? titleMatch[1].trim() : `Building with HTML and CSS`;
+        // 3. Extract Module Theme Title (text on the same line as "Week N")
+        let weekTitle = `Building with HTML and CSS`;
+        const weekLine = lines.find(l => /^Week\s*0?\d+\s*[:\-–—]?\s*/i.test(l));
+        if (weekLine) {
+            const titlePart = weekLine.replace(/^Week\s*0?\d+\s*[:\-–—]?\s*/i, '').trim();
+            if (titlePart.length > 3) weekTitle = titlePart;
+        }
 
-        // 4. Extract explicit lesson names (e.g. "Lesson 1: How HTML works")
+        // 4. Extract explicit lesson names (each line starting with "Lesson N" or "Review")
         let lessonsList = [];
-        let explicitMatches = text.match(/(?:Lesson\s*\d+[:\-]?\s*[A-Za-z0-9\s,()\-\–\—]+|Review[:\-]?\s*[A-Za-z0-9\s,()\-\–\—]+)/gi);
-        
-        if (explicitMatches && explicitMatches.length > 0) {
-            lessonsList = explicitMatches.map(l => l.trim());
-        } else {
+        for (const line of lines) {
+            if (/^(Lesson\s*\d+\s*[:\-–—]?\s+|Review\s*[:\-–—]?\s*)/i.test(line)) {
+                lessonsList.push(line);
+            }
+        }
+
+        if (lessonsList.length === 0) {
             // Fallback to standard 10-week layout matching the screenshot if OCR text is ambiguous
             lessonsList = [
                 "Lesson 1: How HTML works",
