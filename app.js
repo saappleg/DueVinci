@@ -647,6 +647,40 @@ async function loadDashboardStats() {
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
     if (!courses || !assignments) return;
 
+    const getUnitNum = (item) => {
+        if (item.unit_number) return parseInt(item.unit_number) || 0;
+        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        return 0;
+    };
+
+    const getLessonNum = (item) => {
+        const match = item.title.match(/lesson\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        const numMatch = item.title.replace(/[^0-9]/g, '');
+        return numMatch ? parseInt(numMatch) : 999;
+    };
+
+    assignments.sort((a, b) => {
+        let unitA = getUnitNum(a);
+        let unitB = getUnitNum(b);
+        if (unitA !== unitB) return unitA - unitB;
+        
+        let isSubA = a.title.startsWith('↳');
+        let isSubB = b.title.startsWith('↳');
+        
+        if (!isSubA && isSubB) return -1;
+        if (isSubA && !isSubB) return 1;
+        
+        if (isSubA && isSubB) {
+            let lessonA = getLessonNum(a);
+            let lessonB = getLessonNum(b);
+            if (lessonA !== lessonB) return lessonA - lessonB;
+        }
+        
+        return new Date(a.due_date) - new Date(b.due_date);
+    });
+
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
