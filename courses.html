@@ -88,14 +88,24 @@
             </div>
         </aside>
 
-        <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
+            
+            <!-- Global Title Header with Leonardo Da Vinci Inspired SVG Logo -->
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
                 <div class="flex items-center gap-4">
                     <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
                     </button>
                     <div class="hidden md:flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
+                        <div class="w-10 h-10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-sm">
+                                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                                <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                                <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                                <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                                <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            </svg>
+                        </div>
                         <div>
                             <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
                             <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner</p>
