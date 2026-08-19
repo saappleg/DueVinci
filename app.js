@@ -218,7 +218,10 @@ function handleAuth(session) {
         }
         
         const path = window.location.pathname;
-        if ((path.endsWith('index.html') || path.endsWith('/')) && document.getElementById('dashboardGrid')) loadDashboardStats();
+        if ((path.endsWith('index.html') || path.endsWith('/')) && document.getElementById('dashboardGrid')) {
+            loadDashboardStats();
+            if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
+        }
         if (path.endsWith('courses.html') && document.getElementById('coursesGrid')) loadCoursesPage();
         if (path.endsWith('calendar.html') && document.getElementById('calendar')) {
             initCalendar();
@@ -639,9 +642,19 @@ window.closeTermModal = () => {
 
 window.deleteCurrentTermFolder = async () => {
     if (activeTermModalName === 'Unassigned') {
-        alert('Cannot delete the default Unassigned folder.');
+        if (confirm('Delete Unassigned folder and all unassigned classes inside it?')) {
+            const termCourses = localCourses.filter(c => !c.term || c.term.trim() === '' || c.term.trim() === 'Unassigned');
+            for (let c of termCourses) {
+                await supabaseClient.from('courses').delete().eq('id', c.id);
+            }
+            localCourses = localCourses.filter(c => c.term && c.term.trim() !== '' && c.term.trim() !== 'Unassigned');
+            closeTermModal();
+            renderTermFolders();
+            renderAlphabeticals();
+        }
         return;
     }
+    
     if (confirm(`Delete term folder "${activeTermModalName}"? Classes inside will be moved to Unassigned.`)) {
         const termCourses = localCourses.filter(c => c.term && c.term.trim() === activeTermModalName);
         for (let c of termCourses) {
@@ -718,6 +731,7 @@ window.openCourseModal = (courseId) => {
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
+    if (typeof window.renderResourceLinksSection === 'function') window.renderResourceLinksSection(course.id, 'courseResourceSection');
 };
 
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
