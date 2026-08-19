@@ -1,10 +1,16 @@
-// --- DYNAMIC ACADEMICS, GPA, STREAK, EXAM COUNTDOWN, & RESOURCE LINKS ---
+// --- DYNAMIC ACADEMICS, STREAK, EXAM COUNTDOWN, & SETTINGS TOGGLE ---
 
 window.renderAcademicsDashboardWidget = async (containerId) => {
+    if (localStorage.getItem('duevinci_hide_academics') === 'true') {
+        const existingWidget = document.getElementById('academicsAnalyticsWidget');
+        if (existingWidget) existingWidget.remove();
+        return;
+    }
+
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Remove any existing duplicate widget before rendering a fresh one
+    // Remove any existing instance to prevent duplication
     const existing = document.getElementById('academicsAnalyticsWidget');
     if (existing) existing.remove();
 
@@ -35,11 +41,7 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
     analyticsDiv.id = 'academicsAnalyticsWidget';
     analyticsDiv.className = 'mb-6';
     analyticsDiv.innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
-                <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Estimated GPA</h4>
-                <p id="gpaDisplayResult" class="text-2xl font-extrabold text-indigo-500">4.00</p>
-            </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Study Streak</h4>
                 <p class="text-2xl font-extrabold text-emerald-500">🔥 5 Days</p>
@@ -60,6 +62,39 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
         container.insertBefore(analyticsDiv, headerTitle.nextSibling);
     } else {
         container.insertBefore(analyticsDiv, container.firstChild);
+    }
+};
+
+// Inject Academics visibility toggle directly into Settings -> Appearance tab
+window.injectAcademicsSettingsToggle = () => {
+    const appearanceTab = document.getElementById('content-appearance');
+    if (!appearanceTab || document.getElementById('academicsToggleContainer')) return;
+
+    const toggleDiv = document.createElement('div');
+    toggleDiv.id = 'academicsToggleContainer';
+    toggleDiv.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700';
+    
+    const isHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
+    toggleDiv.innerHTML = `
+        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Academics Widget</label>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-500 dark:text-zinc-400">Show analytics widget on dashboard</span>
+            <input type="checkbox" id="academicsSwitch" ${!isHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
+        </div>
+    `;
+    appearanceTab.appendChild(toggleDiv);
+};
+
+window.toggleAcademicsVisibility = (show) => {
+    if (show) {
+        localStorage.removeItem('duevinci_hide_academics');
+        if (typeof window.renderAcademicsDashboardWidget === 'function') {
+            window.renderAcademicsDashboardWidget('dashboardGrid');
+        }
+    } else {
+        localStorage.setItem('duevinci_hide_academics', 'true');
+        const widget = document.getElementById('academicsAnalyticsWidget');
+        if (widget) widget.remove();
     }
 };
 
@@ -108,3 +143,7 @@ window.removeResourceLink = (courseId, index) => {
     localStorage.setItem(`resources_${courseId}`, JSON.stringify(savedLinks));
     window.renderResourceLinksSection(courseId, 'courseResourceSection');
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(window.injectAcademicsSettingsToggle, 400);
+});
