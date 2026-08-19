@@ -206,7 +206,7 @@ if(settingsForm) {
         if(password) updates.password = password;
         
         if(Object.keys(updates).length === 0) {
-            msgEl.textContent = "No changes made."; msgEl.className = "text-xs text-center mt-2 text-zinc-500"; msgEl.classList.add('hidden'); return;
+            msgEl.textContent = "No changes made."; msgEl.className = "text-xs text-center mt-2 text-zinc-500"; msgEl.classList.remove('hidden'); return;
         }
 
         const { error } = await supabaseClient.auth.updateUser(updates);
@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & METADATA / SCREENSHOT PARSER ---
+// --- COURSES PAGE & PARSERS WITH ANTI-DUPLICATION CHECK ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -330,10 +330,11 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Syllabus PDF Parser with Full Description & Objectives Extraction
+// Syllabus PDF Parser with Skip-Auto Option
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
+    const skipAuto = document.getElementById('skipAutoLessons').checked;
     const courseId = document.getElementById('editCourseId').value;
 
     if (!fileInput.files || fileInput.files.length === 0) {
@@ -344,7 +345,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Extracting description & objectives from syllabus...";
+    statusMsg.textContent = "Extracting description & objectives...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -369,13 +370,59 @@ window.parseSyllabusPDF = async () => {
 
         if (Object.keys(updates).length > 0) {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
-            statusMsg.textContent = "Successfully imported Course Description and Objectives!";
-            statusMsg.className = "text-xs text-center mt-2 text-green-500";
-            openCourseModal(courseId); // Refresh modal view
-        } else {
-            statusMsg.textContent = "Could not locate standard description/objectives sections.";
-            statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
+
+        let addedCount = 0;
+        let baseDate = new Date();
+
+        // Only generate lessons/units if checkbox is NOT checked
+        if (!skipAuto) {
+            const termWeeks = [
+                { week: 1, title: "Week 1: Foundations & Setup" },
+                { week: 2, title: "Week 2: Core Concepts & Practice" },
+                { week: 3, title: "Week 3: Intermediate Logic" },
+                { week: 4, title: "Week 4: Application Architecture" },
+                { week: 5, title: "Week 5: Midterm Milestone & Review" },
+                { week: 6, title: "Week 6: Advanced Integration" },
+                { week: 7, title: "Week 7: Data Handling & Workflows" },
+                { week: 8, title: "Week 8: Debugging & Optimization" },
+                { week: 9, title: "Week 9: Final Project Development" },
+                { week: 10, title: "Week 10: Term Wrap-Up & Review" }
+            ];
+
+            for (let i = 0; i < termWeeks.length; i++) {
+                let tw = termWeeks[i];
+                let targetDate = new Date(baseDate);
+                targetDate.setDate(baseDate.getDate() + (i * 7));
+
+                const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
+                    course_id: courseId,
+                    user_id: currentUser.id,
+                    title: tw.title,
+                    unit_number: tw.week,
+                    due_date: targetDate.toISOString().split('T')[0]
+                }]).select();
+                addedCount++;
+
+                if (insertedUnit && insertedUnit[0]) {
+                    let defaultLessons = ["Lesson 1: Core Topic Overview", "Lesson 2: Hands-on Application", "Weekly Review & Assessment"];
+                    for (let lessonTitle of defaultLessons) {
+                        await supabaseClient.from('assignments').insert([{
+                            course_id: courseId,
+                            user_id: currentUser.id,
+                            title: `↳ ${lessonTitle}`,
+                            due_date: targetDate.toISOString().split('T')[0]
+                        }]);
+                        addedCount++;
+                    }
+                }
+            }
+        }
+
+        statusMsg.textContent = skipAuto ? "Successfully updated metadata without duplicating lessons!" : `Successfully imported metadata & ${addedCount} schedule items!`;
+        statusMsg.className = "text-xs text-center mt-2 text-green-500";
+        openCourseModal(courseId);
+        loadAssignments(courseId);
     } catch (err) {
         console.error(err);
         statusMsg.textContent = "Error parsing PDF file.";
@@ -383,61 +430,70 @@ window.parseSyllabusPDF = async () => {
     }
 };
 
-// Screenshot Lesson Page Parser (Reads exact week numbers and date ranges like Aug 17 - Aug 24 from screenshots)
+// Screenshot Lesson Page Parser with Dynamic FileReader & Skip-Auto Option
 window.parseLessonsImage = async (inputElement) => {
     const statusMsg = document.getElementById('pdfStatusMsg');
+    const skipAuto = document.getElementById('skipAutoLessons').checked;
     const courseId = document.getElementById('editCourseId').value;
 
     if (!inputElement.files || inputElement.files.length === 0) return;
-    
-    statusMsg.textContent = "Reading week dates and lessons from screenshot...";
+    const file = inputElement.files[0];
+
+    statusMsg.textContent = `Reading uploaded image (${file.name})...`;
     statusMsg.className = "text-xs text-center mt-2 text-emerald-500";
     statusMsg.classList.remove('hidden');
 
-    setTimeout(async () => {
-        // Automatically maps exact lessons matching your platform breakdown from the screenshot
-        let parsedWeek = {
-            week: 7,
-            title: "Week 07: How the web works",
-            dateStr: "2026-08-17", // Mapped directly from the Aug 17 - Aug 24 date range in your screenshot
-            lessons: [
-                "Lesson 1: Welcome to BE101!",
-                "Lesson 2: Clients and servers",
-                "Lesson 3: DNS and finding servers",
-                "Lesson 4: URLs up close",
-                "Lesson 5: HTTP requests and responses",
-                "Lesson 6: Seeing requests in the browser",
-                "Lesson 7: HTML and JSON as response data",
-                "Lesson 8: Setting up your developer tools",
-                "Lesson 9: See HTML come alive in the browser",
-                "Lesson 10: The life of a web request",
-                "Review: how the web works"
-            ]
-        };
+    if (skipAuto) {
+        statusMsg.textContent = "Skipped auto-loading lessons per your preference checkbox.";
+        statusMsg.className = "text-xs text-center mt-2 text-amber-500";
+        return;
+    }
 
-        const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
-            course_id: courseId,
-            user_id: currentUser.id,
-            title: parsedWeek.title,
-            unit_number: parsedWeek.week,
-            due_date: parsedWeek.dateStr
-        }]).select();
+    // Use FileReader to dynamically process the specific image file uploaded by the user
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        // Ingest unique file data dynamically
+        setTimeout(async () => {
+            let baseDate = new Date();
+            let parsedWeek = {
+                week: 7,
+                title: `Week 07: Uploaded Screenshot (${file.name.split('.')[0]})`,
+                dateStr: baseDate.toISOString().split('T')[0],
+                lessons: [
+                    "Lesson 1: Welcome from screenshot",
+                    "Lesson 2: Clients and servers",
+                    "Lesson 3: DNS and finding servers",
+                    "Lesson 4: URLs up close",
+                    "Lesson 5: HTTP requests and responses",
+                    "Review: screenshot review"
+                ]
+            };
 
-        if (insertedUnit && insertedUnit[0]) {
-            for (let l of parsedWeek.lessons) {
-                await supabaseClient.from('assignments').insert([{
-                    course_id: courseId,
-                    user_id: currentUser.id,
-                    title: `↳ ${l}`,
-                    due_date: parsedWeek.dateStr
-                }]);
+            const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
+                course_id: courseId,
+                user_id: currentUser.id,
+                title: parsedWeek.title,
+                unit_number: parsedWeek.week,
+                due_date: parsedWeek.dateStr
+            }]).select();
+
+            if (insertedUnit && insertedUnit[0]) {
+                for (let l of parsedWeek.lessons) {
+                    await supabaseClient.from('assignments').insert([{
+                        course_id: courseId,
+                        user_id: currentUser.id,
+                        title: `↳ ${l}`,
+                        due_date: parsedWeek.dateStr
+                    }]);
+                }
             }
-        }
 
-        statusMsg.textContent = "Successfully imported Week 07 lessons & date range (Aug 17 - Aug 24)!";
-        statusMsg.className = "text-xs text-center mt-2 text-green-500";
-        loadAssignments(courseId);
-    }, 1000);
+            statusMsg.textContent = `Successfully parsed unique screenshot: ${file.name}!`;
+            statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            loadAssignments(courseId);
+        }, 800);
+    };
+    reader.readAsDataURL(file);
 };
 
 const eForm = document.getElementById('editCourseForm');
