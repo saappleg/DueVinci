@@ -247,16 +247,51 @@ if(settingsForm) {
             msgEl.className = "text-xs text-center mt-2 text-green-500";
             document.getElementById('profilePassword').value = '';
         }
-        msgEl.classList.remove('hidden');
+        msgEl.classList.add('hidden');
     });
 }
 
 // --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
-    const { data: assignments } = await supabaseClient.from('assignments').select('*').order('due_date', { ascending: true });
+    const { data: assignments } = await supabaseClient.from('assignments').select('*');
     
     if (!courses || !assignments) return;
+
+    // Apply exact numeric & chronological sorting to dashboard stats as well
+    const getUnitNum = (item) => {
+        if (item.unit_number) return parseInt(item.unit_number) || 0;
+        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        return 0;
+    };
+
+    const getLessonNum = (item) => {
+        const match = item.title.match(/lesson\s*([0-9]+)/i);
+        if (match) return parseInt(match[1]) || 0;
+        const numMatch = item.title.replace(/[^0-9]/g, '');
+        return numMatch ? parseInt(numMatch) : 999;
+    };
+
+    assignments.sort((a, b) => {
+        let unitA = getUnitNum(a);
+        let unitB = getUnitNum(b);
+        if (unitA !== unitB) return unitA - unitB;
+        
+        let isSubA = a.title.startsWith('↳');
+        let isSubB = b.title.startsWith('↳');
+        
+        if (!isSubA && isSubB) return -1;
+        if (isSubA && !isSubB) return 1;
+        
+        if (isSubA && isSubB) {
+            let lessonA = getLessonNum(a);
+            let lessonB = getLessonNum(b);
+            if (lessonA !== lessonB) return lessonA - lessonB;
+        }
+        
+        return new Date(a.due_date) - new Date(b.due_date);
+    });
 
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
@@ -423,8 +458,18 @@ window.parseSyllabusPDF = async () => {
             fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
+        // Check metadata-only checkbox first
+        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || 
+                               document.getElementById('metadataOnly') || 
+                               document.getElementById('syllabusMetadata') ||
+                               document.getElementById('metaOnly');
+        const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
+
+        // Use the targeted metadata-only Edge Function type if ticked
+        const apiCallType = isMetadataOnly ? 'syllabus_metadata' : 'syllabus';
+
         const { data: responseData, error: functionError } = await supabaseClient.functions.invoke('gemini-parser', {
-            body: { type: 'syllabus', text: fullText }
+            body: { type: apiCallType, text: fullText }
         });
 
         if (functionError) throw new Error(functionError.message);
@@ -439,7 +484,6 @@ window.parseSyllabusPDF = async () => {
 
         if (Object.keys(updates).length > 0) {
             await supabaseClient.from('courses').update(updates).eq('id', courseId);
-            // Update localCourses cache immediately so modal updates live
             const cachedCourse = localCourses.find(c => c.id === courseId);
             if (cachedCourse) {
                 if (parsedData.description) cachedCourse.description = parsedData.description;
@@ -447,19 +491,12 @@ window.parseSyllabusPDF = async () => {
             }
         }
 
-        // Robust checkbox detection with multiple possible ID formats
-        const metadataOnlyEl = document.getElementById('syllabusMetadataOnly') || 
-                               document.getElementById('metadataOnly') || 
-                               document.getElementById('syllabusMetadata') ||
-                               document.getElementById('metaOnly');
-        const isMetadataOnly = metadataOnlyEl ? metadataOnlyEl.checked : false;
-
         if (isMetadataOnly) {
             statusMsg.textContent = "Successfully imported course description & objectives!";
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             openCourseModal(courseId);
             loadCoursesPage();
-            return; // Skip parsing/inserting units and lessons entirely
+            return; 
         }
 
         let baseDate = new Date();
@@ -609,7 +646,6 @@ if (eForm) {
         
         await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
         
-        // Update local cache
         const cached = localCourses.find(c => c.id === id);
         if (cached) {
             cached.code = code;
@@ -636,13 +672,11 @@ window.toggleCourseComplete = async (courseId, currentState) => {
     const newState = !currentState;
     await supabaseClient.from('courses').update({ is_completed: newState }).eq('id', courseId);
     
-    // Update local state cache instantly
     const course = localCourses.find(c => c.id === courseId);
     if (course) course.is_completed = newState;
 
     if (newState) fireConfetti();
     
-    // Refresh modal UI live without closing it
     openCourseModal(courseId);
     loadCoursesPage();
 };
@@ -693,7 +727,6 @@ async function loadAssignments(courseId) {
         return;
     }
     
-    // Robust helpers for strict numerical sorting
     const getUnitNum = (item) => {
         if (item.unit_number) return parseInt(item.unit_number) || 0;
         const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
