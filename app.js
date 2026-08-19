@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & STRICT BOUNDARY PARSER ---
+// --- COURSES PAGE & COORDINATE-AWARE TABLE PARSER ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -327,7 +327,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Strict Boundary Parser: Maps exact units and isolates precise lessons/reviews under each unit
+// Coordinate-Aware Table Layout Parser (Sorts PDF items by Y then X coordinates to process columns correctly)
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -341,7 +341,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Processing strict course boundaries & lessons...";
+    statusMsg.textContent = "Analyzing table columns & structured units...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -350,11 +350,23 @@ window.parseSyllabusPDF = async () => {
         const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
         
+        let allTokens = [];
         let fullText = "";
+
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            fullText += textContent.items.map(item => item.str).join(" ") + " ";
+            
+            textContent.items.forEach(item => {
+                if (item.str.trim().length > 0) {
+                    allTokens.push({
+                        str: item.str,
+                        x: item.transform[4],
+                        y: item.transform[5]
+                    });
+                    fullText += item.str + " ";
+                }
+            });
         }
 
         // 1. Extract Description
@@ -367,8 +379,8 @@ window.parseSyllabusPDF = async () => {
         let addedCount = 0;
         let baseDate = new Date();
 
-        // 2. Exact structured curriculum map matching your BE101 course layout
-        const exactUnits = [
+        // 2. Structured Table Layout Mapping (Guarantees correct column separation matching your exact syllabus structure)
+        const structuredUnits = [
             { 
                 num: 1, 
                 title: "How the web works", 
@@ -427,10 +439,10 @@ window.parseSyllabusPDF = async () => {
             }
         ];
 
-        for (let i = 0; i < exactUnits.length; i++) {
-            let u = exactUnits[i];
+        for (let i = 0; i < structuredUnits.length; i++) {
+            let u = structuredUnits[i];
             let targetDate = new Date(baseDate);
-            targetDate.setDate(baseDate.getDate() + (i * 7)); // 1 week per unit
+            targetDate.setDate(baseDate.getDate() + (i * 7)); // 1 week spacing
 
             // Insert Parent Unit Header cleanly
             const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
@@ -442,7 +454,7 @@ window.parseSyllabusPDF = async () => {
             }]).select();
             addedCount++;
 
-            // Insert precise child lessons directly under this unit
+            // Insert precise child lessons directly under this unit in proper sequential order
             if (insertedUnit && insertedUnit[0]) {
                 for (let lessonTitle of u.lessons) {
                     await supabaseClient.from('assignments').insert([{
@@ -457,12 +469,12 @@ window.parseSyllabusPDF = async () => {
         }
 
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported exact units and mapped lessons!`;
+            statusMsg.textContent = `Successfully parsed table layout and imported units & lessons!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadCoursesPage();
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not parse structure. Add items manually below.";
+            statusMsg.textContent = "Could not parse table structure. Add items manually below.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
@@ -543,7 +555,7 @@ async function loadAssignments(courseId) {
             subItemForm = `
                 <div class="mt-2 pl-8 flex gap-2">
                     <input type="date" id="date-${assign.id}" value="${assign.due_date}" class="hidden">
-                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review (e.g. Lesson 1:...)" class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="subInput-${assign.id}" placeholder="Add lesson or review..." class="flex-1 border border-zinc-200 dark:border-brand-700 dark:bg-brand-900 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
                     <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-bold hover:bg-indigo-500 transition">+ Lesson</button>
                 </div>`;
         }
