@@ -487,7 +487,10 @@ window.parseSyllabusPDF = async () => {
         if (parsedData.objectives) updates.objectives = parsedData.objectives;
 
         if (Object.keys(updates).length > 0) {
-            await supabaseClient.from('courses').update(updates).eq('id', courseId);
+            const { error: updateError } = await supabaseClient.from('courses').update(updates).eq('id', courseId);
+            if (updateError) {
+                console.error("SUPABASE UPDATE FAILED:", updateError.message);
+            }
             const cachedCourse = localCourses.find(c => c.id === courseId);
             if (cachedCourse) {
                 if (parsedData.description) cachedCourse.description = parsedData.description;
@@ -649,7 +652,13 @@ if (eForm) {
         const description = document.getElementById('editCourseDescription')?.value || '';
         const objectives = document.getElementById('editCourseObjectives')?.value || '';
         
-        await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
+        const { error: updateError } = await supabaseClient.from('courses').update({ code, color, emoji, description, objectives }).eq('id', id);
+        
+        if (updateError) {
+            console.error("COURSE EDIT UPDATE FAILED:", updateError.message);
+            alert(`Failed to save course: ${updateError.message}`);
+            return;
+        }
         
         const cached = localCourses.find(c => c.id === id);
         if (cached) {
@@ -770,8 +779,8 @@ async function loadAssignments(courseId, page = 1) {
         return new Date(a.due_date) - new Date(b.due_date);
     });
 
-    // Pagination configuration (10 items per page)
-    const pageSize = 10;
+    // Pagination configuration (8 items per page)
+    const pageSize = 8;
     const totalPages = Math.ceil(assignments.length / pageSize);
     if (page > totalPages && totalPages > 0) page = totalPages;
     if (page < 1) page = 1;
@@ -880,11 +889,24 @@ function initCalendar() {
             right: 'dayGridMonth,timeGridWeek'
         },
         events: [],
-        eventClick: function(info) {
+        eventClick: async function(info) {
             if (info.event.extendedProps.isCustom) {
                 if(confirm(`Delete custom event "${info.event.title}"?`)) {
                     deleteCustomEvent(info.event.extendedProps.eventId);
                 }
+            } else if (info.event.extendedProps.isAssignment) {
+                const assignId = info.event.extendedProps.assignmentId;
+                const currentState = info.event.extendedProps.isCompleted;
+                const newState = !currentState;
+                
+                await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+                if (newState) fireConfetti();
+                loadCalendarCourses();
+            }
+        },
+        eventDidMount: function(info) {
+            if (info.event.extendedProps.isAssignment && info.event.extendedProps.isCompleted) {
+                info.el.style.textDecoration = 'line-through';
             }
         }
     });
@@ -908,7 +930,12 @@ async function loadCalendarCourses() {
         calendarEvents.push({
             title: `${course.emoji || '📚'} ${prefix}${assign.title}`,
             start: assign.due_date,
-            color: assign.is_completed ? '#9ca3af' : course.color
+            color: assign.is_completed ? '#9ca3af' : course.color,
+            extendedProps: { 
+                isAssignment: true, 
+                assignmentId: assign.id, 
+                isCompleted: assign.is_completed 
+            }
         });
     });
     
@@ -927,7 +954,7 @@ async function loadCalendarCourses() {
     }
 }
 
-window.openEventModal = () => document.getElementById('eventModal').classList.add('hidden');
+window.openEventModal = () => document.getElementById('eventModal').classList.remove('hidden');
 window.closeEventModal = () => document.getElementById('eventModal').classList.add('hidden');
 
 const customEventForm = document.getElementById('customEventForm');
