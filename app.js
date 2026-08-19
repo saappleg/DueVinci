@@ -174,42 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.injectAppearanceSettingsExtras, 400);
 });
 
-// --- INJECT CALENDAR DARK MODE FIX STYLES ---
-const calendarDarkFixStyle = document.createElement('style');
-calendarDarkFixStyle.innerHTML = `
-    .dark .fc-popover {
-        background-color: #18181b !important;
-        border-color: #27272a !important;
-        color: #f4f4f5 !important;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
-        border-radius: 0.75rem;
-        overflow: hidden;
-    }
-    .dark .fc-popover-header {
-        background-color: #27272a !important;
-        color: #f4f4f5 !important;
-        padding: 10px 14px !important;
-        border-bottom: 1px solid #3f3f46 !important;
-    }
-    .dark .fc-popover-title {
-        color: #f4f4f5 !important;
-        font-weight: 700 !important;
-        font-size: 0.875rem !important;
-    }
-    .dark .fc-popover-close {
-        color: #a1a1aa !important;
-        opacity: 0.9 !important;
-        cursor: pointer;
-    }
-    .dark .fc-popover-close:hover {
-        color: #ffffff !important;
-    }
-    .dark .fc-popover-body {
-        padding: 8px !important;
-    }
-`;
-document.head.appendChild(calendarDarkFixStyle);
-
 // --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
@@ -275,14 +239,14 @@ window.toggleSidebar = () => {
     aside.classList.toggle('hidden');
 };
 
-// --- POMODORO TIMER LOGIC WITH REFRESH PERSISTENCE ---
+// --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
 let isWorking = localStorage.getItem('timerIsWorking') !== 'false';
 
 let timerEndTime = parseInt(localStorage.getItem('timerEndTime')) || 0;
-let timerRunning = localStorage.getItem('timerRunning') === 'true';
+let timerRunning = localStorage.getItem('timerRunning'] === 'true';
 let timeLeft = parseInt(localStorage.getItem('timeLeft')) || (focusMinutes * 60);
 
 if (timerRunning && timerEndTime > Date.now()) {
@@ -723,9 +687,7 @@ async function loadDashboardStats() {
                 </div>`;
         });
     }
-}
-
-// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
+}// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -1009,7 +971,7 @@ if (cForm) {
     });
 }
 
-// --- STABLE COURSE MODAL WITH CSS TAB TOGGLING ---
+// --- COURSE MODAL TAB SWITCHING & RENDERING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1050,25 +1012,9 @@ window.openCourseModal = (courseId) => {
     document.getElementById('pdfStatusMsg').classList.add('hidden');
     document.getElementById('syllabusFile').value = '';
     
-    // Inject Tab Buttons above the modal body if not already present
-    const modalBox = document.querySelector('#courseModal .bg-white, #courseModal .dark\\:bg-brand-800') || document.querySelector('#courseModal > div > div');
-    if (modalBox && !document.getElementById('cleanCourseTabs')) {
-        const tabContainer = document.createElement('div');
-        tabContainer.id = 'cleanCourseTabs';
-        tabContainer.className = 'flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-4 gap-6 shrink-0 bg-white dark:bg-brand-800';
-        tabContainer.innerHTML = `
-            <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
-            <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Coursework</button>
-            <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-2.5 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
-            <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-2.5 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
-        `;
-        const modalHeader = modalBox.querySelector('.flex.items-center.justify-between');
-        if (modalHeader) {
-            modalHeader.insertAdjacentElement('afterend', tabContainer);
-        }
-    }
+    switchCourseTab('overview');
+    renderStaticCoursePanels(course);
 
-    setupCourseModalPanels(course);
     document.getElementById('courseModal').classList.remove('hidden');
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
@@ -1092,41 +1038,7 @@ window.switchCourseTab = (tabName) => {
     });
 };
 
-function setupCourseModalPanels(course) {
-    const modalBody = document.querySelector('#courseModal .overflow-y-auto');
-    if (!modalBody) return;
-
-    // Check if panels wrapper already exists
-    let wrapper = document.getElementById('cleanPanelsWrapper');
-    if (!wrapper) {
-        // Extract existing elements from modalBody to place inside tabs cleanly
-        const existingContent = modalBody.innerHTML;
-        
-        wrapper = document.createElement('div');
-        wrapper.id = 'cleanPanelsWrapper';
-        wrapper.className = 'p-6 space-y-6';
-        wrapper.innerHTML = `
-            <div id="panel-overview" class="space-y-6">
-                ${existingContent}
-            </div>
-            <div id="panel-coursework" class="hidden space-y-4">
-                <div id="courseworkTabContent"></div>
-            </div>
-            <div id="panel-resources" class="hidden space-y-4"></div>
-            <div id="panel-scratchpad" class="hidden space-y-4"></div>
-        `;
-        modalBody.innerHTML = '';
-        modalBody.appendChild(wrapper);
-
-        // Move add assignment form and list into coursework tab
-        const cwTab = document.getElementById('courseworkTabContent');
-        const addForm = document.getElementById('addAssignmentForm');
-        const assignList = document.getElementById('assignmentList');
-        if (addForm) cwTab.appendChild(addForm);
-        if (assignList) cwTab.appendChild(assignList);
-    }
-
-    // Populate Resources tab
+function renderStaticCoursePanels(course) {
     let links = course.resources || [];
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
@@ -1148,7 +1060,6 @@ function setupCourseModalPanels(course) {
         `;
     }
 
-    // Populate Scratchpad tab
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
@@ -1173,7 +1084,7 @@ window.addResourceLink = async (courseId) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    setupCourseModalPanels(course);
+    renderStaticCoursePanels(course);
 };
 
 window.removeResourceLink = async (courseId, idx) => {
@@ -1185,7 +1096,7 @@ window.removeResourceLink = async (courseId, idx) => {
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
-    setupCourseModalPanels(course);
+    renderStaticCoursePanels(course);
 };
 
 window.saveCourseScratchpad = async (courseId, val) => {
