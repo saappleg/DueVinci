@@ -7,6 +7,7 @@ let currentUser = null;
 let calendarInstance = null;
 let localCourses = [];
 let currentAssignmentPage = 1;
+let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
 
 // --- INJECT CALENDAR DARK MODE FIX STYLES ---
 const calendarDarkFixStyle = document.createElement('style');
@@ -63,6 +64,28 @@ function fireConfetti() {
             origin: { y: 0.6 },
             colors: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6']
         });
+    }
+}
+
+// --- TOP TITLE BAR INJECTOR ---
+function ensureTopTitleBar() {
+    const appScreen = document.getElementById('appScreen');
+    if (!appScreen) return;
+    
+    let titleBar = document.getElementById('appTopTitleBar');
+    if (!titleBar) {
+        titleBar = document.createElement('header');
+        titleBar.id = 'appTopTitleBar';
+        titleBar.className = 'bg-white dark:bg-brand-800 border-b border-zinc-200 dark:border-brand-700 px-6 py-3 flex items-center justify-between shadow-xs shrink-0';
+        titleBar.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">DV</div>
+                <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-lg">DueVinci</h1>
+            </div>
+            <div class="flex items-center gap-4 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                <span>Student Planner Workspace</span>
+            </div>`;
+        appScreen.insertBefore(titleBar, appScreen.firstChild);
     }
 }
 
@@ -178,7 +201,10 @@ function handleAuth(session) {
     if (session) {
         currentUser = session.user;
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
-        if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
+        if (document.getElementById('appScreen')) {
+            document.getElementById('appScreen').classList.remove('hidden');
+            ensureTopTitleBar();
+        }
         
         const path = window.location.pathname;
         if ((path.endsWith('index.html') || path.endsWith('/')) && document.getElementById('dashboardGrid')) loadDashboardStats();
@@ -295,7 +321,6 @@ async function loadDashboardStats() {
     
     if (!courses || !assignments) return;
 
-    // Strict numerical & chronological sorting for Up Next
     const getUnitNum = (item) => {
         if (item.unit_number) return parseInt(item.unit_number) || 0;
         const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
@@ -383,6 +408,14 @@ async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
     
+    // Ensure all terms from existing courses are also tracked in customTerms
+    localCourses.forEach(c => {
+        if (c.term && !customTerms.includes(c.term.trim())) {
+            customTerms.push(c.term.trim());
+        }
+    });
+    localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    
     const coursesGridEl = document.getElementById('coursesGrid') || document.getElementById('courseList')?.parentElement;
     if (!coursesGridEl) return;
 
@@ -404,7 +437,7 @@ async function loadCoursesPage() {
                     <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
                     <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                 </div>
-            `;
+            </div>`;
     }
 
     renderTermFolders();
@@ -416,6 +449,10 @@ function renderTermFolders() {
     if (!foldersGrid) return;
 
     const termsMap = {};
+    // Ensure all customTerms folders appear even if empty
+    customTerms.forEach(t => { termsMap[t] = []; });
+    if (!termsMap['Unassigned']) termsMap['Unassigned'] = [];
+
     localCourses.forEach(c => {
         const t = c.term ? c.term.trim() : 'Unassigned';
         if (!termsMap[t]) termsMap[t] = [];
@@ -498,6 +535,11 @@ window.handleDropToTerm = async (e, termName) => {
     if (!courseId) return;
 
     const newTerm = termName === 'Unassigned' ? null : termName;
+    if (newTerm && !customTerms.includes(newTerm)) {
+        customTerms.push(newTerm);
+        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    }
+
     await supabaseClient.from('courses').update({ term: newTerm }).eq('id', courseId);
     
     const course = localCourses.find(c => c.id === courseId);
@@ -511,8 +553,13 @@ window.createNewTermFolder = () => {
     const input = document.getElementById('newTermInput');
     const termVal = input ? input.value.trim() : '';
     if (!termVal) return;
+    
+    if (!customTerms.includes(termVal)) {
+        customTerms.push(termVal);
+        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    }
     input.value = '';
-    openTermModal(termVal);
+    renderTermFolders();
 };
 
 // --- TERM MODAL POP-UP ---
@@ -532,7 +579,8 @@ function ensureTermModalExists() {
                     <button type="button" onclick="closeTermModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xl font-bold">✕</button>
                 </div>
                 <div id="termModalCourseList" class="py-4 space-y-3 overflow-y-auto flex-1"></div>
-                <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex justify-end">
+                <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex justify-between items-center">
+                    <button type="button" onclick="deleteCurrentTermFolder()" class="text-xs text-red-500 hover:text-red-700 font-bold transition">Delete Term Folder</button>
                     <button type="button" onclick="closeTermModal()" class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 font-bold rounded-lg text-sm transition">Close</button>
                 </div>
             </div>`;
@@ -540,8 +588,11 @@ function ensureTermModalExists() {
     }
 }
 
+let activeTermModalName = '';
+
 window.openTermModal = (termName) => {
     ensureTermModalExists();
+    activeTermModalName = termName;
     document.getElementById('termModalTitle').innerText = `Classes in ${termName}`;
     
     const listEl = document.getElementById('termModalCourseList');
@@ -575,6 +626,28 @@ window.openTermModal = (termName) => {
 window.closeTermModal = () => {
     const modal = document.getElementById('termModal');
     if (modal) modal.classList.add('hidden');
+};
+
+window.deleteCurrentTermFolder = async () => {
+    if (activeTermModalName === 'Unassigned') {
+        alert('Cannot delete the default Unassigned folder.');
+        return;
+    }
+    if (confirm(`Delete term folder "${activeTermModalName}"? Classes inside will be moved to Unassigned.`)) {
+        // Unassign courses in this term
+        const termCourses = localCourses.filter(c => c.term && c.term.trim() === activeTermModalName);
+        for (let c of termCourses) {
+            await supabaseClient.from('courses').update({ term: null }).eq('id', c.id);
+            c.term = null;
+        }
+        
+        customTerms = customTerms.filter(t => t !== activeTermModalName);
+        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+        
+        closeTermModal();
+        renderTermFolders();
+        renderAlphabeticals();
+    }
 };
 
 const cForm = document.getElementById('courseForm');
@@ -1088,6 +1161,7 @@ function initCalendar() {
     
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
+        timeZone: 'local',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
