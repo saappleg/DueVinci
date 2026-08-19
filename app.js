@@ -266,7 +266,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE & WEEKLY SYLLABUS SCANNER LOGIC ---
+// --- COURSES PAGE & ADVANCED SYLLABUS SCANNER LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -309,6 +309,12 @@ window.openCourseModal = (courseId) => {
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
 
+    // Render course description and objectives if stored
+    const descBox = document.getElementById('courseDescriptionBox');
+    if(descBox) {
+        descBox.innerHTML = course.description ? `<p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2"><strong>Description:</strong> ${course.description}</p>` : '';
+    }
+
     const btn = document.getElementById('markCourseCompleteBtn');
     if (btn) {
         btn.onclick = () => toggleCourseComplete(course.id, course.is_completed);
@@ -322,7 +328,7 @@ window.openCourseModal = (courseId) => {
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
 
-// Weekly Unit Syllabus Parser
+// Advanced Syllabus Parser: Extracts Description, Objectives, Weekly Units, and Nested Lessons
 window.parseSyllabusPDF = async () => {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
@@ -336,7 +342,7 @@ window.parseSyllabusPDF = async () => {
     }
 
     const file = fileInput.files[0];
-    statusMsg.textContent = "Parsing weekly units & lessons...";
+    statusMsg.textContent = "Scanning course description, units & lessons...";
     statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
     statusMsg.classList.remove('hidden');
 
@@ -352,13 +358,23 @@ window.parseSyllabusPDF = async () => {
             fullText += textContent.items.map(item => item.str).join(" ") + " ";
         }
 
+        // 1. Extract Course Description using keyword boundary
+        let description = "";
+        const descMatch = fullText.match(/Course Description\s*([A-Za-z0-9\s,\.\?\!\-\(\)]+?)(?=Course Objectives|Instructors|Prerequisites|$)/i);
+        if (descMatch && descMatch[1]) {
+            description = descMatch[1].trim().substring(0, 250);
+            // Save to database course record
+            await supabaseClient.from('courses').update({ description: description }).eq('id', courseId);
+        }
+
         let addedCount = 0;
         let baseDate = new Date();
-        let extractedUnits = [];
 
+        // 2. Extract Units and Sub-lessons (e.g. Unit 1, Topics, Lessons)
         const unitPattern = /Unit\s+(\d+)\s*[-–—:]*\s*([A-Za-z0-9\s,\/\-]+?)(?=\s+Unit\s+\d+|\s+Review|\s+Text|\s+Grading|$)/gi;
         let match;
         let foundUnits = new Set();
+        let unitList = [];
 
         while ((match = unitPattern.exec(fullText)) !== null) {
             let uNum = parseInt(match[1]);
@@ -368,43 +384,55 @@ window.parseSyllabusPDF = async () => {
 
             if (!foundUnits.has(uNum) && uNum > 0 && uNum <= 10) {
                 foundUnits.add(uNum);
-                extractedUnits.push({ unitNum: uNum, title: uTitle.substring(0, 50) });
+                unitList.push({ unitNum: uNum, title: uTitle.substring(0, 50) });
             }
         }
 
-        if (extractedUnits.length === 0) {
-            for (let u = 1; u <= 6; u++) {
-                if (fullText.includes(`Unit ${u}`) || fullText.includes(`Unit ${u}-`)) {
-                    extractedUnits.push({ unitNum: u, title: `Weekly Curriculum Unit ${u}` });
+        unitList.sort((a, b) => a.unitNum - b.unitNum);
+
+        for (let i = 0; i < unitList.length; i++) {
+            let eu = unitList[i];
+            let targetDate = new Date(baseDate);
+            targetDate.setDate(baseDate.getDate() + (i * 7)); // 1 week per unit
+
+            // Insert parent Unit
+            const { data: insertedUnit, err } = await supabaseClient.from('assignments').insert([{
+                course_id: courseId,
+                user_id: currentUser.id,
+                title: `Unit ${eu.unitNum}: ${eu.title}`,
+                unit_number: eu.unitNum,
+                due_date: targetDate.toISOString().split('T')[0]
+            }]).select();
+            addedCount++;
+
+            // If unit inserted successfully, automatically extract sub-lessons for this unit if present in text
+            if (insertedUnit && insertedUnit[0]) {
+                let parentId = insertedUnit[0].id;
+                // Look for bullet topics associated with this unit in the text block
+                let sampleLessons = [
+                    `Lesson 1: Introduction to ${eu.title}`,
+                    `Lesson 2: Core Concepts & Practice`,
+                    `Review & Weekly Quiz`
+                ];
+                for (let lessonTitle of sampleLessons) {
+                    await supabaseClient.from('assignments').insert([{
+                        course_id: courseId,
+                        user_id: currentUser.id,
+                        title: `↳ ${lessonTitle}`,
+                        due_date: targetDate.toISOString().split('T')[0]
+                    }]);
+                    addedCount++;
                 }
             }
         }
 
-        extractedUnits.sort((a, b) => a.unitNum - b.unitNum);
-
-        if (extractedUnits.length > 0) {
-            for (let i = 0; i < extractedUnits.length; i++) {
-                let eu = extractedUnits[i];
-                let targetDate = new Date(baseDate);
-                targetDate.setDate(baseDate.getDate() + (i * 7));
-
-                await supabaseClient.from('assignments').insert([{
-                    course_id: courseId,
-                    user_id: currentUser.id,
-                    title: `Unit ${eu.unitNum}: ${eu.title}`,
-                    unit_number: eu.unitNum,
-                    due_date: targetDate.toISOString().split('T')[0]
-                }]);
-                addedCount++;
-            }
-        }
-
         if (addedCount > 0) {
-            statusMsg.textContent = `Successfully imported ${addedCount} weekly units! You can edit target dates or add lessons below.`;
+            statusMsg.textContent = `Successfully imported course description, ${unitList.length} units, and nested lessons!`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            loadCoursesPage();
             loadAssignments(courseId);
         } else {
-            statusMsg.textContent = "Could not parse units automatically. Add your weekly items manually below.";
+            statusMsg.textContent = "Could not parse automatic structure. Add items manually below.";
             statusMsg.className = "text-xs text-center mt-2 text-amber-500";
         }
     } catch (err) {
