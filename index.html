@@ -18,7 +18,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=6" defer></script>
+    <script src="app.js?v=7" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -60,7 +60,6 @@
                     </div>
                 </div>
 
-                <!-- Custom Timer Form (Hidden by default) -->
                 <div id="timerSettingsForm" class="hidden px-6 pb-4 text-sm text-zinc-600 dark:text-zinc-400 space-y-2">
                     <div class="flex justify-between items-center gap-2">
                         <label class="flex-1">Focus (min): <input type="number" id="focusMinInput" class="w-16 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600" value="25"></label>
@@ -69,7 +68,6 @@
                     <button type="button" onclick="saveTimerSettings()" class="w-full bg-indigo-600 text-white font-bold py-1.5 rounded hover:bg-indigo-700 transition text-xs">Save Time</button>
                 </div>
 
-                <!-- Timer Circle Display -->
                 <div id="timerContent" class="px-6 pb-6 flex flex-col items-center transition-all overflow-hidden">
                     <div class="relative w-40 h-40 rounded-full border-4 border-zinc-300 dark:border-brand-600 flex flex-col items-center justify-center mb-4">
                         <svg class="absolute top-0 left-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
@@ -152,8 +150,6 @@
     <!-- Modular Settings Modal -->
     <div id="settingsModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
-            
-            <!-- Settings Sidebar -->
             <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
                 <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
                 <nav class="space-y-1">
@@ -161,12 +157,8 @@
                     <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                 </nav>
             </div>
-
-            <!-- Settings Content Area -->
             <div class="flex-1 p-6 relative">
                 <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                
-                <!-- Profile Tab Content -->
                 <div id="content-profile" class="block space-y-6">
                     <div>
                         <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
@@ -185,8 +177,6 @@
                         <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
                     </form>
                 </div>
-
-                <!-- Appearance Tab Content -->
                 <div id="content-appearance" class="hidden space-y-6">
                     <div>
                         <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
@@ -201,7 +191,6 @@
                         </select>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
