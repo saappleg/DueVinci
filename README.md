@@ -19,3 +19,4 @@ DueVinci/
 ├── courses.html     # Class management & PDF syllabus parser
 ├── calendar.html    # FullCalendar view & custom event manager
 └── app.js           # Core business logic, Supabase hooks, and UI controllers
+
