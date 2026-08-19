@@ -431,7 +431,6 @@ window.parseSyllabusPDF = async () => {
         let baseDate = new Date();
 
         if (parsedData.units && parsedData.units.length > 0) {
-            // Sort units chronologically by end date
             parsedData.units.sort((a, b) => {
                 if (!a.dateStr || !b.dateStr) return 0;
                 return new Date(a.dateStr) - new Date(b.dateStr);
@@ -513,7 +512,6 @@ window.parseLessonsImage = async (inputElement) => {
             let baseDate = new Date();
 
             if (parsedData.units && parsedData.units.length > 0) {
-                // Sort units chronologically by end date
                 parsedData.units.sort((a, b) => {
                     if (!a.dateStr || !b.dateStr) return 0;
                     return new Date(a.dateStr) - new Date(b.dateStr);
@@ -619,7 +617,7 @@ window.addSubItem = async (parentId, courseId) => {
 };
 
 async function loadAssignments(courseId) {
-    const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId).order('due_date', { ascending: true });
+    const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
     
     const listEl = document.getElementById('assignmentList');
     listEl.innerHTML = '';
@@ -628,6 +626,19 @@ async function loadAssignments(courseId) {
         listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>';
         return;
     }
+    
+    // Strict sorting: Group by unit_number first, main units above sub-lessons, then chronological date
+    assignments.sort((a, b) => {
+        let unitA = a.unit_number || 0;
+        let unitB = b.unit_number || 0;
+        if (unitA !== unitB) return unitA - unitB;
+        
+        let isSubA = a.title.startsWith('↳');
+        let isSubB = b.title.startsWith('↳');
+        if (isSubA !== isSubB) return isSubA ? 1 : -1;
+        
+        return new Date(a.due_date) - new Date(b.due_date);
+    });
     
     assignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
