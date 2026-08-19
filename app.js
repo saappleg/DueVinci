@@ -261,7 +261,8 @@ async function loadDashboardStats() {
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
         upNextListEl.innerHTML = '';
-        const upcoming = assignments.filter(a => !a.is_completed && !a.title.startsWith('↳')).slice(0, 5);
+        // Includes both units and individual lessons on the home screen
+        const upcoming = assignments.filter(a => !a.is_completed).slice(0, 5);
         if (upcoming.length === 0) {
             upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming weekly items. You\'re all caught up!</p>';
         } else {
@@ -627,7 +628,7 @@ async function loadAssignments(courseId) {
         return;
     }
     
-    // Strict sorting: Group by unit_number first, main units above sub-lessons, then chronological date
+    // Strict numeric and chronological sorting (fixes Lesson 10 sorting above Lesson 9)
     assignments.sort((a, b) => {
         let unitA = a.unit_number || 0;
         let unitB = b.unit_number || 0;
@@ -636,6 +637,12 @@ async function loadAssignments(courseId) {
         let isSubA = a.title.startsWith('↳');
         let isSubB = b.title.startsWith('↳');
         if (isSubA !== isSubB) return isSubA ? 1 : -1;
+        
+        if (isSubA && isSubB) {
+            let numA = parseInt(a.title.replace(/[^0-9]/g, '')) || 0;
+            let numB = parseInt(b.title.replace(/[^0-9]/g, '')) || 0;
+            if (numA !== numB) return numA - numB;
+        }
         
         return new Date(a.due_date) - new Date(b.due_date);
     });
