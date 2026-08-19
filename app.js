@@ -7,6 +7,17 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 let currentUser = null;
 let calendarInstance = null;
 
+// Dark/Light Mode Toggle Logic
+window.toggleTheme = () => {
+    if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+    }
+};
+
 // Check authentication state on page load
 async function checkUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -24,14 +35,13 @@ function handleAuth(session) {
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
         
-        // Page Routing Logic: Only load what is on the screen
+        // Page Routing Logic
         if (document.getElementById('calendar')) initCalendar();
         if (document.getElementById('dashboardGrid')) loadDashboardCourses();
         if (document.getElementById('calendar')) loadCalendarCourses();
 
     } else {
         currentUser = null;
-        // If the user is logged out and NOT on the index page, kick them back to index.html
         const currentPath = window.location.pathname;
         if (!currentPath.endsWith('index.html') && !currentPath.endsWith('/') && !currentPath.includes('DueVinci')) {
             window.location.href = 'index.html';
@@ -73,7 +83,7 @@ window.signInWithEmail = async () => {
 
 window.logout = async () => {
     await supabaseClient.auth.signOut();
-    window.location.href = 'index.html'; // Force redirect to login screen on logout
+    window.location.href = 'index.html'; 
 };
 
 // --- DASHBOARD LOGIC (Runs only on index.html) ---
@@ -90,11 +100,13 @@ async function loadDashboardCourses() {
     courseListEl.innerHTML = '';
 
     courses.forEach(course => {
+        const emoji = course.emoji || '📚';
         courseListEl.innerHTML += `
-            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-600 transition-colors duration-200">
                 <div class="flex items-center gap-3">
-                    <span class="w-4 h-4 rounded-full inline-block shadow-sm" style="background-color: ${course.color};"></span>
-                    <span class="font-bold text-sm text-slate-700">${course.code}</span>
+                    <span class="text-xl">${emoji}</span>
+                    <span class="w-3 h-3 rounded-full inline-block shadow-sm" style="background-color: ${course.color};"></span>
+                    <span class="font-bold text-sm text-slate-700 dark:text-slate-200">${course.code}</span>
                 </div>
                 <button onclick="deleteCourse('${course.id}')" class="text-xs text-slate-400 hover:text-red-500 transition">✕</button>
             </div>
@@ -111,11 +123,13 @@ if (courseForm) {
 
         const code = document.getElementById('courseCode').value;
         const color = document.getElementById('courseColor').value;
+        const emoji = document.getElementById('courseEmoji').value || '📚';
 
-        const { error } = await supabaseClient.from('courses').insert([{ code, color, user_id: currentUser.id }]);
+        const { error } = await supabaseClient.from('courses').insert([{ code, color, emoji, user_id: currentUser.id }]);
 
         if (!error) {
             document.getElementById('courseCode').value = '';
+            document.getElementById('courseEmoji').value = '';
             loadDashboardCourses();
         } else {
             alert('Error adding course: ' + error.message);
@@ -154,8 +168,9 @@ async function loadCalendarCourses() {
 
     let calendarEvents = [];
     courses.forEach(course => {
+        const emoji = course.emoji || '📚';
         calendarEvents.push({
-            title: `${course.code} Registration`,
+            title: `${emoji} ${course.code} Registration`,
             start: new Date().toISOString().split('T')[0],
             color: course.color
         });
