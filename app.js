@@ -184,15 +184,11 @@ window.closeSettingsModal = () => {
 };
 
 window.switchSettingsTab = (tabName) => {
-    // Hide all contents
     document.getElementById('content-profile').classList.add('hidden');
     document.getElementById('content-appearance').classList.add('hidden');
-    
-    // Reset tab styles
     document.getElementById('tab-profile').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
     document.getElementById('tab-appearance').className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
     
-    // Show active content and highlight active tab
     document.getElementById(`content-${tabName}`).classList.remove('hidden');
     document.getElementById(`tab-${tabName}`).className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
 };
@@ -269,7 +265,7 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE LOGIC ---
+// --- COURSES PAGE & PDF PARSING LOGIC ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses; 
@@ -299,7 +295,7 @@ if (cForm) {
         const color = document.getElementById('courseColor').value;
         const emoji = document.getElementById('courseEmoji').value || '📚';
         const { error } = await supabaseClient.from('courses').insert([{ code, color, emoji, user_id: currentUser.id }]);
-        if (!error) { document.getElementById('courseCode').value = ''; loadCoursesPage(); }
+        if (!error) { document.getElementById('courseCode').value; loadCoursesPage(); }
     });
 }
 
@@ -318,10 +314,95 @@ window.openCourseModal = (courseId) => {
         btn.innerText = course.is_completed ? "↺ Undo Completion" : "✔ Mark Complete";
         btn.className = course.is_completed ? "text-xs bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-brand-700 dark:text-zinc-400 px-3 py-1.5 rounded font-bold transition" : "text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition";
     }
+    document.getElementById('pdfStatusMsg').classList.add('hidden');
+    document.getElementById('syllabusFile').value = '';
     document.getElementById('courseModal').classList.remove('hidden');
     loadAssignments(course.id);
 };
 window.closeCourseModal = () => document.getElementById('courseModal').classList.add('hidden');
+
+// PDF Syllabus Parser Engine
+window.parseSyllabusPDF = async () => {
+    const fileInput = document.getElementById('syllabusFile');
+    const statusMsg = document.getElementById('pdfStatusMsg');
+    const courseId = document.getElementById('editCourseId').value;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        statusMsg.textContent = "Please select a PDF file first.";
+        statusMsg.className = "text-xs text-center mt-2 text-red-500";
+        statusMsg.classList.remove('hidden');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    statusMsg.textContent = "Reading PDF...";
+    statusMsg.className = "text-xs text-center mt-2 text-indigo-500";
+    statusMsg.classList.remove('hidden');
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(" ");
+            fullText += pageText + "\n";
+        }
+
+        // Basic line/date extraction heuristics
+        // Looks for common date patterns like MM/DD or Jan 15 inside lines
+        const lines = fullText.split(/(?:\r\n|\r|\n|(?:\s{2,}))/);
+        let addedCount = 0;
+        const currentYear = new Date().getFullYear();
+
+        for (let line of lines) {
+            line = line.trim();
+            if (line.length < 5) continue;
+
+            // Simple regex match for dates (e.g. 10/12, Oct 12, October 12)
+            const dateMatch = line.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/i);
+            
+            if (dateMatch) {
+                // Parse out potential date string
+                let parsedDate = new Date(dateMatch[0] + " " + currentYear);
+                if (isNaN(parsedDate.getTime())) {
+                    parsedDate = new Date(); // fallback to today if unparseable
+                }
+                const dateStr = parsedDate.toISOString().split('T')[0];
+
+                // Clean title by removing the date snippet
+                let title = line.replace(dateMatch[0], "").trim();
+                title = title.replace(/^[:\-\–\—\s]+|[:\-\–\—\s]+$/g, ""); // clean symbols
+                if (title.length < 3) title = "Assignment / Milestone";
+
+                // Insert into DB
+                await supabaseClient.from('assignments').insert([{
+                    course_id: courseId,
+                    user_id: currentUser.id,
+                    title: title.substring(0, 60),
+                    due_date: dateStr
+                }]);
+                addedCount++;
+            }
+        }
+
+        if (addedCount > 0) {
+            statusMsg.textContent = `Successfully imported ${addedCount} assignments!`;
+            statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            loadAssignments(courseId);
+        } else {
+            statusMsg.textContent = "No standard date patterns found in PDF. Try adding manually.";
+            statusMsg.className = "text-xs text-center mt-2 text-amber-500";
+        }
+    } catch (err) {
+        console.error(err);
+        statusMsg.textContent = "Error parsing PDF file.";
+        statusMsg.className = "text-xs text-center mt-2 text-red-500";
+    }
+};
 
 const eForm = document.getElementById('editCourseForm');
 if (eForm) {
@@ -432,7 +513,6 @@ async function loadCalendarCourses() {
     }
 }
 
-// Custom Event Forms
 window.openEventModal = () => document.getElementById('eventModal').classList.remove('hidden');
 window.closeEventModal = () => document.getElementById('eventModal').classList.add('hidden');
 
