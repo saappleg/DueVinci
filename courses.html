@@ -20,7 +20,6 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
-    <!-- Include Tesseract.js for visual screenshot OCR scanning -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -32,6 +31,7 @@
 
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         
+        <!-- Sidebar -->
         <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto">
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
@@ -67,23 +67,25 @@
 
             <div class="p-4 flex-1">
                 <nav class="space-y-1">
-                    <a href="index.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard</a>
-                    <a href="courses.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Classes</a>
-                    <a href="calendar.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Calendar</a>
+                    <a href="index.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Dashboard</a>
+                    <a href="courses.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition">Classes</a>
+                    <a href="grades.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Grades</a>
+                    <a href="calendar.html" class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition">Calendar</a>
                 </nav>
             </div>
 
             <div class="p-4">
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Settings
+                    Settings
                 </button>
             </div>
         </aside>
 
+        <!-- Main Content Area -->
         <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-brand-900">
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-end px-8 gap-4 bg-white dark:bg-brand-900">
                 <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Sign out
+                    Sign out
                 </button>
             </header>
 
@@ -104,7 +106,7 @@
                                 <input type="color" id="courseColor" value="#4f46e5" class="absolute -inset-2 w-16 h-16 cursor-pointer bg-transparent">
                             </div>
                             <button type="submit" class="bg-white dark:bg-zinc-100 text-zinc-900 h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-zinc-200 transition shrink-0 shadow-sm">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Add Class
+                                Add Class
                             </button>
                         </form>
                     </div>
@@ -116,10 +118,11 @@
         </div>
     </div>
 
-    <!-- Course Settings Modal -->
+    <!-- Course Settings Modal with Stable Static Tabs -->
     <div id="courseModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50">
+            
+            <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50 shrink-0">
                 <h2 class="text-xl font-bold dark:text-white flex items-center gap-2" id="modalCourseTitle"><span>📚</span> Course Settings</h2>
                 <div class="flex items-center gap-3">
                     <button type="button" id="markCourseCompleteBtn" class="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition">✔ Mark Complete</button>
@@ -127,66 +130,83 @@
                 </div>
             </div>
 
-            <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="space-y-6">
-                    <div>
-                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
-                        <form id="editCourseForm" class="space-y-3">
-                            <input type="hidden" id="editCourseId">
-                            <div class="flex items-center gap-2">
-                                <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
-                                <input type="text" id="editCourseCode" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+            <!-- Static Tab Navigation Bar -->
+            <div class="flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-3 gap-6 shrink-0 bg-white dark:bg-brand-800">
+                <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
+                <button type="button" onclick="switchCourseTab('coursework')" id="tabBtn-coursework" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Coursework</button>
+                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
+            </div>
+
+            <!-- Modal Content Panels -->
+            <div class="p-6 overflow-y-auto flex-1">
+                
+                <!-- 1. Overview & Syllabus Panel -->
+                <div id="panel-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
+                            <form id="editCourseForm" class="space-y-3">
+                                <input type="hidden" id="editCourseId">
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                                    <input type="text" id="editCourseCode" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                                </div>
+                                <div class="flex items-center justify-between border border-zinc-200 dark:border-brand-700 rounded-lg p-2 dark:bg-brand-900">
+                                    <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
+                                    <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+                                </div>
+                                <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
+                            </form>
+                            <div id="courseMetadataBox"></div>
+                        </div>
+
+                        <div class="border-t border-zinc-200 dark:border-brand-700 pt-4 space-y-4">
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
+                                <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-2">
+                                <label class="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none font-medium mb-2">
+                                    <input type="checkbox" id="syllabusMetadataOnly" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                    Don't auto-load lessons/units from this syllabus (Description and Objectives Only)
+                                </label>
+                                <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata & Objectives</button>
                             </div>
-                            <div class="flex items-center justify-between border border-zinc-200 dark:border-brand-700 rounded-lg p-2 dark:bg-brand-900">
-                                <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
-                                <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📸 Import Lessons Screenshot</h3>
+                                <input type="file" id="lessonImageFile" accept="image/*" onchange="parseLessonsImage(this)" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer">
                             </div>
-                            <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
+                            <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
+                        </div>
+
+                        <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Coursework</button>
+                    </div>
+
+                    <div class="flex flex-col h-full">
+                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
+                        <form id="addAssignmentForm" class="space-y-2 mb-4 bg-zinc-50 dark:bg-brand-900 p-3 rounded-xl border border-zinc-200 dark:border-brand-700">
+                            <div class="flex gap-2">
+                                <input type="text" id="assignTitle" placeholder="e.g. Unit 1: How the web works" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
+                                <input type="number" id="assignUnit" placeholder="Unit #" class="w-20 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" id="assignDate" placeholder="YYYY-MM-DD" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 font-mono">
+                                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Unit</button>
+                            </div>
                         </form>
-                        <div id="courseMetadataBox"></div>
+                        <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto"></div>
                     </div>
-
-                    <!-- Import Sections with Isolated Syllabus Checkbox -->
-                    <div class="border-t border-zinc-200 dark:border-brand-700 pt-4 space-y-4">
-                        <div>
-                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📄 Import Syllabus (PDF)</h3>
-                            <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-2">
-                            
-                            <!-- Checkbox isolated specifically under Syllabus Upload -->
-                            <label class="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none font-medium mb-2">
-                                <input type="checkbox" id="syllabusMetadataOnly" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                                Don't auto-load lessons/units from this syllabus (Description and Objectives Only)
-                            </label>
-
-                            <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata & Objectives</button>
-                        </div>
-
-                        <div>
-                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📸 Import Lessons Screenshot</h3>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Upload a screenshot of your course breakdown page to scan exact week numbers & dates.</p>
-                            <input type="file" id="lessonImageFile" accept="image/*" onchange="parseLessonsImage(this)" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-100 cursor-pointer">
-                        </div>
-
-                        <p id="pdfStatusMsg" class="text-xs text-center mt-2 hidden"></p>
-                    </div>
-
-                    <button type="button" onclick="deleteCurrentCourse()" class="w-full text-red-500 text-sm font-medium mt-2 hover:underline">Delete Class & Coursework</button>
                 </div>
 
-                <div class="flex flex-col h-full">
-                    <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
-                    <form id="addAssignmentForm" class="space-y-2 mb-4 bg-zinc-50 dark:bg-brand-900 p-3 rounded-xl border border-zinc-200 dark:border-brand-700">
-                        <div class="flex gap-2">
-                            <input type="text" id="assignTitle" placeholder="e.g. Unit 1: How the web works" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
-                            <input type="number" id="assignUnit" placeholder="Unit #" class="w-20 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="date" id="assignDate" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
-                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Unit</button>
-                        </div>
-                    </form>
-                    <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto"></div>
-                </div>
+                <!-- 2. Coursework Panel -->
+                <div id="panel-coursework" class="hidden space-y-4"></div>
+
+                <!-- 3. Resources & Links Panel -->
+                <div id="panel-resources" class="hidden space-y-4"></div>
+
+                <!-- 4. Scratchpad Panel -->
+                <div id="panel-scratchpad" class="hidden space-y-4"></div>
+
             </div>
         </div>
     </div>
