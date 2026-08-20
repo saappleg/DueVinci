@@ -9,17 +9,17 @@ const currentHost = window.location.hostname;
 let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
-// If we are on the live GitHub Pages website, use Production Database
-if (currentHost.includes('github.io')) {
+// Determine environment based on hostname. Use Production DB for the live site (GitHub Pages or custom domain)
+if (currentHost.includes('github.io') || currentHost.includes('duevinci.tech')) {
     SUPABASE_URL = PROD_SUPABASE_URL;
     SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
     console.log('🚀 Running in Production Mode (DueVinci-Prod)');
-} 
-// For local environments (localhost, 127.0.0.1, file:///), use Dev Database
-else {
+} else {
+    // For local environments (localhost, 127.0.0.1, file:///), use Dev Database
     SUPABASE_URL = DEV_SUPABASE_URL;
     SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
+}
 }
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
