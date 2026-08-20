@@ -1,9 +1,57 @@
 // --- MULTI-TIMER & FLOATING WIDGET LOGIC ---
-let activeTimers = JSON.parse(localStorage.getItem('duevinci_timers')) || [
-    { id: 'default', name: 'Focus Session', focusMin: 25, breakMin: 5, timeLeft: 25 * 60, isWorking: true, running: false }
+
+/**
+ * Creates a timer state object.
+ */
+function createTimerState(id, name = 'Study Block', focusMin = 25, breakMin = 5) {
+    return {
+        id: id || ('timer_' + Date.now()),
+        name: name.trim() || 'Study Block',
+        focusMin: focusMin,
+        breakMin: breakMin,
+        timeLeft: focusMin * 60,
+        isWorking: true,
+        running: false
+    };
+}
+
+/**
+ * Steps a single timer state by 1 second. Returns a new or updated timer state.
+ */
+function stepTimerState(timer) {
+    if (!timer || !timer.running) return timer;
+    
+    if (timer.timeLeft > 0) {
+        return {
+            ...timer,
+            timeLeft: timer.timeLeft - 1
+        };
+    } else {
+        const nextIsWorking = !timer.isWorking;
+        return {
+            ...timer,
+            isWorking: nextIsWorking,
+            timeLeft: (nextIsWorking ? timer.focusMin : timer.breakMin) * 60
+        };
+    }
+}
+
+/**
+ * Formats seconds into MM:SS format.
+ */
+function formatTimerTime(totalSeconds) {
+    const safeSec = Math.max(0, Math.floor(totalSeconds || 0));
+    const min = Math.floor(safeSec / 60);
+    const sec = safeSec % 60;
+    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+let activeTimers = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_timers'))) || [
+    createTimerState('default', 'Focus Session', 25, 5)
 ];
 
 function saveTimersToStorage() {
+    if (typeof localStorage === 'undefined') return;
     const serialized = activeTimers.map(t => ({ 
         id: t.id, 
         name: t.name, 
@@ -17,6 +65,7 @@ function saveTimersToStorage() {
 }
 
 function initMultiTimersUI() {
+    if (typeof document === 'undefined') return;
     renderFloatingTimerWidget();
     
     // Automatically inject multi-timer manager into sidebar or dashboard if container doesn't exist
@@ -33,30 +82,24 @@ function initMultiTimersUI() {
     if (container) renderTimersManager(container);
 }
 
-window.addNewTimer = () => {
+const _timerScope = typeof window !== 'undefined' ? window : globalThis;
+
+_timerScope.addNewTimer = () => {
+    if (typeof document === 'undefined') return;
     const nameInput = document.getElementById('newTimerNameInput');
     const name = nameInput ? nameInput.value.trim() : 'Study Block';
     if (!name) return;
 
-    const newTimer = {
-        id: 'timer_' + Date.now(),
-        name: name,
-        focusMin: 25,
-        breakMin: 5,
-        timeLeft: 25 * 60,
-        isWorking: true,
-        running: false
-    };
-
+    const newTimer = createTimerState('timer_' + Date.now(), name, 25, 5);
     activeTimers.push(newTimer);
     saveTimersToStorage();
-    if(nameInput) nameInput.value = '';
+    if (nameInput) nameInput.value = '';
     initMultiTimersUI();
 };
 
-window.deleteTimer = (id) => {
+_timerScope.deleteTimer = (id) => {
     if (activeTimers.length <= 1) {
-        alert('You must keep at least one active timer.');
+        if (typeof alert === 'function') alert('You must keep at least one active timer.');
         return;
     }
     const idx = activeTimers.findIndex(t => t.id === id);
@@ -67,7 +110,7 @@ window.deleteTimer = (id) => {
     }
 };
 
-window.toggleMultiTimerRun = (id) => {
+_timerScope.toggleMultiTimerRun = (id) => {
     const timer = activeTimers.find(t => t.id === id);
     if (!timer) return;
 
@@ -77,26 +120,29 @@ window.toggleMultiTimerRun = (id) => {
 };
 
 // Global ticker running every second for all active custom timers
-setInterval(() => {
-    let updated = false;
-    activeTimers.forEach(t => {
-        if (t.running) {
-            updated = true;
-            if (t.timeLeft > 0) {
-                t.timeLeft--;
-            } else {
-                t.isWorking = !t.isWorking;
-                t.timeLeft = (t.isWorking ? t.focusMin : t.breakMin) * 60;
-                if (typeof fireConfetti === 'function') fireConfetti();
+if (typeof setInterval !== 'undefined') {
+    setInterval(() => {
+        let updated = false;
+        activeTimers = activeTimers.map(t => {
+            if (t.running) {
+                updated = true;
+                const prevWorking = t.isWorking;
+                const prevTime = t.timeLeft;
+                const nextState = stepTimerState(t);
+                if (prevTime === 0 && prevWorking !== nextState.isWorking && typeof fireConfetti === 'function') {
+                    fireConfetti();
+                }
+                return nextState;
             }
-        }
-    });
+            return t;
+        });
 
-    if (updated) {
-        saveTimersToStorage();
-        updateTimersDisplayDOM();
-    }
-}, 1000);
+        if (updated) {
+            saveTimersToStorage();
+            updateTimersDisplayDOM();
+        }
+    }, 1000);
+}
 
 function updateTimersDisplayDOM() {
     activeTimers.forEach(t => {
@@ -184,6 +230,22 @@ function renderTimersManager(container) {
     container.innerHTML = html;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initMultiTimersUI();
-});
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initMultiTimersUI();
+    });
+}
+
+_timerScope.createTimerState = createTimerState;
+_timerScope.stepTimerState = stepTimerState;
+_timerScope.formatTimerTime = formatTimerTime;
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        createTimerState,
+        stepTimerState,
+        formatTimerTime
+    };
+}
+
+

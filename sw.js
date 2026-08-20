@@ -1,5 +1,5 @@
 // DueVinci Service Worker - Offline Caching
-const CACHE_NAME = 'duevinci-v2.4';
+const CACHE_NAME = 'duevinci-v2.5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,10 +11,14 @@ const ASSETS_TO_CACHE = [
   './app.js',
   './timers.js',
   './academics.js',
+  './renaissance-theme.css',
   './manifest.json',
   './maestro-logo.svg',
   './maestro-logo.png',
-  './wgu-owl.png'
+  './wgu-owl.png',
+  './icons/icon-192x192.png',
+  './icons/icon-512x512.png',
+  './icons/favicon.ico'
 ];
 
 self.addEventListener('install', (event) => {

@@ -51,11 +51,16 @@
    git clone https://github.com/saappleg/DueVinci.git
    cd DueVinci
    ```
-2. **Supabase Configuration**
+2. **Install Dev Tooling & Run Tests**
+   ```bash
+   npm install
+   npm test
+   ```
+3. **Supabase Configuration**
    - Create a new Supabase project.
    - Set up `courses`, `assignments`, and `custom_events` tables matching the frontend schemas.
    - Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `app.js`.
-3. **Edge Function Deployment**
+4. **Edge Function Deployment**
    ```bash
    supabase functions deploy gemini-parser
    ```
@@ -63,25 +68,31 @@
    ```bash
    supabase secrets set GEMINI_API_KEY=your_google_ai_key
    ```
-4. **Launch**
-   Serve the static files with any local development server (e.g., Live Server extension in VS Code) and open `index.html`.
+5. **Launch**
+   Serve the static files with any local development server (e.g., Live Server extension in VS Code) or run `npx serve .` and open `index.html`.
 
 ---
 ## Project Structure 📂
 
 ```text
 DueVinci/
-├── index.html       # Main dashboard (Up Next & Goals)
-├── courses.html     # Class management & PDF parser
-├── grades.html      # Grade tracking & GPA calculations
-├── calendar.html    # FullCalendar view & custom events
-└── app.js           # Core logic, Supabase hooks, UI controllers
+├── index.html          # Main dashboard (Up Next & Goals)
+├── courses.html        # Class management & PDF parser
+├── grades.html         # Grade tracking & GPA calculations
+├── calendar.html       # FullCalendar view & custom events
+├── academics.js        # Academic analytics & streak algorithms
+├── timers.js           # Multi-timer Pomodoro state engine
+├── app.js              # Core logic, Supabase hooks, UI controllers
+├── sw.js               # Service Worker & offline caching
+├── tests/              # Automated unit & integration tests (Vitest)
+└── .github/workflows/  # CI/CD and deployment workflows
 ```
 
 ---
-## Contributing 🤝
+## Contributing & Releases 🤝
 
-Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit issues and pull requests.
+- Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit issues and pull requests.
+- See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
 ---
 ## Security 🔒
