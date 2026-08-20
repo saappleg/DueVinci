@@ -85,7 +85,3 @@ DueVinci/
 ## 👨‍💻 Author
 
 Created and developed by **Steven Applegate**.
-
-```
-
-```
