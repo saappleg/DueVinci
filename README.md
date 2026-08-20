@@ -31,6 +31,15 @@ DueVinci is a comprehensive, student-focused academic workspace and planner. Bui
    ```bash
    git clone [https://github.com/yourusername/duevinci.git](https://github.com/yourusername/duevinci.git)
    cd duevinci
+## 🔒 Data Retention & Security
+
+DueVinci is built with privacy and data security in mind, utilizing modern backend architecture to keep student data safe.
+
+* **Authentication & Authorization:** User accounts are managed via Supabase Auth. Credentials are encrypted, and database access is locked down using PostgreSQL Row Level Security (RLS) policies, ensuring users can only read, edit, or delete their own academic data.
+* **AI Processing Privacy:** Syllabus documents and lesson screenshots are processed securely. The Gemini API is accessed exclusively through a server-side Supabase Edge Function, keeping API keys hidden from the client-side. Document text and images are only used for the instantaneous generation of course schedules and are not retained or used to train Google's foundational AI models.
+* **Data Control:** Users retain absolute control over their workspace. Deleting a class or term folder immediately permanently deletes all associated coursework, objectives, and links from the database.
+* **Client-Side Storage:** Non-sensitive workspace preferences—such as dark/light mode, timer durations, date formatting, and UI collapse states—are saved locally in the browser's `localStorage` for a snappy, personalized experience without unnecessary database calls.
+
 ## 📂 Project Structure
 
 ```text
