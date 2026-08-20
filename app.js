@@ -1,6 +1,6 @@
-// Supabase Project API Keys
-const SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
+// Supabase Project API Keys (DueVinci-Dev)
+const SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -533,9 +533,7 @@ window.signInWithEmail = async () => {
 window.logout = async () => {
     await supabaseClient.auth.signOut();
     window.location.href = 'index.html';
-};
-
-// --- MODULAR SETTINGS POPUP ---
+};// --- MODULAR SETTINGS POPUP ---
 function ensureSettingsModalExists() {
     if (document.getElementById('settingsModal')) return;
     const div = document.createElement('div');
@@ -758,7 +756,9 @@ async function loadDashboardStats() {
                 </div>`;
         });
     }
-}// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
+}
+
+// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -770,6 +770,7 @@ async function loadCoursesPage() {
     });
     localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
     
+    // Safely populate the grids without overwriting the static HTML form
     renderTermFolders();
     renderAlphabeticals();
 }
@@ -962,9 +963,7 @@ window.openTermModal = (termName) => {
 window.closeTermModal = () => {
     const modal = document.getElementById('termModal');
     if (modal) modal.classList.add('hidden');
-};
-
-window.deleteCurrentTermFolder = async () => {
+};window.deleteCurrentTermFolder = async () => {
     if (activeTermModalName === 'Unassigned') {
         if (confirm('Delete Unassigned folder and all unassigned classes inside it?')) {
             const termCourses = localCourses.filter(c => !c.term || c.term.trim() === '' || c.term.trim() === 'Unassigned');
@@ -1343,7 +1342,9 @@ window.parseLessonsImage = async (inputElement) => {
             statusMsg.className = "text-xs text-center mt-2 text-red-500";
         }
     };
-};const eForm = document.getElementById('editCourseForm');
+};
+
+const eForm = document.getElementById('editCourseForm');
 if (eForm) {
     eForm.addEventListener('submit', async (e) => {
         e.preventDefault();
