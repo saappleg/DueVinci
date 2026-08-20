@@ -1,5 +1,5 @@
 // DueVinci Service Worker - Offline Caching
-const CACHE_NAME = 'duevinci-v2.2';
+const CACHE_NAME = 'duevinci-v2.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
