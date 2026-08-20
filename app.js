@@ -3,29 +3,24 @@ let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
 const currentHost = window.location.hostname;
-const currentProtocol = window.location.protocol;
 
-// If testing locally via server OR just double-clicking the HTML file, use DueVinci-Dev
-if (currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '' || currentProtocol === 'file:') {
-    SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
-    SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
-    console.log('🔧 Running in Development Mode (DueVinci-Dev)');
-} 
-// If deployed to GitHub Pages/Live, use the Production Database
-else {
-    // REMEMBER TO PASTE YOUR ACTUAL PRODUCTION KEYS HERE BEFORE MERGING TO MAIN
+// If we are on the live GitHub Pages website, use Production Keys
+if (currentHost.includes('github.io')) {
+    // REMEMBER TO PASTE YOUR ACTUAL PRODUCTION KEYS HERE
     SUPABASE_URL = 'YOUR_PRODUCTION_URL_HERE'; 
     SUPABASE_ANON_KEY = 'YOUR_PRODUCTION_ANON_KEY_HERE';
     console.log('🚀 Running in Production Mode');
+} 
+// For literally ANY other environment (localhost, local IP, or file:///), use Dev Keys
+else {
+    SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+    SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+    console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 }
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- END SUPABASE CONFIG ---
-
-let currentUser = null;
-let calendarInstance = null;
-let localCourses = [];
 
 let currentUser = null;
 let calendarInstance = null;
