@@ -3,15 +3,17 @@ let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
 const currentHost = window.location.hostname;
+const currentProtocol = window.location.protocol;
 
-// If testing locally, use the DueVinci-Dev Database
-if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+// If testing locally via server OR just double-clicking the HTML file, use DueVinci-Dev
+if (currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '' || currentProtocol === 'file:') {
     SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
     SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 } 
 // If deployed to GitHub Pages/Live, use the Production Database
 else {
+    // REMEMBER TO PASTE YOUR ACTUAL PRODUCTION KEYS HERE BEFORE MERGING TO MAIN
     SUPABASE_URL = 'YOUR_PRODUCTION_URL_HERE'; 
     SUPABASE_ANON_KEY = 'YOUR_PRODUCTION_ANON_KEY_HERE';
     console.log('🚀 Running in Production Mode');
