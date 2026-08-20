@@ -88,18 +88,29 @@
             </header>
 
             <main class="flex-1 p-8 overflow-y-auto" id="dashboardGrid">
-                <div class="flex justify-between items-end mb-8">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
                     <div>
                         <h2 class="text-3xl font-bold dark:text-white mb-1">Dashboard</h2>
                         <p class="text-zinc-500 dark:text-zinc-400 text-sm">Overview of your upcoming tasks, study streaks, and workload balance.</p>
                     </div>
+                    <button type="button" onclick="openQuickAddModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5 shrink-0">
+                        <span>⚡</span> + Quick Add Task
+                    </button>
                 </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200">
-                        <h3 class="text-md font-bold mb-4 text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Up Next
-                        </h3>
+                    <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-md font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Up Next
+                            </h3>
+                            <div class="flex items-center gap-1">
+                                <button type="button" id="filter-priority-all" onclick="filterDashboardUpNext('all')" class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-sm transition">All</button>
+                                <button type="button" id="filter-priority-high" onclick="filterDashboardUpNext('high')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🔥 Urgent</button>
+                                <button type="button" id="filter-priority-medium" onclick="filterDashboardUpNext('medium')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">⚡ Normal</button>
+                                <button type="button" id="filter-priority-low" onclick="filterDashboardUpNext('low')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🌱 Low</button>
+                            </div>
+                        </div>
                         <ul class="space-y-3" id="upNextList"></ul>
                     </div>
 

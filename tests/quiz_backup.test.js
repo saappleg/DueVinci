@@ -122,4 +122,19 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(ics).toContain('END:VCALENDAR');
         });
     });
+
+    describe('Audio Synthesizer & Speech Utilities', () => {
+        it('handles playTimerAlarm gracefully across different sound profiles', async () => {
+            const { playTimerAlarm } = await import('../js/modules/utils.js');
+            expect(() => playTimerAlarm('zenBowl')).not.toThrow();
+            expect(() => playTimerAlarm('gentleChime')).not.toThrow();
+            expect(() => playTimerAlarm('digitalBeep')).not.toThrow();
+        });
+
+        it('handles speakText and toggleAmbientNoise without error', async () => {
+            const { speakText, toggleAmbientNoise } = await import('../js/modules/utils.js');
+            expect(() => speakText('Hello study notes', 1.0)).not.toThrow();
+            expect(() => toggleAmbientNoise('off')).not.toThrow();
+        });
+    });
 });

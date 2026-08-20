@@ -53,23 +53,42 @@ export async function loadDashboardStats() {
     if (upNextListEl) {
         upNextListEl.className = "max-h-[320px] overflow-y-auto space-y-2 pr-1";
         upNextListEl.innerHTML = '';
-        const upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
+        const currentFilter = window.activePriorityFilter || 'all';
+
+        let upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
+        
+        if (currentFilter !== 'all') {
+            upcoming = upcoming.filter(a => (a.priority || 'medium') === currentFilter);
+        }
 
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">No upcoming lessons. You\'re all caught up!</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400 py-3 text-center">No matching upcoming lessons. You\'re all caught up! 🎉</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
+                
+                const priority = assign.priority || 'medium';
+                let priorityBadge = '';
+                if (priority === 'high') {
+                    priorityBadge = `<span class="text-[10px] bg-rose-500/10 text-rose-500 border border-rose-500/20 px-1.5 py-0.5 rounded font-bold">🔥 Urgent</span>`;
+                } else if (priority === 'low') {
+                    priorityBadge = `<span class="text-[10px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold">🌱 Low</span>`;
+                }
 
                 upNextListEl.innerHTML += `
-                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700">
-                        <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
-                        <div>
-                            <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${course.emoji} ${unitBadge}${assign.title}</p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${formattedDate}</p>
+                    <div class="flex items-center justify-between p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 hover:border-indigo-500/40 transition">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                            <div class="truncate">
+                                <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${course.emoji} ${unitBadge}${assign.title}</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${formattedDate}</p>
+                            </div>
+                        </div>
+                        <div class="shrink-0 ml-2">
+                            ${priorityBadge}
                         </div>
                     </div>`;
             });
@@ -461,6 +480,9 @@ export function renderStaticCoursePanels(course) {
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">📝 Course Scratchpad & Study Notes</h3>
                 <div class="flex gap-2">
+                    <button type="button" onclick="downloadCourseNotesAsMarkdown('${course.id}')" title="Download as .md file" class="px-2.5 py-1 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded text-xs font-bold transition">
+                        📥 Download .md
+                    </button>
                     <button type="button" onclick="switchCourseTab('studyquiz'); generateStudyDeck('${course.id}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition shadow-sm">
                         ⚡ Generate Test from Notes
                     </button>
@@ -886,6 +908,138 @@ export async function loadAssignments(courseId, page = 1) {
     }
 }
 
+export function downloadCourseNotesAsMarkdown(courseId) {
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
+
+    const content = `# ${course.emoji || '📚'} ${course.code} Study Notes & Scratchpad\n\n${course.scratchpad || '*No notes recorded.*'}\n\n---\n*Exported from DueVinci on ${new Date().toLocaleDateString()}*`;
+    const cleanCode = course.code.replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${cleanCode}_Study_Notes.md`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+export function filterDashboardUpNext(priority = 'all') {
+    if (typeof window !== 'undefined') {
+        window.activePriorityFilter = priority;
+        ['all', 'high', 'medium', 'low'].forEach(p => {
+            const btn = document.getElementById(`filter-priority-${p}`);
+            if (btn) {
+                if (p === priority) {
+                    btn.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-sm transition";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition";
+                }
+            }
+        });
+        loadDashboardStats();
+    }
+}
+
+export async function openQuickAddModal() {
+    let modal = document.getElementById('quickAddModal');
+    if (!modal && typeof document !== 'undefined') {
+        const div = document.createElement('div');
+        div.id = 'quickAddModal';
+        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden p-4';
+        div.innerHTML = `
+            <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-md p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-brand-700">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⚡</span>
+                        <h3 class="text-base font-bold text-zinc-900 dark:text-white">Quick Add Assignment</h3>
+                    </div>
+                    <button type="button" onclick="closeQuickAddModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-lg font-bold">✕</button>
+                </div>
+                <form id="quickAddForm" onsubmit="submitQuickAddTask(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Class / Course</label>
+                        <select id="quickAddCourseSelect" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+                            <option value="">Select a class...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Assignment or Exam Title</label>
+                        <input type="text" id="quickAddTitle" required placeholder="e.g. Unit 3 Quiz or Practice Exam" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Due Date</label>
+                            <input type="date" id="quickAddDueDate" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Priority</label>
+                            <select id="quickAddPriority" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+                                <option value="medium">⚡ Normal</option>
+                                <option value="high">🔥 Urgent</option>
+                                <option value="low">🌱 Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" id="quickAddSubmitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-sm">+ Add to Course Plan</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(div);
+    }
+
+    const select = document.getElementById('quickAddCourseSelect');
+    if (select) {
+        select.innerHTML = '<option value="">Select a class...</option>';
+        localCourses.forEach(c => {
+            select.innerHTML += `<option value="${c.id}">${c.emoji || '📚'} ${c.code}</option>`;
+        });
+    }
+
+    const modalEl = document.getElementById('quickAddModal');
+    if (modalEl) modalEl.classList.remove('hidden');
+}
+
+export function closeQuickAddModal() {
+    const modalEl = document.getElementById('quickAddModal');
+    if (modalEl) modalEl.classList.add('hidden');
+}
+
+export async function submitQuickAddTask(event) {
+    if (event) event.preventDefault();
+    const courseId = document.getElementById('quickAddCourseSelect')?.value;
+    const title = document.getElementById('quickAddTitle')?.value.trim();
+    const dueDate = document.getElementById('quickAddDueDate')?.value;
+    const priority = document.getElementById('quickAddPriority')?.value || 'medium';
+
+    if (!courseId || !title || !dueDate) {
+        alert('Please fill out all required fields.');
+        return;
+    }
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    const newAssignment = {
+        course_id: courseId,
+        user_id: user.id,
+        title: title.startsWith('↳') ? title : `↳ ${title}`,
+        due_date: dueDate,
+        priority: priority,
+        is_completed: false
+    };
+
+    await supabaseClient.from('assignments').insert([newAssignment]);
+    closeQuickAddModal();
+    
+    // Refresh stats and study plan
+    loadDashboardStats();
+    if (window.renderStudyPlanDashboardWidget) {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
 // Bind to window for HTML event handlers
 if (typeof window !== 'undefined') {
     window.loadDashboardStats = loadDashboardStats;
@@ -908,6 +1062,11 @@ if (typeof window !== 'undefined') {
     window.removeCourseResourceLink = removeCourseResourceLink;
     window.saveCourseScratchpad = saveCourseScratchpad;
     window.updateScratchpadPreview = updateScratchpadPreview;
+    window.downloadCourseNotesAsMarkdown = downloadCourseNotesAsMarkdown;
+    window.filterDashboardUpNext = filterDashboardUpNext;
+    window.openQuickAddModal = openQuickAddModal;
+    window.closeQuickAddModal = closeQuickAddModal;
+    window.submitQuickAddTask = submitQuickAddTask;
     window.parseSyllabusPDF = parseSyllabusPDF;
     window.parseLessonsImage = parseLessonsImage;
     window.deleteCurrentCourse = deleteCurrentCourse;

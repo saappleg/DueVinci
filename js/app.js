@@ -1,14 +1,14 @@
 // --- DUEVINCI APPLICATION ENTRY POINT ---
 
 import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/config.js';
-import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm } from './modules/utils.js';
+import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm, toggleAmbientNoise, speakText } from './modules/utils.js';
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
-import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateScratchpadPreview } from './modules/courses.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
-import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery } from './modules/flashcards.js';
+import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
 import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
 import { generateBalancedStudyPlan, renderStudyPlanDashboardWidget } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
@@ -17,7 +17,7 @@ import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUs
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
-import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
+import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
 
 // Re-export for external and test suite imports
 export {
@@ -39,6 +39,8 @@ export {
     fireConfetti,
     recordStudyActivity,
     playTimerAlarm,
+    toggleAmbientNoise,
+    speakText,
     calculateStudyStreak,
     calculateDaysRemaining,
     getWorkloadIntensity,
@@ -79,6 +81,11 @@ export {
     loadAssignments,
     toggleAssignment,
     updateScratchpadPreview,
+    downloadCourseNotesAsMarkdown,
+    filterDashboardUpNext,
+    openQuickAddModal,
+    closeQuickAddModal,
+    submitQuickAddTask,
     isSimulatingGrades,
     simulatedGradesMap,
     loadGradesPage,
@@ -106,6 +113,8 @@ export {
     rateFlashcardSM2,
     getSavedDeckMastery,
     saveCardMastery,
+    speakCurrentFlashcard,
+    exportFlashcardsAsCSV,
     formatMathFormula,
     renderMarkdownToHtml,
     generateBalancedStudyPlan,
@@ -139,6 +148,8 @@ export {
     toggleGreekTheme,
     updateDateFormat,
     toggleMuteAlarm,
+    updateAlarmSound,
+    updateAmbientNoise,
     updateGpaScale,
     toggleSidebar,
     openSettingsModal,
@@ -169,6 +180,8 @@ _rootScope.parseInputDate = parseInputDate;
 _rootScope.fireConfetti = fireConfetti;
 _rootScope.recordStudyActivity = recordStudyActivity;
 _rootScope.playTimerAlarm = playTimerAlarm;
+_rootScope.toggleAmbientNoise = toggleAmbientNoise;
+_rootScope.speakText = speakText;
 _rootScope.calculateStudyStreak = calculateStudyStreak;
 _rootScope.calculateDaysRemaining = calculateDaysRemaining;
 _rootScope.getWorkloadIntensity = getWorkloadIntensity;
@@ -207,6 +220,11 @@ _rootScope.closeTermModal = closeTermModal;
 _rootScope.loadAssignments = loadAssignments;
 _rootScope.toggleAssignment = toggleAssignment;
 _rootScope.updateScratchpadPreview = updateScratchpadPreview;
+_rootScope.downloadCourseNotesAsMarkdown = downloadCourseNotesAsMarkdown;
+_rootScope.filterDashboardUpNext = filterDashboardUpNext;
+_rootScope.openQuickAddModal = openQuickAddModal;
+_rootScope.closeQuickAddModal = closeQuickAddModal;
+_rootScope.submitQuickAddTask = submitQuickAddTask;
 _rootScope.loadGradesPage = loadGradesPage;
 _rootScope.toggleGradeSimulator = toggleGradeSimulator;
 _rootScope.resetGradeSimulation = resetGradeSimulation;
@@ -231,6 +249,8 @@ _rootScope.calculateSM2Repetition = calculateSM2Repetition;
 _rootScope.rateFlashcardSM2 = rateFlashcardSM2;
 _rootScope.getSavedDeckMastery = getSavedDeckMastery;
 _rootScope.saveCardMastery = saveCardMastery;
+_rootScope.speakCurrentFlashcard = speakCurrentFlashcard;
+_rootScope.exportFlashcardsAsCSV = exportFlashcardsAsCSV;
 _rootScope.formatMathFormula = formatMathFormula;
 _rootScope.renderMarkdownToHtml = renderMarkdownToHtml;
 _rootScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
@@ -262,6 +282,8 @@ _rootScope.changeTheme = changeTheme;
 _rootScope.toggleGreekTheme = toggleGreekTheme;
 _rootScope.updateDateFormat = updateDateFormat;
 _rootScope.toggleMuteAlarm = toggleMuteAlarm;
+_rootScope.updateAlarmSound = updateAlarmSound;
+_rootScope.updateAmbientNoise = updateAmbientNoise;
 _rootScope.updateGpaScale = updateGpaScale;
 _rootScope.toggleSidebar = toggleSidebar;
 _rootScope.openSettingsModal = openSettingsModal;
@@ -281,6 +303,12 @@ if (typeof document !== 'undefined') {
         updateTimerDisplay();
         initMultiTimersUI();
         initNetworkStatusListeners();
+
+        // Restore ambient noise if active
+        const savedAmbient = localStorage.getItem('duevinci_ambient_noise');
+        if (savedAmbient && savedAmbient !== 'off') {
+            toggleAmbientNoise(savedAmbient);
+        }
 
         // Render Study Plan widget on Dashboard
         const currentPage = getCurrentPageName();

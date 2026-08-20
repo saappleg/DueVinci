@@ -29,6 +29,16 @@ export function toggleMuteAlarm(muted) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_mute_alarm', muted);
 }
 
+export function updateAlarmSound(sound) {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_alarm_sound', sound);
+}
+
+export function updateAmbientNoise(type) {
+    if (typeof window.toggleAmbientNoise === 'function') {
+        window.toggleAmbientNoise(type);
+    }
+}
+
 export function updateGpaScale(scale) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_gpa_scale', scale);
     if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
@@ -53,10 +63,32 @@ export function injectAppearanceSettingsExtras() {
     const currentGpaScale = localStorage.getItem('duevinci_gpa_scale') || '4.0';
     const isAcademicsHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
 
+    const currentAlarmSound = localStorage.getItem('duevinci_alarm_sound') || 'gentleChime';
+    const currentAmbientNoise = localStorage.getItem('duevinci_ambient_noise') || 'off';
+
     const container = document.createElement('div');
     container.id = 'appearanceExtrasContainer';
     container.className = 'max-w-sm space-y-4 pt-4 border-t border-zinc-200 dark:border-brand-700';
     container.innerHTML = `
+        <div>
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Timer Alarm Chime</label>
+            <div class="flex gap-2 items-center">
+                <select id="alarmSoundSelect" onchange="updateAlarmSound(this.value)" class="flex-1 text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <option value="gentleChime" ${currentAlarmSound === 'gentleChime' ? 'selected' : ''}>🔔 Gentle Rising Chime</option>
+                    <option value="zenBowl" ${currentAlarmSound === 'zenBowl' ? 'selected' : ''}>🧘 Zen Singing Bowl</option>
+                    <option value="digitalBeep" ${currentAlarmSound === 'digitalBeep' ? 'selected' : ''}>⏱️ Digital Beep</option>
+                </select>
+                <button type="button" onclick="playTimerAlarm(document.getElementById('alarmSoundSelect').value)" class="px-2.5 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded text-xs font-bold transition">▶ Test</button>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Ambient Focus Generator</label>
+            <select id="ambientNoiseSelect" onchange="updateAmbientNoise(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="off" ${currentAmbientNoise === 'off' ? 'selected' : ''}>🔇 Off</option>
+                <option value="brown" ${currentAmbientNoise === 'brown' ? 'selected' : ''}>🌧️ Soothing Rain / Brown Noise</option>
+                <option value="white" ${currentAmbientNoise === 'white' ? 'selected' : ''}>💨 Pure Focus White Noise</option>
+            </select>
+        </div>
         <div>
             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format Display</label>
             <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
@@ -595,6 +627,8 @@ if (typeof window !== 'undefined') {
     window.toggleGreekTheme = toggleGreekTheme;
     window.updateDateFormat = updateDateFormat;
     window.toggleMuteAlarm = toggleMuteAlarm;
+    window.updateAlarmSound = updateAlarmSound;
+    window.updateAmbientNoise = updateAmbientNoise;
     window.updateGpaScale = updateGpaScale;
     window.toggleSidebar = toggleSidebar;
     window.injectAppearanceSettingsExtras = injectAppearanceSettingsExtras;

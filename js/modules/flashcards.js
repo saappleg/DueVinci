@@ -426,7 +426,14 @@ export function getFlashcardsHtml() {
             <div class="flex justify-between items-center text-xs text-zinc-400 font-bold px-2">
                 <span class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">${masteryBadge}</span>
                 <span>Card ${currentCardIndex + 1} of ${currentDeckCards.length}</span>
-                <span class="text-indigo-500 font-medium">Click card to flip 🔄</span>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="speakCurrentFlashcard()" title="Read aloud" class="p-1 rounded hover:bg-zinc-200 dark:hover:bg-brand-700 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center gap-1 transition">
+                        🔊 <span class="hidden sm:inline">Listen</span>
+                    </button>
+                    <button type="button" onclick="exportFlashcardsAsCSV()" title="Export Deck to Anki / CSV" class="p-1 rounded hover:bg-zinc-200 dark:hover:bg-brand-700 text-zinc-500 hover:text-indigo-600 dark:hover:text-white text-xs font-bold transition">
+                        📥 CSV
+                    </button>
+                </div>
             </div>
 
             <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[180px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.01]">
@@ -581,6 +588,43 @@ export function prevFlashcard() {
     }
 }
 
+export function speakCurrentFlashcard() {
+    if (currentDeckCards.length === 0) return;
+    const card = currentDeckCards[currentCardIndex];
+    const textToSpeak = isCardFlipped 
+        ? `Definition: ${card.definition}` 
+        : `Term: ${card.term}`;
+    
+    if (typeof window !== 'undefined' && window.speakText) {
+        window.speakText(textToSpeak);
+    }
+}
+
+export function exportFlashcardsAsCSV(courseId = currentDeckCourseId) {
+    if (currentDeckCards.length === 0) {
+        alert('No flashcards to export! Add notes to generate a deck first.');
+        return;
+    }
+
+    const courses = window.localCourses || [];
+    const course = courses.find(c => c.id === courseId);
+    const courseCode = course ? course.code.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Deck';
+
+    let csvContent = "Front,Back\n";
+    currentDeckCards.forEach(c => {
+        const front = `"${(c.term || '').replace(/"/g, '""')}"`;
+        const back = `"${(c.definition || '').replace(/"/g, '""')}"`;
+        csvContent += `${front},${back}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${courseCode}_Flashcards_Anki.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
 // Bind to window & globalThis
 const _scope = typeof window !== 'undefined' ? window : globalThis;
 _scope.calculateSM2Repetition = calculateSM2Repetition;
@@ -600,3 +644,5 @@ _scope.renderFlashcardView = renderFlashcardView;
 _scope.flipCurrentCard = flipCurrentCard;
 _scope.nextFlashcard = nextFlashcard;
 _scope.prevFlashcard = prevFlashcard;
+_scope.speakCurrentFlashcard = speakCurrentFlashcard;
+_scope.exportFlashcardsAsCSV = exportFlashcardsAsCSV;
