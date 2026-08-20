@@ -2760,7 +2760,8 @@ window.filterCommandPalette = (query) => {
         { title: '/party', desc: 'Trigger celebratory confetti storm', action: () => { confetti({ particleCount: 100, spread: 80 }); }, icon: '🎉' },
         { title: '/inspire', desc: 'Leonardo da Vinci wisdom quote', action: () => { alert('"Learning never exhausts the mind." — Leonardo da Vinci'); }, icon: '📜' },
         { title: '/zen', desc: 'Activate Zen study aura', action: () => { confetti({ particleCount: 40, spread: 60, colors: ['#a78bfa', '#818cf8', '#c084fc'] }); }, icon: '🧘' },
-        { title: '/maestro', desc: 'Rain Maestro University crests & shields', action: () => triggerMaestroRain(), icon: '🛡️' }
+        { title: '/maestro', desc: 'Rain Maestro University crests & shields', action: () => triggerMaestroRain(), icon: '🛡️' },
+        { title: '/nightowl', desc: 'Summon the WGU Night Owls flyover', action: () => triggerNightOwlFlight(), icon: '🦉' }
     ];
 
     const filtered = q ? items.filter(i => i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)) : items;
@@ -2949,6 +2950,196 @@ window.triggerMaestroRain = () => {
             setTimeout(() => overlay.remove(), 600);
         }
     }, 6000);
+};
+
+// --- SECRET WGU NIGHT OWLS FLIGHT ANIMATION (/nightowl) ---
+window.triggerNightOwlFlight = () => {
+    const existing = document.getElementById('nightOwlFlightOverlay');
+    if (existing) existing.remove();
+
+    if (!document.getElementById('nightOwlFlightStyle')) {
+        const style = document.createElement('style');
+        style.id = 'nightOwlFlightStyle';
+        style.innerHTML = `
+            @keyframes owlSwoopRight {
+                0% {
+                    transform: translate3d(-140px, var(--start-y), 0) scale(var(--owl-scale)) rotate(var(--init-rot));
+                    opacity: 0;
+                }
+                8% {
+                    opacity: 1;
+                }
+                50% {
+                    transform: translate3d(50vw, calc(var(--start-y) + var(--swoop-dip)), 0) scale(calc(var(--owl-scale) * 1.15)) rotate(calc(var(--init-rot) + 12deg));
+                }
+                92% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translate3d(calc(100vw + 140px), calc(var(--start-y) + var(--end-drift)), 0) scale(var(--owl-scale)) rotate(calc(var(--init-rot) + 6deg));
+                    opacity: 0;
+                }
+            }
+            @keyframes owlSwoopLeft {
+                0% {
+                    transform: translate3d(calc(100vw + 140px), var(--start-y), 0) scaleX(-1) scale(var(--owl-scale)) rotate(var(--init-rot));
+                    opacity: 0;
+                }
+                8% {
+                    opacity: 1;
+                }
+                50% {
+                    transform: translate3d(50vw, calc(var(--start-y) + var(--swoop-dip)), 0) scaleX(-1) scale(calc(var(--owl-scale) * 1.15)) rotate(calc(var(--init-rot) - 12deg));
+                }
+                92% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translate3d(-140px, calc(var(--start-y) + var(--end-drift)), 0) scaleX(-1) scale(var(--owl-scale)) rotate(calc(var(--init-rot) - 6deg));
+                    opacity: 0;
+                }
+            }
+            @keyframes owlHoverFlap {
+                0%, 100% {
+                    margin-top: 0px;
+                }
+                50% {
+                    margin-top: var(--flap-amp);
+                }
+            }
+            @keyframes owlBadgePop {
+                0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+                50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            .wgu-flying-owl {
+                position: absolute;
+                top: 0;
+                left: 0;
+                user-select: none;
+                cursor: pointer;
+                transition: filter 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                filter: drop-shadow(0 6px 16px rgba(0, 32, 78, 0.45));
+                will-change: transform, opacity;
+            }
+            .wgu-flying-owl:hover {
+                filter: drop-shadow(0 8px 24px rgba(255, 184, 28, 0.8)) brightness(1.2) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'nightOwlFlightOverlay';
+    overlay.className = 'fixed inset-0 pointer-events-none z-[9999] overflow-hidden';
+    document.body.appendChild(overlay);
+
+    // Toast Badge Banner (WGU Night Owls Theme)
+    const badge = document.createElement('div');
+    badge.className = 'fixed top-14 left-1/2 -translate-x-1/2 z-[10000] bg-[#00204E]/95 text-white px-5 py-3 rounded-2xl shadow-2xl border border-[#FFB81C]/70 flex items-center gap-3.5 backdrop-blur-md transition-all pointer-events-none';
+    badge.style.animation = 'owlBadgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+    badge.innerHTML = `
+        <div class="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shrink-0 border border-[#FFB81C]">
+            <img src="wgu-owl.png" alt="WGU Night Owl" class="w-full h-full object-contain">
+        </div>
+        <div>
+            <div class="text-xs font-black tracking-wider uppercase text-[#FFB81C] flex items-center gap-1.5">
+                <span>🦉</span> Western Governors University
+            </div>
+            <div class="text-xs text-zinc-100 font-medium">Night Owls Take Flight! Sage of Wisdom Activated 💙💛</div>
+        </div>
+    `;
+    overlay.appendChild(badge);
+
+    // Confetti burst in WGU colors (Navy, Gold, White, Amber)
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 75,
+            spread: 90,
+            origin: { y: 0.12 },
+            colors: ['#00204E', '#002F6C', '#FFB81C', '#FFD100', '#FFFFFF']
+        });
+        setTimeout(() => {
+            confetti({
+                particleCount: 45,
+                angle: 60,
+                spread: 65,
+                origin: { x: 0 },
+                colors: ['#FFB81C', '#00204E', '#FFFFFF']
+            });
+            confetti({
+                particleCount: 45,
+                angle: 120,
+                spread: 65,
+                origin: { x: 1 },
+                colors: ['#FFB81C', '#00204E', '#FFFFFF']
+            });
+        }, 300);
+    }
+
+    const totalOwls = 32;
+
+    for (let i = 0; i < totalOwls; i++) {
+        const el = document.createElement('div');
+        el.className = 'wgu-flying-owl pointer-events-auto';
+
+        const size = Math.floor(Math.random() * 45) + 55; // 55px to 100px width
+        const goRight = Math.random() > 0.35; // Most fly left-to-right, some right-to-left
+        const startY = Math.floor(Math.random() * (window.innerHeight - 180) + 40) + 'px';
+        const delay = (Math.random() * 3.2).toFixed(2); // 0s to 3.2s
+        const dur = (Math.random() * 2.2 + 2.8).toFixed(2); // 2.8s to 5.0s
+        const swoopDip = (Math.random() * 160 - 80).toFixed(0) + 'px';
+        const endDrift = (Math.random() * 140 - 70).toFixed(0) + 'px';
+        const flapAmp = (Math.random() * 24 - 12).toFixed(0) + 'px';
+        const flapDur = (Math.random() * 0.8 + 0.6).toFixed(2) + 's';
+        const scale = (Math.random() * 0.4 + 0.8).toFixed(2);
+        const initRot = (Math.random() * 14 - 7).toFixed(0) + 'deg';
+
+        el.style.width = `${size}px`;
+        el.style.setProperty('--start-y', startY);
+        el.style.setProperty('--swoop-dip', swoopDip);
+        el.style.setProperty('--end-drift', endDrift);
+        el.style.setProperty('--flap-amp', flapAmp);
+        el.style.setProperty('--owl-scale', scale);
+        el.style.setProperty('--init-rot', initRot);
+
+        const animName = goRight ? 'owlSwoopRight' : 'owlSwoopLeft';
+        el.style.animation = `${animName} ${dur}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}s forwards, owlHoverFlap ${flapDur} ease-in-out ${delay}s infinite alternate`;
+
+        el.innerHTML = `<img src="wgu-owl.png" alt="WGU Owl" class="w-full h-auto select-none pointer-events-none drop-shadow-md">`;
+
+        // Interactive click/tap on flying owl
+        el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            el.style.transition = 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease';
+            el.style.transform = 'scale(2.0) rotate(360deg)';
+            el.style.opacity = '0';
+            if (typeof confetti === 'function') {
+                const rect = el.getBoundingClientRect();
+                confetti({
+                    particleCount: 20,
+                    spread: 55,
+                    origin: {
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                    colors: ['#FFB81C', '#00204E', '#FFFFFF', '#FFD100']
+                });
+            }
+            setTimeout(() => el.remove(), 300);
+        });
+
+        overlay.appendChild(el);
+    }
+
+    // Clean fade out after all owls complete flight
+    setTimeout(() => {
+        if (overlay) {
+            overlay.style.transition = 'opacity 0.7s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 700);
+        }
+    }, 7000);
 };
 
 // --- PWA INSTALL PROMPT ---
