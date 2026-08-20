@@ -550,7 +550,7 @@ export function sendDirectMailto() {
     const mailBody = encodeURIComponent(`${message}\n\n---\nSent from DueVinci User: ${currentUser?.email || 'Student'}`);
 
     if (typeof window !== 'undefined') {
-        window.location.href = `mailto:steven@duevinci.app?subject=${mailSubject}&body=${mailBody}`;
+        window.location.href = `mailto:support@duevinci.tech?subject=${mailSubject}&body=${mailBody}`;
     }
 }
 

@@ -67,10 +67,10 @@ We may revise this policy to reflect architectural changes or regulatory updates
 ---
 ## Contact <a id="contact"></a>
 
-For questions or concerns, contact the developer:
+For questions or concerns, contact the team:
 
-- **Steven Applegate** – DueVinci Creator & Administrator
-- Email: <steven@example.com>
+- **DueVinci Support Team**
+- Email: <support@duevinci.tech>
 
 ---
-*Last Updated: August 19, 2026*
+*Last Updated: August 20, 2026*
