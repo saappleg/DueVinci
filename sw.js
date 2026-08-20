@@ -11,7 +11,9 @@ const ASSETS_TO_CACHE = [
   './app.js',
   './timers.js',
   './academics.js',
-  './manifest.json'
+  './manifest.json',
+  './maestro-logo.svg',
+  './maestro-logo.png'
 ];
 
 self.addEventListener('install', (event) => {
