@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    name: Syntax & Integrity Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate JavaScript Syntax
+        run: |
+          echo "Checking JavaScript syntax..."
+          for file in $(find . -maxdepth 2 -name "*.js" ! -path "*/node_modules/*"); do
+            echo "Checking $file..."
+            node --check "$file"
+          done
+          echo "All JavaScript files passed syntax check!"
+
+      - name: Verify Web App Assets
+        run: |
+          echo "Checking essential web assets..."
+          test -f index.html || { echo "Missing index.html"; exit 1; }
+          test -f courses.html || { echo "Missing courses.html"; exit 1; }
+          test -f grades.html || { echo "Missing grades.html"; exit 1; }
+          test -f calendar.html || { echo "Missing calendar.html"; exit 1; }
+          test -f manifest.json || { echo "Missing manifest.json"; exit 1; }
+          test -f sw.js || { echo "Missing sw.js"; exit 1; }
+          echo "All core assets verified successfully!"

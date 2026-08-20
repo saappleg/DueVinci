@@ -1,6 +1,6 @@
 # DueVinci 📚
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/saappleg/DueVinci-dev/ci.yml?branch=main&label=CI)](https://github.com/saappleg/DueVinci-dev/actions) [![License](https://img.shields.io/github/license/saappleg/DueVinci-dev)](LICENSE) [![Version](https://img.shields.io/github/v/tag/saappleg/DueVinci-dev?label=Version)](https://github.com/saappleg/DueVinci-dev/tags)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/saappleg/DueVinci/ci.yml?branch=main&label=CI)](https://github.com/saappleg/DueVinci/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Security Policy](https://img.shields.io/badge/Security-Policy-brightgreen.svg)](SECURITY.md)
 
 > **DueVinci** is a comprehensive, student‑focused academic workspace and planner. It replaces fragmented productivity apps and combines coursework tracking, GPA calculation, an integrated Pomodoro timer, and AI‑powered syllabus parsing into a single, cohesive dashboard.
 
@@ -11,6 +11,7 @@
 - [Setup & Installation 🚀](#setup--installation)
 - [Project Structure 📂](#project-structure)
 - [Contributing 🤝](#contributing)
+- [Security 🔒](#security-)
 - [License 📄](#license)
 
 ---
@@ -80,9 +81,14 @@ DueVinci/
 ---
 ## Contributing 🤝
 
-Contributions are welcome! Please fork the repository, create a feature branch, and submit a pull request. Follow the existing code style and run the linter before submitting.
+Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit issues and pull requests.
+
+---
+## Security 🔒
+
+Please review our [SECURITY.md](SECURITY.md) for vulnerability disclosure guidelines and our privacy/security practices.
 
 ---
 ## License 📄
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
