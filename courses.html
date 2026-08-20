@@ -261,19 +261,24 @@
                 <div id="panel-resources" class="hidden space-y-4"></div>
                 <div id="panel-scratchpad" class="hidden space-y-4"></div>
                 <div id="panel-studyquiz" class="hidden space-y-4">
-                    <div class="flex items-center justify-between p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
                         <div>
                             <h4 class="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                                 <span>🎴</span> Active Recall Flashcards & Quiz
                             </h4>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Generate study cards based on your course syllabus & units.</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Generate 3D study cards or practice quizzes directly from your syllabus.</p>
                         </div>
-                        <button type="button" onclick="generateStudyDeck(document.getElementById('editCourseId').value)" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
-                            ✨ Generate Flashcards
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="generateStudyDeck(document.getElementById('editCourseId').value)" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+                                <span>✨</span> Flashcards
+                            </button>
+                            <button type="button" onclick="generateQuizMode(document.getElementById('editCourseId').value)" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+                                <span>🎯</span> Practice Quiz
+                            </button>
+                        </div>
                     </div>
-                    <div id="studyQuizContainer" class="p-6 bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 min-h-[220px] flex items-center justify-center text-zinc-400 text-xs">
-                        Click "Generate Flashcards" above to build an interactive study deck for this class.
+                    <div id="studyQuizContainer" class="p-6 bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 min-h-[240px] flex items-center justify-center text-zinc-400 text-xs">
+                        Select "Flashcards" or "Practice Quiz" above to build an interactive study session for this class.
                     </div>
                 </div>
 

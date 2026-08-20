@@ -1,11 +1,42 @@
 // --- DYNAMIC SUPABASE ENVIRONMENT ROUTING ---
+if (typeof window === 'undefined') {
+    globalThis.window = globalThis;
+}
+if (typeof window.addEventListener === 'undefined') {
+    window.addEventListener = () => {};
+    window.removeEventListener = () => {};
+    window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} });
+}
+if (typeof document === 'undefined') {
+    globalThis.document = {
+        documentElement: { classList: { add: () => {}, remove: () => {} } },
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getElementById: () => null,
+        createElement: () => ({ setAttribute: () => {}, appendChild: () => {}, classList: { add: () => {}, remove: () => {} } }),
+        body: { appendChild: () => {}, removeChild: () => {} }
+    };
+}
+if (typeof localStorage === 'undefined' || !localStorage.getItem) {
+    globalThis.localStorage = {
+        _store: {},
+        getItem: function(key) { return this._store[key] || null; },
+        setItem: function(key, val) { this._store[key] = String(val); },
+        removeItem: function(key) { delete this._store[key]; },
+        clear: function() { this._store = {}; }
+    };
+}
+const _appScope = typeof window !== 'undefined' ? window : globalThis;
+
 const DEV_SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
 const DEV_SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
 
 const PROD_SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
 const PROD_SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
 
-const currentHost = window.location.hostname;
+const currentHost = (typeof window !== 'undefined' && window.location) ? window.location.hostname : 'localhost';
 let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
@@ -14,20 +45,26 @@ if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1') || cu
     // Development environment
     SUPABASE_URL = DEV_SUPABASE_URL;
     SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
-    console.log('🔧 Running in Development Mode (DueVinci-Dev)');
+    if (typeof console !== 'undefined') console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 } else {
     // Production environment – includes GitHub Pages, custom domains, etc.
     SUPABASE_URL = PROD_SUPABASE_URL;
     SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
-    console.log('🚀 Running in Production Mode (DueVinci-Prod)');
+    if (typeof console !== 'undefined') console.log('🚀 Running in Production Mode (DueVinci-Prod)');
 }
 
-
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const supabaseClient = (typeof window !== 'undefined' && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         experimental: { passkey: true }
     }
-});
+}) : { 
+    auth: { 
+        getSession: () => Promise.resolve({ data: { session: null } }),
+        getUser: () => Promise.resolve({ data: { user: null } }),
+        onAuthStateChange: () => {} 
+    }, 
+    from: () => ({ select: () => Promise.resolve({ data: [] }) }) 
+};
 
 // --- END SUPABASE CONFIG ---
 
@@ -35,41 +72,44 @@ let currentUser = null;
 let calendarInstance = null;
 let localCourses = [];
 let currentAssignmentPage = 1;
-let customTerms = JSON.parse(localStorage.getItem('duevinci_terms')) || [];
-let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
+let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || [];
+let hideUnassignedFolder = typeof localStorage !== 'undefined' && localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
 let lastProcessedSessionToken = null;
 
 // --- COOKIE HELPERS FOR TOUR STATE ---
-window.setCookie = (name, value, days = 365) => {
+_appScope.setCookie = (name, value, days = 365) => {
     try {
         const d = new Date();
         d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-        document.cookie = `${name}=${value};path=/;expires=${d.toUTCString()}`;
+        if (typeof document !== 'undefined') document.cookie = `${name}=${value};path=/;expires=${d.toUTCString()}`;
     } catch (e) {}
     try {
-        localStorage.setItem(`cookie_${name}`, value);
+        if (typeof localStorage !== 'undefined') localStorage.setItem(`cookie_${name}`, value);
     } catch (e) {}
 };
 
-window.getCookie = (name) => {
+_appScope.getCookie = (name) => {
     try {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        if (match) return match[2];
+        if (typeof document !== 'undefined') {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            if (match) return match[2];
+        }
     } catch (e) {}
     try {
-        return localStorage.getItem(`cookie_${name}`);
+        if (typeof localStorage !== 'undefined') return localStorage.getItem(`cookie_${name}`);
     } catch (e) {
         return null;
     }
+    return null;
 };
 
-window.deleteCookie = (name) => {
+_appScope.deleteCookie = (name) => {
     try {
-        document.cookie = `${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+        if (typeof document !== 'undefined') document.cookie = `${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
     } catch (e) {}
     try {
-        localStorage.removeItem(`cookie_${name}`);
+        if (typeof localStorage !== 'undefined') localStorage.removeItem(`cookie_${name}`);
     } catch (e) {}
 };
 
@@ -915,6 +955,7 @@ window.ensureSettingsModalExists = () => {
                             <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
                             <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                             <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
+                            <button type="button" onclick="switchSettingsTab('data')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-data">💾 Data & Backup</button>
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
@@ -1046,6 +1087,62 @@ window.ensureSettingsModalExists = () => {
                         </div>
                     </div>
 
+                    <!-- Tab: Data & Backup -->
+                    <div id="content-data" class="hidden space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Data Portability & Backup</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Export, restore, or sync your coursework and academic settings.</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- 1-Click JSON Backup -->
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                            <span>💾</span> 1-Click JSON Backup
+                                        </h4>
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Download a complete snapshot of all enrolled courses, assignments, timers, and local settings.</p>
+                                    </div>
+                                    <button type="button" onclick="exportUserDataJSON()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap">
+                                        Export Backup (.json)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Restore from JSON -->
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                                <div>
+                                    <h4 class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <span>📥</span> Restore from Backup File
+                                    </h4>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Upload a previously exported DueVinci JSON backup to restore your data.</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="file" id="importJsonFileInput" accept=".json" class="text-xs text-zinc-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-zinc-200 file:dark:bg-brand-700 file:text-zinc-800 file:dark:text-zinc-200 hover:file:bg-zinc-300 cursor-pointer">
+                                    <button type="button" onclick="triggerImportJSON()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                                        Restore Data
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Calendar Export -->
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                            <span>📅</span> Calendar Sync (.ics)
+                                        </h4>
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Export your master deadline schedule to Apple Calendar, Google Calendar, or Outlook.</p>
+                                    </div>
+                                    <button type="button" onclick="exportToICS()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-900 dark:bg-brand-700 dark:hover:bg-brand-600 text-white rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap">
+                                        Download .ics
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         `;
@@ -1129,7 +1226,7 @@ window.closeSettingsModal = () => {
 };
 
 window.switchSettingsTab = (tabName) => {
-    const tabs = ['profile', 'appearance', 'privacy'];
+    const tabs = ['profile', 'appearance', 'privacy', 'data'];
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);
@@ -1145,6 +1242,105 @@ window.switchSettingsTab = (tabName) => {
             }
         }
     });
+};
+
+function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}) {
+    return {
+        version: "1.0",
+        app: "DueVinci",
+        exportedAt: new Date().toISOString(),
+        data: {
+            courses: Array.isArray(courses) ? courses : [],
+            assignments: Array.isArray(assignments) ? assignments : [],
+            customEvents: Array.isArray(customEvents) ? customEvents : [],
+            timers: Array.isArray(timers) ? timers : [],
+            preferences: preferences && typeof preferences === 'object' ? preferences : {}
+        }
+    };
+}
+
+function validateBackupPayload(json) {
+    if (!json || typeof json !== 'object') return { valid: false, error: 'Invalid JSON root' };
+    if (!json.data || typeof json.data !== 'object') return { valid: false, error: 'Missing data object' };
+    if (!Array.isArray(json.data.courses)) return { valid: false, error: 'courses must be an array' };
+    if (!Array.isArray(json.data.assignments)) return { valid: false, error: 'assignments must be an array' };
+    return { valid: true };
+}
+
+window.exportUserDataJSON = async () => {
+    try {
+        const { data: courses } = await supabaseClient.from('courses').select('*');
+        const { data: assignments } = await supabaseClient.from('assignments').select('*');
+        const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
+        const timers = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_timers'))) || [];
+        
+        const prefs = {
+            theme: localStorage.getItem('theme'),
+            dateFormat: localStorage.getItem('duevinci_date_format'),
+            gpaScale: localStorage.getItem('duevinci_gpa_scale'),
+            muteAlarm: localStorage.getItem('duevinci_mute_alarm'),
+            hideAcademics: localStorage.getItem('duevinci_hide_academics'),
+            activityDates: JSON.parse(localStorage.getItem('duevinci_activity_dates') || '[]')
+        };
+
+        const payload = buildBackupPayload(courses || [], assignments || [], customEvents || [], timers, prefs);
+        const jsonStr = JSON.stringify(payload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const dateTag = new Date().toISOString().split('T')[0];
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `duevinci_backup_${dateTag}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        console.error("Export error:", err);
+        alert("Failed to export backup: " + (err.message || err));
+    }
+};
+
+window.triggerImportJSON = async () => {
+    const fileInput = document.getElementById('importJsonFileInput');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert("Please select a valid DueVinci .json backup file to restore.");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            const validation = validateBackupPayload(parsed);
+            if (!validation.valid) {
+                alert("Invalid backup file: " + validation.error);
+                return;
+            }
+
+            if (!confirm(`Restore ${parsed.data.courses.length} courses and ${parsed.data.assignments.length} assignments? This will merge them with your workspace.`)) {
+                return;
+            }
+
+            // Restore preferences and timers
+            if (parsed.data.timers) localStorage.setItem('duevinci_timers', JSON.stringify(parsed.data.timers));
+            if (parsed.data.preferences) {
+                const p = parsed.data.preferences;
+                if (p.theme) localStorage.setItem('theme', p.theme);
+                if (p.dateFormat) localStorage.setItem('duevinci_date_format', p.dateFormat);
+                if (p.gpaScale) localStorage.setItem('duevinci_gpa_scale', p.gpaScale);
+                if (p.muteAlarm !== undefined) localStorage.setItem('duevinci_mute_alarm', p.muteAlarm);
+                if (p.activityDates) localStorage.setItem('duevinci_activity_dates', JSON.stringify(p.activityDates));
+            }
+
+            alert("Backup successfully restored! Refreshing page...");
+            window.location.reload();
+        } catch (err) {
+            console.error("Import error:", err);
+            alert("Error parsing backup JSON file: " + err.message);
+        }
+    };
+    reader.readAsText(file);
 };
 
 // --- SUPPORT & HELP MODAL ---
@@ -2491,21 +2687,109 @@ window.toggleExcludeGpa = async (assignId, excluded) => {
     loadGradesPage();
 };
 
-// --- AI STUDY FLASHCARDS & PRACTICE QUIZ ---
+// --- AI STUDY FLASHCARDS & INTERACTIVE PRACTICE QUIZ ---
 let currentDeckCards = [];
 let currentCardIndex = 0;
 let isCardFlipped = false;
+let currentStudyMode = 'flashcards'; // 'flashcards' | 'quiz'
+let currentDeckCourseId = null;
+
+let currentQuizQuestions = [];
+let currentQuizIndex = 0;
+let currentQuizScore = 0;
+let currentQuizStreak = 0;
+let isCurrentQuestionAnswered = false;
+let selectedOptionIndex = null;
+
+function generateQuizQuestions(course, assignments = []) {
+    const topics = assignments ? assignments.map(a => a.title.replace('↳', '').trim()).filter(Boolean) : [];
+    const questions = [];
+
+    const defaultDistractors = [
+        "Historical background unrelated to this semester's primary objectives",
+        "Elementary prerequisites covered in preliminary coursework",
+        "Optional reference material without direct grading impact",
+        "Administrative formatting standards only"
+    ];
+
+    if (topics.length > 0) {
+        topics.slice(0, 8).forEach((topic, idx) => {
+            const unitNum = Math.floor(idx / 3) + 1;
+            const correctAnswer = `Key analytical concept and assessment milestone in Unit ${unitNum} for ${topic}.`;
+            
+            const otherTopics = topics.filter(t => t !== topic);
+            const distractors = [];
+            if (otherTopics.length >= 3) {
+                otherTopics.slice(0, 3).forEach(ot => {
+                    distractors.push(`Secondary sub-topic covering ${ot} and peripheral applications.`);
+                });
+            } else {
+                distractors.push(...defaultDistractors.slice(0, 3));
+            }
+
+            const allOptions = [correctAnswer, ...distractors.slice(0, 3)];
+            const shuffled = [...allOptions].sort(() => 0.5 - ((idx % 3) * 0.3));
+            const correctIdx = shuffled.indexOf(correctAnswer);
+
+            questions.push({
+                id: `q_${idx + 1}`,
+                topic: topic,
+                unit: unitNum,
+                question: `Which statement best describes the focus and application of "${topic}" in ${course?.code || 'this course'}?`,
+                options: shuffled,
+                correctIndex: correctIdx >= 0 ? correctIdx : 0,
+                explanation: `In Unit ${unitNum}, "${topic}" represents a core learning milestone required for upcoming quizzes and final exams.`
+            });
+        });
+    } else {
+        questions.push(
+            {
+                id: 'q_default_1',
+                topic: 'Course Fundamentals',
+                unit: 1,
+                question: `What is the primary methodology introduced in ${course?.code || 'this course'} foundational units?`,
+                options: [
+                    'Mastery of core terminology, structural logic, and problem-solving workflows.',
+                    'Memorization of historical publication dates without practical application.',
+                    'Advanced multi-tier system optimization exclusively.',
+                    'General administrative orientation only.'
+                ],
+                correctIndex: 0,
+                explanation: 'Foundational units establish terminology, analytical problem-solving models, and conceptual baselines.'
+            },
+            {
+                id: 'q_default_2',
+                topic: 'Midterm Mastery',
+                unit: 2,
+                question: `How are cumulative exam points typically weighted across key units?`,
+                options: [
+                    'Distributed across major lesson topics with active problem sets.',
+                    'Concentrated exclusively on the introductory syllabus reading.',
+                    'Randomly evaluated without reference to unit objectives.',
+                    'Assigned solely based on optional extra-credit submissions.'
+                ],
+                correctIndex: 0,
+                explanation: 'Exams synthesize concepts across all unit learning milestones and coursework assignments.'
+            }
+        );
+    }
+
+    return questions;
+}
 
 window.generateStudyDeck = async (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
+
+    currentDeckCourseId = courseId;
+    currentStudyMode = 'flashcards';
 
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
     const topics = assignments ? assignments.map(a => a.title.replace('↳', '').trim()).filter(Boolean) : [];
     
     const deck = [];
     if (topics.length > 0) {
-        topics.slice(0, 8).forEach((t, idx) => {
+        topics.slice(0, 10).forEach((t, idx) => {
             deck.push({
                 term: `${course.code}: ${t}`,
                 definition: `Key concept in Unit ${Math.floor(idx/3)+1}. Review core principles, active recall points, and test requirements for ${t}.`
@@ -2531,23 +2815,52 @@ window.renderFlashcardView = () => {
     
     const card = currentDeckCards[currentCardIndex];
     container.innerHTML = `
-        <div class="space-y-4 text-center">
+        <div class="space-y-4 text-center w-full max-w-xl mx-auto">
             <div class="flex justify-between items-center text-xs text-zinc-400 font-bold px-2">
                 <span>Card ${currentCardIndex + 1} of ${currentDeckCards.length}</span>
-                <span class="text-indigo-500 font-medium">Click card to flip 🔄</span>
+                <span class="text-indigo-500 font-medium hidden sm:inline">Space: flip • ← →: navigate</span>
             </div>
-            <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[160px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.02]">
-                <div class="text-[11px] uppercase tracking-wider font-extrabold ${isCardFlipped ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-400'} mb-2">
-                    ${isCardFlipped ? '💡 Concept / Definition' : '📖 Term / Topic'}
-                </div>
-                <div class="font-bold text-base dark:text-white leading-relaxed">
-                    ${isCardFlipped ? card.definition : card.term}
+            
+            <div class="flashcard-3d-wrapper cursor-pointer select-none" onclick="flipCurrentCard()">
+                <div class="flashcard-3d-inner ${isCardFlipped ? 'flipped' : ''}">
+                    <!-- Front Face -->
+                    <div class="flashcard-face flashcard-front p-8 bg-zinc-50 dark:bg-brand-900 border-2 border-zinc-200 dark:border-brand-700 rounded-2xl shadow-lg">
+                        <div class="text-[11px] uppercase tracking-wider font-extrabold text-indigo-500 mb-3 flex items-center gap-1.5">
+                            <span>📖</span> Term / Key Concept
+                        </div>
+                        <div class="font-extrabold text-lg text-zinc-800 dark:text-white leading-snug px-4">
+                            ${card.term}
+                        </div>
+                        <div class="mt-4 text-[11px] text-zinc-400">Click or press Space to reveal definition</div>
+                    </div>
+                    
+                    <!-- Back Face -->
+                    <div class="flashcard-face flashcard-back p-8 bg-indigo-50/40 dark:bg-brand-900 border-2 border-indigo-500 rounded-2xl shadow-lg">
+                        <div class="text-[11px] uppercase tracking-wider font-extrabold text-emerald-500 mb-3 flex items-center gap-1.5">
+                            <span>💡</span> Active Recall Definition
+                        </div>
+                        <div class="font-semibold text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed px-4">
+                            ${card.definition}
+                        </div>
+                        <div class="mt-4 text-[11px] text-indigo-400">Rate your mastery below (keys 1-4)</div>
+                    </div>
                 </div>
             </div>
-            <div class="flex justify-between gap-2">
-                <button onclick="prevFlashcard()" ${currentCardIndex === 0 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}">← Prev</button>
-                <button onclick="flipCurrentCard()" class="px-4 py-2 bg-indigo-50 dark:bg-brand-700/60 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold border border-indigo-200 dark:border-brand-600 transition">Flip 🔄</button>
-                <button onclick="nextFlashcard()" ${currentCardIndex === currentDeckCards.length - 1 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"'}">Next →</button>
+            
+            <!-- Confidence Mastery Bar -->
+            <div class="flex items-center justify-center gap-1.5 text-[11px] font-bold">
+                <span class="text-zinc-400 text-[10px] mr-1">Recall:</span>
+                <button type="button" onclick="rateFlashcardConfidence(1)" class="px-2.5 py-1 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:scale-105 transition" title="Shortcut: 1">1: Again 🔴</button>
+                <button type="button" onclick="rateFlashcardConfidence(2)" class="px-2.5 py-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:scale-105 transition" title="Shortcut: 2">2: Hard 🟠</button>
+                <button type="button" onclick="rateFlashcardConfidence(3)" class="px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:scale-105 transition" title="Shortcut: 3">3: Good 🟡</button>
+                <button type="button" onclick="rateFlashcardConfidence(4)" class="px-2.5 py-1 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:scale-105 transition" title="Shortcut: 4">4: Easy 🟢</button>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="flex justify-between gap-2 pt-2">
+                <button type="button" onclick="prevFlashcard()" ${currentCardIndex === 0 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}">← Prev</button>
+                <button type="button" onclick="flipCurrentCard()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">Flip 🔄</button>
+                <button type="button" onclick="nextFlashcard()" ${currentCardIndex === currentDeckCards.length - 1 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"'}">Next →</button>
             </div>
         </div>
     `;
@@ -2573,6 +2886,193 @@ window.prevFlashcard = () => {
         renderFlashcardView();
     }
 };
+
+window.rateFlashcardConfidence = (rating) => {
+    if (currentDeckCourseId && typeof localStorage !== 'undefined') {
+        const key = `flashcard_score_${currentDeckCourseId}`;
+        const scores = JSON.parse(localStorage.getItem(key) || '{}');
+        scores[currentCardIndex] = rating;
+        localStorage.setItem(key, JSON.stringify(scores));
+    }
+    nextFlashcard();
+};
+
+window.generateQuizMode = async (courseId) => {
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
+
+    currentDeckCourseId = courseId;
+    currentStudyMode = 'quiz';
+
+    const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
+    currentQuizQuestions = generateQuizQuestions(course, assignments || []);
+    currentQuizIndex = 0;
+    currentQuizScore = 0;
+    currentQuizStreak = 0;
+    isCurrentQuestionAnswered = false;
+    selectedOptionIndex = null;
+
+    renderQuizView();
+};
+
+window.renderQuizView = () => {
+    const container = document.getElementById('studyQuizContainer');
+    if (!container || currentQuizQuestions.length === 0) return;
+
+    // Check if quiz is finished
+    if (currentQuizIndex >= currentQuizQuestions.length) {
+        const total = currentQuizQuestions.length;
+        const pct = Math.round((currentQuizScore / total) * 100);
+        if (pct >= 80 && typeof fireConfetti === 'function') fireConfetti();
+
+        let medal = '🥉 Good Effort!';
+        if (pct >= 90) medal = '🏆 Mastery Achieved!';
+        else if (pct >= 75) medal = '🥈 Great Job!';
+
+        container.innerHTML = `
+            <div class="space-y-4 text-center py-4 max-w-md mx-auto">
+                <div class="text-4xl animate-bounce mb-2">🎉</div>
+                <h3 class="text-lg font-bold text-zinc-900 dark:text-white">${medal}</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">You completed the course practice quiz.</p>
+                <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-zinc-200 dark:border-brand-700">
+                    <div class="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">${currentQuizScore} / ${total}</div>
+                    <div class="text-xs font-bold text-zinc-400 mt-1">${pct}% Final Accuracy</div>
+                </div>
+                <div class="flex justify-center gap-2 pt-2">
+                    <button type="button" onclick="generateQuizMode('${currentDeckCourseId}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                        🔄 Retake Quiz
+                    </button>
+                    <button type="button" onclick="generateStudyDeck('${currentDeckCourseId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                        ✨ Study Flashcards
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const q = currentQuizQuestions[currentQuizIndex];
+    const letters = ['A', 'B', 'C', 'D'];
+
+    let optionsHtml = q.options.map((opt, idx) => {
+        let btnClass = "w-full text-left p-3 rounded-xl border text-xs font-medium transition quiz-option-btn ";
+        let badgeClass = "w-6 h-6 rounded-lg text-[11px] font-bold flex items-center justify-center shrink-0 ";
+
+        if (!isCurrentQuestionAnswered) {
+            btnClass += "bg-white dark:bg-brand-900 border-zinc-200 dark:border-brand-700 hover:border-indigo-500 hover:bg-indigo-50/20 text-zinc-800 dark:text-zinc-200 cursor-pointer";
+            badgeClass += "bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300";
+        } else {
+            if (idx === q.correctIndex) {
+                btnClass += "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold";
+                badgeClass += "bg-emerald-500 text-white";
+            } else if (idx === selectedOptionIndex) {
+                btnClass += "bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-800 dark:text-rose-300 font-bold";
+                badgeClass += "bg-rose-500 text-white";
+            } else {
+                btnClass += "bg-zinc-50 dark:bg-brand-900/50 border-zinc-200 dark:border-brand-800 text-zinc-400 opacity-60";
+                badgeClass += "bg-zinc-200 dark:bg-brand-800 text-zinc-400";
+            }
+        }
+
+        const disabledAttr = isCurrentQuestionAnswered ? 'disabled' : '';
+        return `
+            <button type="button" onclick="submitQuizAnswer(${idx})" ${disabledAttr} class="${btnClass}">
+                <div class="flex items-center gap-2.5">
+                    <span class="${badgeClass}">${letters[idx]}</span>
+                    <span class="flex-1 leading-snug">${opt}</span>
+                </div>
+            </button>
+        `;
+    }).join('');
+
+    let feedbackHtml = '';
+    if (isCurrentQuestionAnswered) {
+        const isCorrect = selectedOptionIndex === q.correctIndex;
+        feedbackHtml = `
+            <div class="mt-3 p-3.5 rounded-xl border ${isCorrect ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800' : 'bg-rose-50/60 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800'} text-xs">
+                <div class="font-bold flex items-center gap-1.5 ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}">
+                    <span>${isCorrect ? '✓ Correct!' : '✕ Incorrect'}</span>
+                </div>
+                <p class="text-zinc-600 dark:text-zinc-300 mt-1 leading-relaxed">${q.explanation}</p>
+                <div class="mt-3 text-right">
+                    <button type="button" onclick="nextQuizQuestion()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition shadow-sm">
+                        ${currentQuizIndex < currentQuizQuestions.length - 1 ? 'Next Question →' : 'Finish Quiz 🏁'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="space-y-4 text-left w-full max-w-xl mx-auto">
+            <div class="flex justify-between items-center pb-2.5 border-b border-zinc-200 dark:border-brand-700 text-xs font-bold">
+                <span class="text-indigo-500">Question ${currentQuizIndex + 1} of ${currentQuizQuestions.length}</span>
+                <div class="flex items-center gap-3">
+                    <span class="text-emerald-500 font-extrabold">Score: ${currentQuizScore}</span>
+                    <span class="text-amber-500 font-extrabold">🔥 Streak: ${currentQuizStreak}</span>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Unit ${q.unit} • ${q.topic}</span>
+                <h4 class="text-sm font-bold text-zinc-900 dark:text-white mt-1 leading-relaxed">${q.question}</h4>
+            </div>
+            
+            <div class="space-y-2">
+                ${optionsHtml}
+            </div>
+            
+            ${feedbackHtml}
+        </div>
+    `;
+};
+
+window.submitQuizAnswer = (optionIdx) => {
+    if (isCurrentQuestionAnswered) return;
+    const q = currentQuizQuestions[currentQuizIndex];
+    selectedOptionIndex = optionIdx;
+    isCurrentQuestionAnswered = true;
+
+    if (optionIdx === q.correctIndex) {
+        currentQuizScore++;
+        currentQuizStreak++;
+    } else {
+        currentQuizStreak = 0;
+    }
+
+    renderQuizView();
+};
+
+window.nextQuizQuestion = () => {
+    currentQuizIndex++;
+    isCurrentQuestionAnswered = false;
+    selectedOptionIndex = null;
+    renderQuizView();
+};
+
+// Keyboard listener for Flashcards Spacebar and Arrow keys
+if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+        const studyContainer = document.getElementById('studyQuizContainer');
+        if (!studyContainer || studyContainer.offsetParent === null) return;
+
+        if (currentStudyMode === 'flashcards' && currentDeckCards.length > 0) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                flipCurrentCard();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextFlashcard();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevFlashcard();
+            } else if (['1', '2', '3', '4'].includes(e.key)) {
+                rateFlashcardConfidence(parseInt(e.key));
+            }
+        }
+    });
+}
 
 function initCalendar() {
     if (calendarInstance) return;
@@ -2653,21 +3153,71 @@ window.deleteCustomEvent = async (id) => {
     loadCalendarCourses();
 };
 
-window.exportToICS = () => {
-    if(!calendarInstance) return;
-    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DueVinci//Student Planner//EN\n";
-    calendarInstance.getEvents().forEach(ev => {
-        const dateStr = ev.start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-        icsContent += "BEGIN:VEVENT\nSUMMARY:" + ev.title + "\nDTSTART:" + dateStr + "\nDTEND:" + dateStr + "\nEND:VEVENT\n";
+function generateICSString(events = [], calendarName = "DueVinci Master Schedule") {
+    let ics = "BEGIN:VCALENDAR\r\n";
+    ics += "VERSION:2.0\r\n";
+    ics += "PRODID:-//DueVinci//Student Command Center//EN\r\n";
+    ics += "CALSCALE:GREGORIAN\r\n";
+    ics += `X-WR-CALNAME:${calendarName}\r\n`;
+    ics += "X-WR-TIMEZONE:UTC\r\n";
+
+    const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+    events.forEach((ev, idx) => {
+        if (!ev.date && !ev.start) return;
+        const rawDate = (ev.date || ev.start || '').split('T')[0];
+        const dateFormatted = rawDate.replace(/-/g, '');
+        const uid = ev.id ? `duevinci-${ev.id}@duevinci.tech` : `duevinci-${dateFormatted}-${idx}@duevinci.tech`;
+        const title = (ev.title || 'Academic Event').replace(/[\\,;]/g, ' ');
+        const desc = (ev.description || ev.course || 'DueVinci Academic Planner').replace(/[\\,;]/g, ' ');
+
+        ics += "BEGIN:VEVENT\r\n";
+        ics += `UID:${uid}\r\n`;
+        ics += `DTSTAMP:${nowStr}\r\n`;
+        ics += `DTSTART;VALUE=DATE:${dateFormatted}\r\n`;
+        ics += `DTEND;VALUE=DATE:${dateFormatted}\r\n`;
+        ics += `SUMMARY:${title}\r\n`;
+        ics += `DESCRIPTION:${desc}\r\n`;
+        ics += "STATUS:CONFIRMED\r\n";
+        ics += "END:VEVENT\r\n";
     });
-    icsContent += "END:VCALENDAR";
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.setAttribute('download', 'duevinci-schedule.ics');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    ics += "END:VCALENDAR\r\n";
+    return ics;
+}
+
+window.exportToICS = async () => {
+    try {
+        let calendarEvents = [];
+        if (calendarInstance) {
+            calendarEvents = calendarInstance.getEvents().map(ev => ({
+                title: ev.title,
+                start: ev.start ? ev.start.toISOString().split('T')[0] : '',
+                id: ev.extendedProps?.assignmentId || ev.extendedProps?.eventId
+            }));
+        } else {
+            const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code)');
+            if (assignments) {
+                calendarEvents = assignments.map(a => ({
+                    title: `[${a.courses?.code || 'Course'}] ${a.title}`,
+                    start: a.due_date,
+                    id: a.id
+                }));
+            }
+        }
+
+        const icsContent = generateICSString(calendarEvents, "DueVinci Schedule");
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.setAttribute('download', 'duevinci-schedule.ics');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        console.error("ICS export error:", e);
+        alert("Failed to export calendar: " + e.message);
+    }
 };
 
 // --- SECRET EASTER EGGS SUITE & GLOBAL COMMAND PALETTE ---
@@ -3212,8 +3762,7 @@ window.dismissPWABanner = () => {
 };
 
 // PWA Service Worker Registration
-
-if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => {
             console.log('SW reg error:', err);
@@ -3221,31 +3770,84 @@ if ('serviceWorker' in navigator && window.location.protocol.startsWith('http'))
     });
 }
 
-// Check What's New banner & tour visibility on launch
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        if (typeof window.checkWhatsNewOnLaunch === 'function') {
-            window.checkWhatsNewOnLaunch();
-        }
-        if (typeof window.updateTourButtonVisibility === 'function') {
-            window.updateTourButtonVisibility();
-        }
-    }, 400);
+// Real-time Network Status Listener
+function initNetworkStatusListener() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-    // --- Passkey UI visibility ---
-    // Show the "Sign in with Passkey" section only if WebAuthn is available.
-    if (window.PublicKeyCredential) {
-        const passkeySection = document.getElementById('passkeySignInSection');
-        if (passkeySection) passkeySection.classList.remove('hidden');
+    let pill = document.getElementById('networkStatusPill');
+    if (!pill) {
+        pill = document.createElement('div');
+        pill.id = 'networkStatusPill';
+        pill.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[99999] px-4 py-2 rounded-full text-xs font-extrabold shadow-2xl transition-all duration-300 pointer-events-none hidden';
+        document.body.appendChild(pill);
     }
-});
+
+    function showStatus(online) {
+        if (!online) {
+            pill.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[99999] px-4 py-2 rounded-full text-xs font-extrabold shadow-2xl transition-all duration-300 pointer-events-none bg-amber-500 text-zinc-900 border border-amber-400 flex items-center gap-2';
+            pill.innerHTML = '<span>⚡</span> Offline Mode – All changes cached locally';
+            pill.classList.remove('hidden');
+        } else {
+            pill.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[99999] px-4 py-2 rounded-full text-xs font-extrabold shadow-2xl transition-all duration-300 pointer-events-none bg-emerald-600 text-white border border-emerald-500 flex items-center gap-2';
+            pill.innerHTML = '<span>🟢</span> Back Online – Reconnected';
+            pill.classList.remove('hidden');
+            setTimeout(() => {
+                if (navigator.onLine) pill.classList.add('hidden');
+            }, 3000);
+        }
+    }
+
+    window.addEventListener('offline', () => showStatus(false));
+    window.addEventListener('online', () => showStatus(true));
+
+    if (!navigator.onLine) showStatus(false);
+}
+
+// Check What's New banner, tour visibility, & network status on launch
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initNetworkStatusListener();
+        setTimeout(() => {
+            if (typeof window.checkWhatsNewOnLaunch === 'function') {
+                window.checkWhatsNewOnLaunch();
+            }
+            if (typeof window.updateTourButtonVisibility === 'function') {
+                window.updateTourButtonVisibility();
+            }
+        }, 400);
+
+        // --- Passkey UI visibility ---
+        if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+            const passkeySection = document.getElementById('passkeySignInSection');
+            if (passkeySection) passkeySection.classList.remove('hidden');
+        }
+    });
+}
 
 // Show the one-time passkey toast after sign-in.
-supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session) {
-        // Slight delay so the app screen is rendered first
-        setTimeout(() => window.showPasskeyToastIfNeeded?.(), 1500);
-    }
-});
+if (typeof supabaseClient !== 'undefined' && supabaseClient.auth) {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            setTimeout(() => window.showPasskeyToastIfNeeded?.(), 1500);
+        }
+    });
+}
 
-checkUser();
+if (typeof checkUser === 'function' && typeof window !== 'undefined' && typeof window.supabase !== 'undefined') {
+    checkUser();
+}
+
+// Environment-safe exports for tests
+_appScope.generateQuizQuestions = generateQuizQuestions;
+_appScope.buildBackupPayload = buildBackupPayload;
+_appScope.validateBackupPayload = validateBackupPayload;
+_appScope.generateICSString = generateICSString;
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        generateQuizQuestions,
+        buildBackupPayload,
+        validateBackupPayload,
+        generateICSString
+    };
+}

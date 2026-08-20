@@ -15,6 +15,36 @@
     { "src": "icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "icons/icon-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View Up Next and Academic Analytics",
+      "url": "index.html",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Courses & Syllabus",
+      "short_name": "Courses",
+      "description": "Manage courses, units, and flashcards",
+      "url": "courses.html",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Grades & GPA",
+      "short_name": "Grades",
+      "description": "Track course grades and GPA simulator",
+      "url": "grades.html",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Master Calendar",
+      "short_name": "Calendar",
+      "description": "View deadlines and export schedule",
+      "url": "calendar.html",
+      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
   "categories": ["education", "productivity"],
   "lang": "en-US"
 }
