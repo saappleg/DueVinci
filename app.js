@@ -1115,14 +1115,10 @@ window.openSettingsModal = () => {
     const modal = document.getElementById('settingsModal');
     if (modal) modal.classList.remove('hidden');
 
-    // Refresh passkey list whenever Settings is opened
-    if (window.PublicKeyCredential) {
-        window.loadPasskeyList();
-    } else {
-        // Hide the passkey section entirely on unsupported browsers
-        const pkSection = document.getElementById('settingsPasskeySection');
-        if (pkSection) pkSection.style.display = 'none';
-    }
+    // Load passkey list in Settings > Profile
+    const pkSection = document.getElementById('settingsPasskeySection');
+    if (pkSection) pkSection.style.display = 'block';
+    window.loadPasskeyList();
 };
 
 window.closeSettingsModal = () => {
