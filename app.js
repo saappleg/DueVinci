@@ -256,6 +256,18 @@ window.changeTheme = (themeValue) => {
     }
 };
 
+// --- GREEK THEME TOGGLE ----------------------------------------------------
+window.toggleGreekTheme = () => {
+  const enabled = document.documentElement.classList.toggle('greek-theme');
+  localStorage.setItem('greekTheme', enabled ? 'on' : 'off');
+};
+
+// Restore Greek theme on load
+if (localStorage.getItem('greekTheme') === 'on') {
+  document.documentElement.classList.add('greek-theme');
+}
+
+// Existing fireConfetti
 function fireConfetti() {
     if (typeof confetti !== 'undefined') {
         confetti({
