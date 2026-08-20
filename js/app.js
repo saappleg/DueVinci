@@ -10,7 +10,7 @@ import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimu
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
 import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
-import { generateBalancedStudyPlan, renderStudyPlanDashboardWidget } from './modules/studyPlan.js';
+import { generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
@@ -119,6 +119,11 @@ export {
     renderMarkdownToHtml,
     generateBalancedStudyPlan,
     renderStudyPlanDashboardWidget,
+    ensureStudyPlanDayModalExists,
+    openStudyPlanDayModal,
+    closeStudyPlanDayModal,
+    startStudyPlanTimer,
+    toggleStudyPlanAssignment,
     getOfflineDb,
     cacheDataLocally,
     getLocalCachedData,
@@ -255,6 +260,11 @@ _rootScope.formatMathFormula = formatMathFormula;
 _rootScope.renderMarkdownToHtml = renderMarkdownToHtml;
 _rootScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _rootScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
+_rootScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;
+_rootScope.openStudyPlanDayModal = openStudyPlanDayModal;
+_rootScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
+_rootScope.startStudyPlanTimer = startStudyPlanTimer;
+_rootScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
 _rootScope.getOfflineDb = getOfflineDb;
 _rootScope.cacheDataLocally = cacheDataLocally;
 _rootScope.getLocalCachedData = getLocalCachedData;

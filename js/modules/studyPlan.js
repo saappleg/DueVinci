@@ -1,6 +1,9 @@
 // --- AI STUDY SCHEDULE & WORKLOAD BALANCER MODULE ---
 import { calculateDaysRemaining } from './academics.js';
 import { supabaseClient } from './config.js';
+import { fireConfetti } from './utils.js';
+
+let cachedStudyPlan = [];
 
 /**
  * Calculates a balanced daily study schedule across multiple enrolled courses.
@@ -25,6 +28,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         const dateStr = currentDate.toISOString().split('T')[0];
         const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
         const displayDate = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const fullDate = currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
         // Find assignments due on or shortly after this date
         const relevantTasks = pendingAssignments.filter(a => {
@@ -35,23 +39,47 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         // Sort by urgency (earliest due first)
         relevantTasks.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
 
-        const dailyBlocks = [];
+        const allDailyBlocks = [];
         let totalEstimatedMinutes = 0;
 
-        relevantTasks.slice(0, 3).forEach(task => {
+        relevantTasks.forEach(task => {
             const course = courses.find(c => c.id === task.course_id);
             const isExam = /exam|final|midterm|test/i.test(task.title);
             const durationMin = isExam ? 50 : 25; // 50m block for exams, 25m for regular lessons
+            const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
-            dailyBlocks.push({
+            let dueText = 'Due today';
+            if (daysLeft === 1) dueText = 'Due tomorrow';
+            else if (daysLeft > 1) dueText = `Due in ${daysLeft} days`;
+
+            let recommendation = 'Break task into active work sprints. Review core assignment rubrics.';
+            if (isExam) {
+                recommendation = 'Active recall with flashcards, practice exam problems, and formula review.';
+            } else if (/reading|chapter|read|textbook/i.test(task.title)) {
+                recommendation = 'Synthesize key definitions, generate summary bullet points, and review diagrams.';
+            } else if (/lab|project|code|program/i.test(task.title)) {
+                recommendation = 'Work on core logic implementation, execute test cases, and document edge conditions.';
+            }
+
+            const block = {
                 taskId: task.id,
                 title: task.title.replace('↳', '').trim(),
+                rawTitle: task.title,
+                courseId: task.course_id,
                 courseCode: course ? course.code : 'Course',
+                courseName: course ? (course.name || course.code) : 'Course',
                 courseEmoji: course ? (course.emoji || '📚') : '📚',
                 courseColor: course ? course.color : '#4f46e5',
                 durationMinutes: durationMin,
-                isExam
-            });
+                isExam,
+                dueDate: task.due_date,
+                daysUntilDue: daysLeft,
+                dueText,
+                recommendation,
+                isCompleted: !!task.is_completed
+            };
+
+            allDailyBlocks.push(block);
             totalEstimatedMinutes += durationMin;
         });
 
@@ -59,13 +87,262 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             date: dateStr,
             dayOfWeek,
             displayDate,
+            fullDate,
             isToday: dayOffset === 0,
             totalMinutes: totalEstimatedMinutes,
-            blocks: dailyBlocks
+            blocks: allDailyBlocks.slice(0, 3), // Preview blocks for dashboard card
+            allBlocks: allDailyBlocks // Complete list for full day popup modal
         });
     }
 
+    cachedStudyPlan = plan;
     return plan;
+}
+
+/**
+ * Ensures the modal container DOM element exists.
+ */
+export function ensureStudyPlanDayModalExists() {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById('studyPlanDayModal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'studyPlanDayModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/75 backdrop-blur-sm hidden p-4 overflow-y-auto';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.onclick = (e) => {
+        if (e.target === modal) closeStudyPlanDayModal();
+    };
+    document.body.appendChild(modal);
+
+    // Close on Escape key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            closeStudyPlanDayModal();
+        }
+    });
+}
+
+/**
+ * Opens the full-day study plan popup modal.
+ * @param {string} dateStr YYYY-MM-DD date string
+ */
+export async function openStudyPlanDayModal(dateStr) {
+    if (typeof document === 'undefined') return;
+    ensureStudyPlanDayModalExists();
+
+    const modal = document.getElementById('studyPlanDayModal');
+    if (!modal) return;
+
+    let day = cachedStudyPlan.find(d => d.date === dateStr);
+
+    if (!day) {
+        // Recalculate if not found in cache
+        const { data: courses } = await supabaseClient.from('courses').select('*');
+        const { data: assignments } = await supabaseClient.from('assignments').select('*');
+        if (courses && assignments) {
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7);
+            day = plan.find(d => d.date === dateStr) || plan[0];
+        }
+    }
+
+    if (!day) return;
+
+    // Intensity calculation
+    let intensityLabel = 'Rest & Light Review';
+    let intensityBg = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
+    let intensityIcon = '🌴';
+
+    if (day.totalMinutes > 90) {
+        intensityLabel = 'Heavy Study Load';
+        intensityBg = 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30';
+        intensityIcon = '🚨';
+    } else if (day.totalMinutes > 45) {
+        intensityLabel = 'Moderate Focus Day';
+        intensityBg = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30';
+        intensityIcon = '🔥';
+    } else if (day.totalMinutes > 0) {
+        intensityLabel = 'Light Study Session';
+        intensityBg = 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30';
+        intensityIcon = '⚡';
+    }
+
+    const uniqueCourses = new Set(day.allBlocks.map(b => b.courseCode)).size;
+    const examCount = day.allBlocks.filter(b => b.isExam).length;
+
+    let tasksHtml = '';
+    if (day.allBlocks.length === 0) {
+        tasksHtml = `
+            <div class="py-10 px-6 text-center space-y-3 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-dashed border-zinc-300 dark:border-brand-700">
+                <span class="text-4xl inline-block">🎉</span>
+                <h4 class="text-base font-black text-zinc-900 dark:text-white">No Urgent Deadlines Scheduled</h4>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
+                    You have no pressing assignments due within this window. Enjoy some well-deserved rest, or use this time for self-paced reading and light flashcard review!
+                </p>
+            </div>
+        `;
+    } else {
+        tasksHtml = day.allBlocks.map((block, idx) => `
+            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-zinc-200 dark:border-brand-700 space-y-3 transition hover:border-indigo-400 dark:hover:border-indigo-500">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-2xl shrink-0 p-2 bg-white dark:bg-brand-800 rounded-xl shadow-xs border border-zinc-200 dark:border-brand-700">${block.courseEmoji}</span>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-brand-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-brand-700">${block.courseCode}</span>
+                                <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">${block.dueText}</span>
+                            </div>
+                            <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${block.title}</h4>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30'}">
+                            ${block.isExam ? '🔥 50m Exam Prep' : '⏱️ 25m Focus Block'}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- AI Study Strategy Tip -->
+                <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 flex items-start gap-2.5 text-xs text-zinc-700 dark:text-zinc-300">
+                    <span class="text-sm shrink-0">💡</span>
+                    <div class="leading-relaxed">
+                        <strong class="font-extrabold text-zinc-900 dark:text-white">Recommended Strategy:</strong> ${block.recommendation}
+                    </div>
+                </div>
+
+                <!-- Interactive Actions -->
+                <div class="flex items-center justify-between pt-1 text-xs">
+                    <button type="button" onclick="startStudyPlanTimer(${block.durationMinutes}, '${block.title.replace(/'/g, "\\'")}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
+                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        Start ${block.durationMinutes}m Timer
+                    </button>
+                    <button type="button" onclick="toggleStudyPlanAssignment('${block.taskId}', ${block.isCompleted}, '${block.courseId}', '${dateStr}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                        Mark Done
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    modal.innerHTML = `
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200 text-zinc-800 dark:text-zinc-200">
+            <!-- Modal Header -->
+            <div class="p-6 pb-4 border-b border-zinc-200 dark:border-brand-700 bg-zinc-50/80 dark:bg-brand-900 flex items-start justify-between gap-4">
+                <div class="space-y-1.5">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xl">🗓️</span>
+                        <h3 class="font-black text-xl text-zinc-900 dark:text-white">${day.fullDate || `${day.dayOfWeek}, ${day.displayDate}`}</h3>
+                        ${day.isToday ? '<span class="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">Today</span>' : ''}
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap text-xs">
+                        <span class="px-2.5 py-0.5 rounded-full border font-bold ${intensityBg}">
+                            ${intensityIcon} ${intensityLabel}
+                        </span>
+                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">
+                            • ${day.totalMinutes} minutes total projected study time
+                        </span>
+                    </div>
+                </div>
+                <button type="button" onclick="closeStudyPlanDayModal()" class="w-9 h-9 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 flex items-center justify-center font-bold text-sm transition">✕</button>
+            </div>
+
+            <!-- Summary Stats Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-zinc-100/60 dark:bg-brand-900 border-b border-zinc-200 dark:border-brand-700 text-xs">
+                <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
+                    <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Planned Time</div>
+                    <div class="text-base font-black text-indigo-600 dark:text-indigo-400 mt-0.5">${day.totalMinutes} mins</div>
+                </div>
+                <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
+                    <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Subjects</div>
+                    <div class="text-base font-black text-zinc-900 dark:text-white mt-0.5">${uniqueCourses} Courses</div>
+                </div>
+                <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
+                    <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Study Blocks</div>
+                    <div class="text-base font-black text-zinc-900 dark:text-white mt-0.5">${day.allBlocks.length} Tasks</div>
+                </div>
+                <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
+                    <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Exams Pending</div>
+                    <div class="text-base font-black ${examCount > 0 ? 'text-rose-500' : 'text-zinc-900 dark:text-white'} mt-0.5">${examCount} Tests</div>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable Task List) -->
+            <div class="p-6 space-y-4 overflow-y-auto max-h-[55vh] bg-white dark:bg-brand-800">
+                <div class="flex justify-between items-center pb-1">
+                    <h4 class="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">All Scheduled Blocks (${day.allBlocks.length})</h4>
+                    <span class="text-[11px] text-zinc-400 font-medium">Balanced for spacing effect</span>
+                </div>
+                <div class="space-y-3">
+                    ${tasksHtml}
+                </div>
+
+                <!-- AI Workload Balancer Advice Callout -->
+                <div class="p-4 bg-indigo-50/80 dark:bg-brand-900 rounded-2xl border border-indigo-200/80 dark:border-brand-700 flex items-start gap-3 text-xs text-zinc-800 dark:text-zinc-200 mt-4">
+                    <span class="text-lg shrink-0">🧠</span>
+                    <div class="leading-relaxed">
+                        <strong class="font-extrabold text-indigo-700 dark:text-indigo-400">Workload Balancer Pro-Tip:</strong> Distributing assignments across 3–4 days prior to deadlines prevents cognitive overload and improves exam performance by up to 35% compared to single-session cramming.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 px-6 bg-zinc-50 dark:bg-brand-900 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between gap-3">
+                <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Click any timer to jump straight into deep work.</span>
+                <button type="button" onclick="closeStudyPlanDayModal()" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-brand-700 dark:hover:bg-brand-600 text-white font-bold rounded-xl text-xs transition shadow-sm">
+                    Close Plan
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+/**
+ * Closes the study plan day modal popup.
+ */
+export function closeStudyPlanDayModal() {
+    if (typeof document === 'undefined') return;
+    const modal = document.getElementById('studyPlanDayModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Starts a timer session directly from a study block.
+ * @param {number} durationMinutes Duration in minutes
+ * @param {string} taskTitle Title of task being studied
+ */
+export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
+    if (typeof window !== 'undefined' && typeof window.toggleTimer === 'function') {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('focusMinutes', durationMinutes);
+            localStorage.setItem('timeLeft', durationMinutes * 60);
+            localStorage.setItem('timerIsWorking', 'true');
+        }
+        if (window.resetTimer) window.resetTimer();
+        if (!window.timerRunning && window.toggleTimer) window.toggleTimer();
+    }
+    closeStudyPlanDayModal();
+}
+
+/**
+ * Helper to mark an assignment completed from within the study plan popup.
+ */
+export async function toggleStudyPlanAssignment(assignId, currentState, courseId, dateStr) {
+    if (!supabaseClient) return;
+    const newState = !currentState;
+    await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    if (newState) fireConfetti();
+
+    // Refresh dashboard widget and re-open modal with refreshed data
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        await window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+    if (dateStr) {
+        await openStudyPlanDayModal(dateStr);
+    }
 }
 
 /**
@@ -75,6 +352,8 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
     if (typeof document === 'undefined') return;
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    ensureStudyPlanDayModalExists();
 
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
@@ -104,17 +383,30 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     </div>
                 `;
             });
+            if (day.allBlocks.length > day.blocks.length) {
+                blocksHtml += `
+                    <div class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 text-center pt-0.5">
+                        +${day.allBlocks.length - day.blocks.length} more study session${day.allBlocks.length - day.blocks.length > 1 ? 's' : ''}
+                    </div>
+                `;
+            }
         }
 
         daysHtml += `
-            <div class="p-3 rounded-xl border ${day.isToday ? 'bg-indigo-50/40 dark:bg-indigo-950/30 border-indigo-500 shadow-sm' : 'bg-zinc-50/70 dark:bg-brand-850 border-zinc-200 dark:border-brand-700'} space-y-2">
+            <div onclick="openStudyPlanDayModal('${day.date}')" class="group cursor-pointer p-3.5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${day.isToday ? 'bg-indigo-50/50 dark:bg-brand-800 border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20' : 'bg-zinc-50/80 dark:bg-brand-800 border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500'} space-y-2.5">
                 <div class="flex justify-between items-center text-xs">
-                    <span class="font-extrabold ${day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300'}">
-                        ${day.dayOfWeek}, ${day.displayDate} ${day.isToday ? '<span class="ml-1 text-[10px] bg-indigo-500 text-white px-1.5 py-0.2 rounded font-bold">TODAY</span>' : ''}
+                    <span class="font-extrabold flex items-center gap-1.5 ${day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300'}">
+                        ${day.dayOfWeek}, ${day.displayDate} ${day.isToday ? '<span class="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-black tracking-wider uppercase">TODAY</span>' : ''}
                     </span>
                     <span class="text-[11px] text-zinc-400 font-mono font-medium">${day.totalMinutes}m planned</span>
                 </div>
                 <div class="space-y-1.5">${blocksHtml}</div>
+                <div class="pt-1 border-t border-zinc-200/50 dark:border-brand-700/50 flex items-center justify-between text-[11px]">
+                    <span class="text-zinc-400 font-medium">${day.allBlocks.length} session${day.allBlocks.length === 1 ? '' : 's'}</span>
+                    <span class="text-indigo-600 dark:text-indigo-400 font-bold group-hover:underline flex items-center gap-1">
+                        View Plan <span class="group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                    </span>
+                </div>
             </div>
         `;
     });
@@ -126,12 +418,12 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">🗓️</div>
                     <div>
                         <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines.</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines. Click any day to open the full plan popup.</p>
                     </div>
                 </div>
                 <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline">↺ Refresh Plan</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
             </div>
         </div>
@@ -142,3 +434,9 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
 const _studyScope = typeof window !== 'undefined' ? window : globalThis;
 _studyScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _studyScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
+_studyScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;
+_studyScope.openStudyPlanDayModal = openStudyPlanDayModal;
+_studyScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
+_studyScope.startStudyPlanTimer = startStudyPlanTimer;
+_studyScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
+
