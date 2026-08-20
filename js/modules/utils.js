@@ -17,12 +17,27 @@ export function setTourCookie() {
     document.cookie = `duevinci_tour_done=true;expires=${d.toUTCString()};path=/;SameSite=Lax`;
 }
 
+export function getBasePath() {
+    if (typeof window === 'undefined' || !window.location) return './';
+    const path = window.location.pathname || '';
+    const segments = path.split('/').filter(Boolean);
+    // If inside a subfolder like /courses/, /courses/index.html, /legal/privacy.html
+    if (segments.length >= 2 || (segments.length === 1 && !path.endsWith('.html') && !segments[0].includes('.'))) {
+        return '../';
+    }
+    return './';
+}
+
 export function getCurrentPageName() {
     if (typeof window === 'undefined' || !window.location) return 'index';
     const path = window.location.pathname || '';
-    const page = path.split("/").pop();
-    if (!page || page === '') return 'index';
-    return page.replace('.html', '');
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 0) return 'index';
+    const last = segments[segments.length - 1].replace('.html', '');
+    if (last === 'index' && segments.length > 1) {
+        return segments[segments.length - 2];
+    }
+    return last;
 }
 
 /**
@@ -265,6 +280,7 @@ export function recordStudyActivity() {
 if (typeof window !== 'undefined') {
     window.getTourCookie = getTourCookie;
     window.setTourCookie = setTourCookie;
+    window.getBasePath = getBasePath;
     window.getCurrentPageName = getCurrentPageName;
     window.playTimerAlarm = playTimerAlarm;
     window.toggleAmbientNoise = toggleAmbientNoise;

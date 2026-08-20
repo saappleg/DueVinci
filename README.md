@@ -70,17 +70,31 @@
 
 ```text
 DueVinci/
-├── index.html       # Main dashboard (Up Next & Goals)
-├── courses.html     # Class management & PDF parser
-├── grades.html      # Grade tracking & GPA calculations
-├── calendar.html    # FullCalendar view & custom events
-└── app.js           # Core logic, Supabase hooks, UI controllers
+├── index.html                   # Main dashboard (Up Next & Goals)
+├── courses/
+│   └── index.html               # Class management, syllabus AI & study quizzes
+├── grades/
+│   └── index.html               # Grade tracking & GPA simulator
+├── calendar/
+│   └── index.html               # FullCalendar view & .ics export
+├── legal/
+│   ├── terms.html               # Terms of Use
+│   └── privacy.html             # Privacy & Data Retention Policy
+├── docs/
+│   ├── CHANGELOG.md             # Version release history
+│   ├── CONTRIBUTING.md          # Contribution guidelines
+│   └── SECURITY.md              # Security policies & reporting
+├── assets/                      # CSS themes, icons, and image assets
+├── js/
+│   ├── app.js                   # Application orchestrator
+│   └── modules/                 # Modular ES6 feature engines
+└── tests/                       # Automated Vitest test suite
 ```
 
 ---
 ## Contributing 🤝
 
-Contributions are welcome! Please fork the repository, create a feature branch, and submit a pull request. Follow the existing code style and run the linter before submitting.
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ---
 ## License 📄

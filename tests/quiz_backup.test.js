@@ -137,4 +137,38 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(() => toggleAmbientNoise('off')).not.toThrow();
         });
     });
+
+    describe('Path & Routing Utilities (Directory-Based Pretty URLs)', () => {
+        it('resolves correct base path for root and subdirectories', async () => {
+            const { getBasePath, getCurrentPageName } = await import('../js/modules/utils.js');
+            
+            // Root
+            globalThis.window = { location: { pathname: '/index.html' } };
+            expect(getBasePath()).toBe('./');
+            expect(getCurrentPageName()).toBe('index');
+
+            globalThis.window = { location: { pathname: '/' } };
+            expect(getBasePath()).toBe('./');
+            expect(getCurrentPageName()).toBe('index');
+
+            // Courses directory
+            globalThis.window = { location: { pathname: '/courses/index.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('courses');
+
+            globalThis.window = { location: { pathname: '/courses/' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('courses');
+
+            // Grades directory
+            globalThis.window = { location: { pathname: '/grades/index.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('grades');
+
+            // Legal directory
+            globalThis.window = { location: { pathname: '/legal/terms.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('terms');
+        });
+    });
 });

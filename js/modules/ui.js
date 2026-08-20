@@ -1,7 +1,6 @@
-// --- UI, SETTINGS, THEMES & MODALS MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
-import { fireConfetti } from './utils.js';
+import { fireConfetti, getBasePath } from './utils.js';
 
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
@@ -136,8 +135,8 @@ export function ensureSettingsModalExists() {
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
                         <button type="button" onclick="openWhatsNewModal()" class="block text-indigo-600 dark:text-indigo-400 font-bold hover:underline">What's New ✨</button>
-                        <a href="privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
-                        <a href="terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
+                        <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
+                        <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
                 <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
@@ -234,8 +233,8 @@ export function ensureSettingsModalExists() {
                                     <div class="text-[11px] text-zinc-500 dark:text-zinc-400">Review our complete data retention and terms documentation.</div>
                                 </div>
                                 <div class="flex gap-2 shrink-0">
-                                    <a href="privacy.html" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition">Privacy Policy ↗</a>
-                                    <a href="terms.html" class="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded-lg font-bold text-xs transition">Terms of Use ↗</a>
+                                    <a href="${getBasePath()}legal/privacy.html" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition">Privacy Policy ↗</a>
+                                    <a href="${getBasePath()}legal/terms.html" class="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded-lg font-bold text-xs transition">Terms of Use ↗</a>
                                 </div>
                             </div>
                         </div>
@@ -355,7 +354,7 @@ export function ensureSupportModalExists() {
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
                         <span class="text-zinc-400 dark:text-zinc-500 block">DueVinci Support</span>
-                        <a href="privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
+                        <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                     </div>
                 </div>
                 <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">

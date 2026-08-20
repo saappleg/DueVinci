@@ -1,6 +1,4 @@
-// --- DUEVINCI REUSABLE WEB COMPONENTS MODULE ---
-
-import { getCurrentPageName } from './utils.js';
+import { getCurrentPageName, getBasePath } from './utils.js';
 import {
     toggleTimer,
     resetTimer,
@@ -28,6 +26,7 @@ class DueVinciSidebar extends BaseElement {
 
     render() {
         if (typeof document === 'undefined') return;
+        const basePath = getBasePath();
         const currentPage = getCurrentPageName();
         const isDashboard = currentPage === 'index' || currentPage === 'index.html' || currentPage === '';
         const isCourses = currentPage === 'courses' || currentPage === 'courses.html';
@@ -81,16 +80,16 @@ class DueVinciSidebar extends BaseElement {
 
             <div class="p-4 flex-1">
                 <nav class="space-y-1">
-                    <a href="index.html" class="${isDashboard ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}index.html" class="${isDashboard ? navActiveStyle : navInactiveStyle}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard
                     </a>
-                    <a href="courses.html" class="${isCourses ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}courses/index.html" class="${isCourses ? navActiveStyle : navInactiveStyle}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Classes
                     </a>
-                    <a href="grades.html" class="${isGrades ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}grades/index.html" class="${isGrades ? navActiveStyle : navInactiveStyle}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Grades
                     </a>
-                    <a href="calendar.html" class="${isCalendar ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}calendar/index.html" class="${isCalendar ? navActiveStyle : navInactiveStyle}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Calendar
                     </a>
                 </nav>

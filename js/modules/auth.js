@@ -1,6 +1,6 @@
 // --- AUTHENTICATION & USER SESSION MODULE ---
 import { supabaseClient } from './config.js';
-import { getCurrentPageName, getTourCookie } from './utils.js';
+import { getCurrentPageName, getBasePath, getTourCookie } from './utils.js';
 
 export let currentUser = null;
 let lastProcessedSessionToken = undefined;
@@ -62,7 +62,7 @@ export function handleAuth(session) {
         currentUser = null;
         const page = getCurrentPageName();
         if (page !== 'index' && page !== 'index.html') {
-            if (typeof window !== 'undefined' && window.location) window.location.href = 'index.html';
+            if (typeof window !== 'undefined' && window.location) window.location.href = getBasePath() + 'index.html';
         } else {
             if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.remove('hidden');
             if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.add('hidden');

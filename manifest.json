@@ -27,21 +27,21 @@
       "name": "Courses & Syllabus",
       "short_name": "Courses",
       "description": "Manage courses, units, and flashcards",
-      "url": "courses.html",
+      "url": "courses/index.html",
       "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Grades & GPA",
       "short_name": "Grades",
       "description": "Track course grades and GPA simulator",
-      "url": "grades.html",
+      "url": "grades/index.html",
       "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Master Calendar",
       "short_name": "Calendar",
       "description": "View deadlines and export schedule",
-      "url": "calendar.html",
+      "url": "calendar/index.html",
       "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ],

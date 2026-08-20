@@ -1,13 +1,13 @@
 // DueVinci Service Worker - Offline Caching
-const CACHE_NAME = 'duevinci-v3.0';
+const CACHE_NAME = 'duevinci-v3.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './courses.html',
-  './grades.html',
-  './calendar.html',
-  './privacy.html',
-  './terms.html',
+  './courses/index.html',
+  './grades/index.html',
+  './calendar/index.html',
+  './legal/privacy.html',
+  './legal/terms.html',
   './assets/css/greek-theme.css',
   './manifest.json',
   './assets/images/maestro-logo.svg',

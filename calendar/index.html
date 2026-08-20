@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DueVinci - Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { brand: { 900: '#151515', 800: '#1c1c1c', 700: '#2b2b2b', 600: '#3f3f3f' } } } } }
+    </script>
+    <script>
+        const theme = localStorage.getItem('theme') || 'system';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
+        else { document.documentElement.classList.remove('dark'); }
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <style>
+        .dark .driver-popover { background-color: #1c1c1c !important; color: #f4f4f5 !important; border: 1px solid #3f3f46 !important; }
+        .dark .driver-popover-title { color: #ffffff !important; }
+        .dark .driver-popover-description { color: #a1a1aa !important; }
+        .dark .fc-col-header-cell-cushion, .dark .fc-daygrid-day-number { color: #e4e4e7; }
+        .dark .fc-theme-standard td, .dark .fc-theme-standard th, .dark .fc-theme-standard .fc-scrollgrid { border-color: #2b2b2b; }
+        .dark .fc-button-primary { background-color: #1c1c1c; border-color: #2b2b2b; }
+        .dark .fc-button-primary:hover { background-color: #2b2b2b; }
+        .fc-event { cursor: pointer; }
+    </style>
+    <link rel="manifest" href="../manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon-16x16.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="../assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="../assets/css/greek-theme.css" />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="../js/app.js"></script>
+</head>
+<body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
+
+    <div id="appScreen" class="hidden flex h-screen overflow-hidden">
+        
+        <duevinci-sidebar></duevinci-sidebar>
+
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
+            
+            <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
+                <div class="flex items-center gap-4">
+                    <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-sm">
+                                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                                <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                                <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                                <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                                <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
+                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Planner</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
+                        <span class="hidden sm:inline">Sign out</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="flex-1 p-8 overflow-y-auto" id="calendarMain">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold dark:text-white mb-1">Calendar & Schedule</h2>
+                        <p class="text-zinc-500 dark:text-zinc-400 text-sm">Overview of coursework targets and custom milestones.</p>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <button type="button" onclick="exportToICS()" class="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Export .ICS
+                        </button>
+                        <button type="button" onclick="openEventModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1">
+                            + Add Event
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+                    <div id="calendar"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add Custom Event Modal -->
+    <div id="eventModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-zinc-200 dark:border-brand-700 pb-3">
+                <h3 class="text-lg font-bold dark:text-white">Add Schedule Event</h3>
+                <button type="button" onclick="closeEventModal()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-white text-xl">✕</button>
+            </div>
+            <form id="customEventForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Event Title</label>
+                    <input type="text" id="eventTitle" placeholder="e.g. Study Group, Final Exam" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Related Class (Optional)</label>
+                    <select id="eventCourseSelect" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="">General / None</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Start Date</label>
+                        <input type="date" id="eventStartDate" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">End Date (Opt)</label>
+                        <input type="date" id="eventEndDate" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition text-sm shadow-sm">Save to Calendar</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

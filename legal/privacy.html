@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DueVinci - Privacy Policy & Data Retention</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class',
+            theme: { extend: { colors: { brand: { 900: '#151515', 800: '#1c1c1c', 700: '#2b2b2b', 600: '#3f3f3f' } } } }
+        }
+    </script>
+    <script>
+        const theme = localStorage.getItem('theme') || 'system';
+    </script>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon-16x16.png">
+    <link rel="stylesheet" href="../assets/css/greek-theme.css" />
+</head>
+<body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans min-h-screen transition-colors duration-200 selection:bg-indigo-500/30">
+
+    <!-- Header -->
+    <header class="border-b border-zinc-200 dark:border-brand-700 bg-white/80 dark:bg-brand-800/80 backdrop-blur sticky top-0 z-20">
+        <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="../index.html" class="flex items-center gap-3 group">
+                <div class="w-8 h-8 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+                        <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                        <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                        <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                        <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                        <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <span class="font-extrabold text-lg text-zinc-900 dark:text-white tracking-tight">DueVinci</span>
+            </a>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                <a href="terms.html" class="text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">Terms of Use</a>
+                <a href="../index.html" class="bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 transition shadow-sm">← Back to App</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-4xl mx-auto px-6 py-12">
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 rounded-3xl p-8 md:p-12 shadow-sm space-y-10">
+            
+            <!-- Page Title -->
+            <div class="border-b border-zinc-200 dark:border-brand-700 pb-6">
+                <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider block mb-1">Privacy & Compliance</span>
+                <h1 class="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Privacy Policy & Data Retention</h1>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: February 20, 2026</p>
+            </div>
+
+            <!-- Section 1 -->
+            <div class="space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">1. Introduction & Scope</h2>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    At <strong>DueVinci</strong> ("we", "our", or "the Service"), we take student privacy and data security seriously. This Privacy Policy explains how information is collected, used, stored, and protected when you use the DueVinci web application at <code class="text-indigo-600 dark:text-indigo-400 font-mono">duevinci.tech</code>.
+                </p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    By using DueVinci, you consent to the practices described in this policy. We do not sell your personal data to third parties or use student coursework for behavioral advertising.
+                </p>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">2. Information We Collect</h2>
+                <div class="space-y-4 text-xs text-zinc-600 dark:text-zinc-300">
+                    <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">A. Account & Authentication Data</h3>
+                        <p class="leading-relaxed">
+                            When you register or sign in, we collect your <strong>email address</strong> and authentication credentials managed securely through Supabase Auth (including WebAuthn/Passkey public key credentials where enabled).
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">B. Student Academic Content</h3>
+                        <p class="leading-relaxed">
+                            We store the academic records you explicitly enter, including: course names, term folders, assignment titles, due dates, completion statuses, grade percentages, custom calendar events, and study notes/scratchpads.
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">C. AI Document Processing Inputs</h3>
+                        <p class="leading-relaxed">
+                            When you upload syllabus PDFs or lesson screenshots for AI scheduling, the extracted text or image payload is transmitted ephemerally to our secure Supabase Edge Function to interface with Google Gemini. <strong>Files and prompt inputs are processed in-flight and are not used to train generalized foundation models.</strong>
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">D. Client-Side Preferences (Local Storage)</h3>
+                        <p class="leading-relaxed">
+                            UI configuration such as your active theme (dark/light/Greek mode), preferred date format, timer audio profiles, and Pomodoro durations are stored directly on your browser device via <code class="font-mono text-zinc-800 dark:text-zinc-200">localStorage</code>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">3. How We Use Your Information</h2>
+                <ul class="list-disc list-inside text-xs text-zinc-600 dark:text-zinc-300 space-y-1.5 leading-relaxed">
+                    <li>To render your personal dashboard, courses, grade simulator, and calendar timeline.</li>
+                    <li>To compute cumulative GPA, course completion percentages, and 7-day workload distributions.</li>
+                    <li>To authenticate your session securely across multiple devices.</li>
+                    <li>To deliver automated syllabus parsing and quiz generation via Google Gemini APIs.</li>
+                    <li>To provide customer support when you reach out via our support channels.</li>
+                </ul>
+            </div>
+
+            <!-- Section 4 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">4. Data Retention & Storage Policy</h2>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    We maintain strict data retention standards to ensure you remain in complete control of your academic data:
+                </p>
+                <div class="overflow-hidden border border-zinc-200 dark:border-brand-700 rounded-xl">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-zinc-100 dark:bg-brand-700/50 text-zinc-800 dark:text-zinc-200">
+                            <tr>
+                                <th class="p-3 font-bold border-b border-zinc-200 dark:border-brand-700">Data Category</th>
+                                <th class="p-3 font-bold border-b border-zinc-200 dark:border-brand-700">Retention Period</th>
+                                <th class="p-3 font-bold border-b border-zinc-200 dark:border-brand-700">Storage Location</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200 dark:divide-brand-700 text-zinc-600 dark:text-zinc-300">
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Account & Profile</td>
+                                <td class="p-3">Retained until account deletion requested</td>
+                                <td class="p-3">Supabase (PostgreSQL with RLS)</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Coursework & Grades</td>
+                                <td class="p-3">Retained until deleted by user or account removed</td>
+                                <td class="p-3">Supabase DB + IndexedDB Offline Cache</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Uploaded Syllabus Files</td>
+                                <td class="p-3">Parsed ephemerally in memory; raw files are not permanently stored</td>
+                                <td class="p-3">Edge Function Memory (Ephemeral)</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Local Preferences</td>
+                                <td class="p-3">Persistent until user clears browser cache</td>
+                                <td class="p-3">Client LocalStorage</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Section 5 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">5. Account Deletion & Right to Be Forgotten</h2>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    You have the right to permanently purge your account and all associated data at any time. DueVinci provides an automated, self-service <strong>Delete Account & Purge Data</strong> option inside the Settings modal.
+                </p>
+                <div class="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-700 dark:text-red-300 space-y-1">
+                    <p class="font-bold">Immediate Deletion Guarantee:</p>
+                    <p class="leading-relaxed">
+                        When you confirm account deletion, your user record, enrolled courses, assignments, custom calendar events, and offline caches are permanently erased immediately across database tables and local storage.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Section 6 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">6. Security & Encryption Practices</h2>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    We employ industry-standard administrative, physical, and technical safeguards:
+                </p>
+                <ul class="list-disc list-inside text-xs text-zinc-600 dark:text-zinc-300 space-y-1.5 leading-relaxed">
+                    <li><strong>Transport Layer Security (TLS/HTTPS):</strong> All network traffic between your client browser and our servers is encrypted with modern TLS ciphers.</li>
+                    <li><strong>Row Level Security (RLS):</strong> Database tables enforce PostgreSQL RLS policies ensuring users can only read and mutate records matching their authenticated UUID.</li>
+                    <li><strong>Protected API Gateways:</strong> Gemini API keys are isolated within server-side Supabase Vault secrets and are never exposed in client bundles.</li>
+                </ul>
+            </div>
+
+            <!-- Section 7 -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-3">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">7. Third-Party Service Providers</h2>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    DueVinci utilizes trusted cloud infrastructure partners solely to operate the service:
+                </p>
+                <ul class="list-disc list-inside text-xs text-zinc-600 dark:text-zinc-300 space-y-1 leading-relaxed">
+                    <li><strong>Supabase Inc.:</strong> Database hosting, user authentication, and serverless Edge Functions.</li>
+                    <li><strong>Google Cloud (Gemini API):</strong> Natural language and optical document processing for syllabus parsing.</li>
+                </ul>
+            </div>
+
+            <!-- Section 8: Contact -->
+            <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-2">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">8. Contact & Questions</h2>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    If you have questions, concerns, or requests regarding this policy or how your data is handled, please reach out to our team at <a href="mailto:support@duevinci.tech" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">support@duevinci.tech</a>.
+                </p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-zinc-200 dark:border-brand-800 py-8 text-center text-xs text-zinc-400 dark:text-zinc-500">
+        <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <span>© 2026 DueVinci. All rights reserved.</span>
+            <div class="flex gap-4">
+                <a href="privacy.html" class="hover:underline font-bold text-indigo-600 dark:text-indigo-400">Privacy Policy</a>
+                <a href="terms.html" class="hover:underline text-zinc-600 dark:text-zinc-400">Terms of Use</a>
+                <a href="../index.html" class="hover:underline text-zinc-600 dark:text-zinc-400">Dashboard</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
