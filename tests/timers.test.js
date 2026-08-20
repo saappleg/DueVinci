@@ -6,10 +6,10 @@ describe('Timer Utilities', () => {
     let formatTimerTime;
 
     beforeAll(async () => {
-        await import('../timers.js');
-        createTimerState = globalThis.createTimerState;
-        stepTimerState = globalThis.stepTimerState;
-        formatTimerTime = globalThis.formatTimerTime;
+        const mod = await import('../js/modules/timers.js');
+        createTimerState = mod.createTimerState || globalThis.createTimerState;
+        stepTimerState = mod.stepTimerState || globalThis.stepTimerState;
+        formatTimerTime = mod.formatTimerTime || globalThis.formatTimerTime;
     });
 
     describe('createTimerState', () => {

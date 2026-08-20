@@ -76,28 +76,31 @@
 
 ```text
 DueVinci/
-├── index.html          # Main dashboard (Up Next & Goals)
-├── courses.html        # Class management & PDF parser
-├── grades.html         # Grade tracking & GPA calculations
-├── calendar.html       # FullCalendar view & custom events
-├── academics.js        # Academic analytics & streak algorithms
-├── timers.js           # Multi-timer Pomodoro state engine
-├── app.js              # Core logic, Supabase hooks, UI controllers
-├── sw.js               # Service Worker & offline caching
-├── tests/              # Automated unit & integration tests (Vitest)
-└── .github/workflows/  # CI/CD and deployment workflows
+├── index.html                   # Main dashboard (Up Next & Goals)
+├── courses/
+│   └── index.html               # Class management, syllabus AI & study quizzes
+├── grades/
+│   └── index.html               # Grade tracking & GPA simulator
+├── calendar/
+│   └── index.html               # FullCalendar view & .ics export
+├── legal/
+│   ├── terms.html               # Terms of Use
+│   └── privacy.html             # Privacy & Data Retention Policy
+├── docs/
+│   ├── CHANGELOG.md             # Version release history
+│   ├── CONTRIBUTING.md          # Contribution guidelines
+│   └── SECURITY.md              # Security policies & reporting
+├── assets/                      # CSS themes, icons, and image assets
+├── js/
+│   ├── app.js                   # Application orchestrator
+│   └── modules/                 # Modular ES6 feature engines
+└── tests/                       # Automated Vitest test suite
 ```
 
 ---
 ## Contributing & Releases 🤝
 
-- Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit issues and pull requests.
-- See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
-
----
-## Security 🔒
-
-Please review our [SECURITY.md](SECURITY.md) for vulnerability disclosure guidelines and our privacy/security practices.
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ---
 ## License 📄

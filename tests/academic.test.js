@@ -7,11 +7,11 @@ describe('Academic Utilities', () => {
     let calculateDaysRemaining;
 
     beforeAll(async () => {
-        await import('../academics.js');
-        calculateStudyStreak = globalThis.calculateStudyStreak;
-        calculateCumulativeGpa = globalThis.calculateCumulativeGpa;
-        getWorkloadIntensity = globalThis.getWorkloadIntensity;
-        calculateDaysRemaining = globalThis.calculateDaysRemaining;
+        const mod = await import('../js/modules/academics.js');
+        calculateStudyStreak = mod.calculateStudyStreak || globalThis.calculateStudyStreak;
+        calculateCumulativeGpa = mod.calculateCumulativeGpa || globalThis.calculateCumulativeGpa;
+        getWorkloadIntensity = mod.getWorkloadIntensity || globalThis.getWorkloadIntensity;
+        calculateDaysRemaining = mod.calculateDaysRemaining || globalThis.calculateDaysRemaining;
     });
 
     describe('calculateStudyStreak', () => {

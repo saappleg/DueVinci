@@ -8,12 +8,12 @@
   "background_color": "#151515",
   "theme_color": "#4f46e5",
   "icons": [
-    { "src": "icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png" },
-    { "src": "icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png" },
-    { "src": "icons/icon-144x144.png", "sizes": "144x144", "type": "image/png" },
-    { "src": "icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "assets/icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png" },
+    { "src": "assets/icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png" },
+    { "src": "assets/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "assets/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
     {
@@ -21,28 +21,28 @@
       "short_name": "Dashboard",
       "description": "View Up Next and Academic Analytics",
       "url": "index.html",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Courses & Syllabus",
       "short_name": "Courses",
       "description": "Manage courses, units, and flashcards",
-      "url": "courses.html",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "url": "courses/index.html",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Grades & GPA",
       "short_name": "Grades",
       "description": "Track course grades and GPA simulator",
-      "url": "grades.html",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "url": "grades/index.html",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Master Calendar",
       "short_name": "Calendar",
       "description": "View deadlines and export schedule",
-      "url": "calendar.html",
-      "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+      "url": "calendar/index.html",
+      "icons": [{ "src": "assets/icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ],
   "categories": ["education", "productivity"],

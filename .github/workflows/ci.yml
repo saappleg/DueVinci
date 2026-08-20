@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 jobs:
   validate:
@@ -39,10 +39,11 @@ jobs:
         run: |
           echo "Checking essential web assets..."
           test -f index.html || { echo "Missing index.html"; exit 1; }
-          test -f courses.html || { echo "Missing courses.html"; exit 1; }
-          test -f grades.html || { echo "Missing grades.html"; exit 1; }
-          test -f calendar.html || { echo "Missing calendar.html"; exit 1; }
+          test -f courses/index.html || { echo "Missing courses/index.html"; exit 1; }
+          test -f grades/index.html || { echo "Missing grades/index.html"; exit 1; }
+          test -f calendar/index.html || { echo "Missing calendar/index.html"; exit 1; }
           test -f manifest.json || { echo "Missing manifest.json"; exit 1; }
           test -f sw.js || { echo "Missing sw.js"; exit 1; }
-          test -f renaissance-theme.css || { echo "Missing renaissance-theme.css"; exit 1; }
+          test -f js/app.js || { echo "Missing js/app.js"; exit 1; }
+          test -f assets/css/greek-theme.css || { echo "Missing greek-theme.css"; exit 1; }
           echo "All core assets verified successfully!"

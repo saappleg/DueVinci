@@ -2,20 +2,38 @@ import { describe, it, expect, beforeAll } from 'vitest';
 
 describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
     let generateQuizQuestions;
+    let generateQuizFromNotes;
     let buildBackupPayload;
     let validateBackupPayload;
     let generateICSString;
 
     beforeAll(async () => {
-        await import('../app.js');
-        generateQuizQuestions = globalThis.generateQuizQuestions;
-        buildBackupPayload = globalThis.buildBackupPayload;
-        validateBackupPayload = globalThis.validateBackupPayload;
-        generateICSString = globalThis.generateICSString;
+        const mod = await import('../js/app.js');
+        generateQuizQuestions = mod.generateQuizQuestions || globalThis.generateQuizQuestions;
+        generateQuizFromNotes = mod.generateQuizFromNotes || globalThis.generateQuizFromNotes;
+        buildBackupPayload = mod.buildBackupPayload || globalThis.buildBackupPayload;
+        validateBackupPayload = mod.validateBackupPayload || globalThis.validateBackupPayload;
+        generateICSString = mod.generateICSString || globalThis.generateICSString;
     });
 
-    describe('generateQuizQuestions', () => {
-        it('generates multiple choice questions from course assignments', () => {
+    describe('generateQuizQuestions from student submitted notes', () => {
+        it('generates quiz questions directly from student submitted notes', () => {
+            const course = { code: 'BIO 101', title: 'General Biology' };
+            const studentNotes = `
+                Mitochondria: Powerhouse of the cell generating ATP via oxidative phosphorylation.
+                Photosynthesis: Light-dependent and Calvin cycle reactions converting sunlight into chemical glucose.
+                CRISPR-Cas9: RNA-guided targeted genome editing endonuclease.
+            `;
+
+            const questions = generateQuizFromNotes(studentNotes, course);
+            expect(questions.length).toBe(3);
+            expect(questions[0].topic).toBe('Mitochondria');
+            expect(questions[0].options.length).toBe(4);
+            expect(questions[0].options[questions[0].correctIndex]).toContain('ATP');
+            expect(questions[0].explanation).toContain('Mitochondria');
+        });
+
+        it('generates multiple choice questions from course assignments when notes are absent', () => {
             const course = { code: 'BIO 101', title: 'General Biology' };
             const assignments = [
                 { title: '↳ Cellular Respiration', due_date: '2026-09-01' },
@@ -26,7 +44,7 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
 
             const questions = generateQuizQuestions(course, assignments);
             expect(questions.length).toBe(4);
-            
+
             const first = questions[0];
             expect(first.topic).toBe('Cellular Respiration');
             expect(first.unit).toBe(1);
@@ -36,7 +54,7 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(first.explanation).toContain('Cellular Respiration');
         });
 
-        it('provides default structured questions if course has no assignments', () => {
+        it('provides default structured questions if course has no assignments or notes', () => {
             const course = { code: 'CS 50' };
             const questions = generateQuizQuestions(course, []);
             expect(questions.length).toBeGreaterThan(0);
@@ -102,6 +120,55 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             const ics = generateICSString([], 'Empty Schedule');
             expect(ics).toContain('BEGIN:VCALENDAR');
             expect(ics).toContain('END:VCALENDAR');
+        });
+    });
+
+    describe('Audio Synthesizer & Speech Utilities', () => {
+        it('handles playTimerAlarm gracefully across different sound profiles', async () => {
+            const { playTimerAlarm } = await import('../js/modules/utils.js');
+            expect(() => playTimerAlarm('zenBowl')).not.toThrow();
+            expect(() => playTimerAlarm('gentleChime')).not.toThrow();
+            expect(() => playTimerAlarm('digitalBeep')).not.toThrow();
+        });
+
+        it('handles speakText and toggleAmbientNoise without error', async () => {
+            const { speakText, toggleAmbientNoise } = await import('../js/modules/utils.js');
+            expect(() => speakText('Hello study notes', 1.0)).not.toThrow();
+            expect(() => toggleAmbientNoise('off')).not.toThrow();
+        });
+    });
+
+    describe('Path & Routing Utilities (Directory-Based Pretty URLs)', () => {
+        it('resolves correct base path for root and subdirectories', async () => {
+            const { getBasePath, getCurrentPageName } = await import('../js/modules/utils.js');
+            
+            // Root
+            globalThis.window = { location: { pathname: '/index.html' } };
+            expect(getBasePath()).toBe('./');
+            expect(getCurrentPageName()).toBe('index');
+
+            globalThis.window = { location: { pathname: '/' } };
+            expect(getBasePath()).toBe('./');
+            expect(getCurrentPageName()).toBe('index');
+
+            // Courses directory
+            globalThis.window = { location: { pathname: '/courses/index.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('courses');
+
+            globalThis.window = { location: { pathname: '/courses/' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('courses');
+
+            // Grades directory
+            globalThis.window = { location: { pathname: '/grades/index.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('grades');
+
+            // Legal directory
+            globalThis.window = { location: { pathname: '/legal/terms.html' } };
+            expect(getBasePath()).toBe('../');
+            expect(getCurrentPageName()).toBe('terms');
         });
     });
 });

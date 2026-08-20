@@ -1,0 +1,93 @@
+// --- LIGHTWEIGHT MARKDOWN & LATEX MATH RENDERER FOR STUDENT NOTES ---
+
+/**
+ * Parses and formats math formulas (supports superscripts, subscripts, Greek letters, and fractions).
+ */
+export function formatMathFormula(mathStr) {
+    if (!mathStr) return '';
+    let formatted = mathStr.trim();
+
+    // Common Greek letters
+    const greekLetters = {
+        '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ',
+        '\\epsilon': 'ε', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ',
+        '\\pi': 'π', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω',
+        '\\Delta': 'Δ', '\\Omega': 'Ω', '\\Sigma': 'Σ', '\\int': '∫',
+        '\\sum': '∑', '\\approx': '≈', '\\le': '≤', '\\ge': '≥', '\\ne': '≠',
+        '\\infty': '∞', '\\pm': '±', '\\times': '×', '\\div': '÷', '\\to': '→',
+        '\\sqrt': '√'
+    };
+
+    for (const [tex, unicode] of Object.entries(greekLetters)) {
+        formatted = formatted.replaceAll(tex, unicode);
+    }
+
+    // Superscripts x^2 or x^{10}
+    formatted = formatted.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+    formatted = formatted.replace(/\^([0-9a-zA-Z+-]+)/g, '<sup>$1</sup>');
+
+    // Subscripts x_1 or x_{total}
+    formatted = formatted.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
+    formatted = formatted.replace(/_([0-9a-zA-Z+-]+)/g, '<sub>$1</sub>');
+
+    // Fractions \frac{a}{b}
+    formatted = formatted.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)');
+
+    return `<span class="font-serif italic tracking-wide text-indigo-600 dark:text-indigo-400 font-semibold px-1">${formatted}</span>`;
+}
+
+/**
+ * Converts Markdown and LaTeX math syntax to sanitized HTML for note previews and flashcards.
+ */
+export function renderMarkdownToHtml(mdText = '') {
+    if (!mdText || typeof mdText !== 'string') return '';
+
+    let html = mdText;
+
+    // Display LaTeX Math: $$formula$$
+    html = html.replace(/\$\$([^$]+)\$\$/g, (match, formula) => {
+        return `<div class="my-2.5 p-3 rounded-xl bg-indigo-50/50 dark:bg-brand-900/80 border border-indigo-200 dark:border-brand-700 text-center font-mono text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 shadow-sm">${formatMathFormula(formula)}</div>`;
+    });
+
+    // Inline LaTeX Math: $formula$
+    html = html.replace(/\$([^$\n]+)\$/g, (match, formula) => {
+        return formatMathFormula(formula);
+    });
+
+    // Fenced Code Blocks
+    html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre class="my-2 p-3 bg-zinc-900 text-zinc-100 dark:bg-black dark:text-zinc-200 rounded-xl text-xs font-mono overflow-x-auto border border-zinc-800"><code>${code.trim()}</code></pre>`;
+    });
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-300 font-mono text-[11px]">$1</code>');
+
+    // Headers
+    html = html.replace(/^### (.*$)/gim, '<h3 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mt-3 mb-1">$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2 class="text-sm font-bold text-zinc-900 dark:text-white mt-3.5 mb-1.5 pb-1 border-b border-zinc-200 dark:border-brand-700">$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1 class="text-base font-extrabold text-zinc-900 dark:text-white mt-4 mb-2">$1</h1>');
+
+    // Bold & Italics
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-zinc-900 dark:text-white">$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em class="italic text-zinc-700 dark:text-zinc-300">$1</em>');
+    html = html.replace(/~~([^~]+)~~/g, '<del class="line-through text-zinc-400">$1</del>');
+
+    // Blockquotes & GitHub Alerts
+    html = html.replace(/^>\s*\[!NOTE\]\s*(.*$)/gim, '<div class="p-2.5 my-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 text-blue-900 dark:text-blue-200 text-xs"><strong>ℹ️ Note:</strong> $1</div>');
+    html = html.replace(/^>\s*\[!TIP\]\s*(.*$)/gim, '<div class="p-2.5 my-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-emerald-500 text-emerald-900 dark:text-emerald-200 text-xs"><strong>💡 Tip:</strong> $1</div>');
+    html = html.replace(/^>\s*\[!IMPORTANT\]\s*(.*$)/gim, '<div class="p-2.5 my-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 text-amber-900 dark:text-amber-200 text-xs"><strong>⚠️ Important:</strong> $1</div>');
+    html = html.replace(/^>\s*(.*$)/gim, '<blockquote class="border-l-4 border-zinc-300 dark:border-brand-600 pl-3 py-1 my-1.5 text-zinc-600 dark:text-zinc-400 italic text-xs">$1</blockquote>');
+
+    // Bullet Lists
+    html = html.replace(/^\s*[-*•]\s+(.*$)/gim, '<li class="ml-4 list-disc text-xs text-zinc-700 dark:text-zinc-300">$1</li>');
+
+    // Line breaks for remaining text
+    html = html.replace(/\n\n/g, '<br/><br/>');
+
+    return html;
+}
+
+// Bind to global/window
+const _mdScope = typeof window !== 'undefined' ? window : globalThis;
+_mdScope.formatMathFormula = formatMathFormula;
+_mdScope.renderMarkdownToHtml = renderMarkdownToHtml;

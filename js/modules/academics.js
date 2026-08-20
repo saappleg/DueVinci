@@ -1,14 +1,15 @@
-// --- DYNAMIC ACADEMICS, REAL STUDY STREAK, EXAM/FINAL COUNTDOWN, & SETTINGS TOGGLE ---
+// --- DYNAMIC ACADEMICS, STUDY STREAK, GPA & WORKLOAD RADAR ---
+import { supabaseClient } from './config.js';
 
 /**
  * Calculates consecutive study days from an array of ISO date strings (YYYY-MM-DD).
  */
-function calculateStudyStreak(activityDates = [], baseDate = new Date()) {
+export function calculateStudyStreak(activityDates = [], baseDate = new Date()) {
     if (!Array.isArray(activityDates) || activityDates.length === 0) return 0;
-    
+
     let streakDays = 0;
     let checkDate = new Date(baseDate);
-    
+
     let currentDateStr = checkDate.toISOString().split('T')[0];
     if (!activityDates.includes(currentDateStr)) {
         checkDate.setDate(checkDate.getDate() - 1);
@@ -20,14 +21,14 @@ function calculateStudyStreak(activityDates = [], baseDate = new Date()) {
         checkDate.setDate(checkDate.getDate() - 1);
         currentDateStr = checkDate.toISOString().split('T')[0];
     }
-    
+
     return streakDays;
 }
 
 /**
  * Calculates difference in days from baseDate to dueDate (YYYY-MM-DD).
  */
-function calculateDaysRemaining(dueDateStr, baseDate = new Date()) {
+export function calculateDaysRemaining(dueDateStr, baseDate = new Date()) {
     if (!dueDateStr) return 0;
     const due = new Date(dueDateStr + 'T00:00:00');
     const base = new Date(baseDate);
@@ -39,7 +40,7 @@ function calculateDaysRemaining(dueDateStr, baseDate = new Date()) {
 /**
  * Categorizes daily workload intensity based on task count and exam presence.
  */
-function getWorkloadIntensity(dayTasks = 0, hasExam = false) {
+export function getWorkloadIntensity(dayTasks = 0, hasExam = false) {
     if (hasExam) {
         return {
             intensityClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-700 animate-pulse',
@@ -71,19 +72,18 @@ function getWorkloadIntensity(dayTasks = 0, hasExam = false) {
 }
 
 /**
- * Calculates cumulative GPA given an array of numeric course percentages.
+ * Calculates cumulative GPA across courses given percentage averages and a scale (4.0 or 5.0).
  */
-function calculateCumulativeGpa(courseAverages = [], scaleTarget = 4.0) {
-    const validScores = courseAverages.filter(s => typeof s === 'number' && !isNaN(s) && s >= 0);
-    if (validScores.length === 0) return '0.00';
-    const sum = validScores.reduce((acc, curr) => acc + curr, 0);
-    const avgPct = sum / validScores.length;
-    return ((avgPct / 100) * scaleTarget).toFixed(2);
+export function calculateCumulativeGpa(courseAverages = [], scale = 4.0) {
+    const valid = courseAverages.filter(g => typeof g === 'number' && !isNaN(g) && g >= 0);
+    if (valid.length === 0) return '0.00';
+    const sum = valid.reduce((acc, v) => acc + v, 0);
+    const avg = sum / valid.length;
+    const gpa = (avg / 100) * scale;
+    return gpa.toFixed(2);
 }
 
-const _scope = typeof window !== 'undefined' ? window : globalThis;
-
-_scope.renderAcademicsDashboardWidget = async (containerId) => {
+export async function renderAcademicsDashboardWidget(containerId) {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_academics') === 'true') {
         if (typeof document !== 'undefined') {
             document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
@@ -95,7 +95,7 @@ _scope.renderAcademicsDashboardWidget = async (containerId) => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Purge ALL existing instances across the DOM to prevent doubling
+    // Purge existing instances to prevent doubling
     document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
 
     let completedCount = 0;
@@ -106,16 +106,13 @@ _scope.renderAcademicsDashboardWidget = async (containerId) => {
     try {
         const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code, emoji)');
         assignmentsData = assignments || [];
-        
+
         if (assignmentsData.length > 0) {
-            // Count ONLY individual lessons or review exams/tests/finals
             const validItems = assignmentsData.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
             totalCount = validItems.length;
             completedCount = validItems.filter(a => a.is_completed).length;
 
-            // Filter uncompleted assignments matching exams, finals, midterms, or tests
             const uncompletedExams = assignmentsData.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
-            
             if (uncompletedExams.length > 0) {
                 examCountdownsHtml = uncompletedExams.map(exam => {
                     const diffDays = calculateDaysRemaining(exam.due_date);
@@ -131,16 +128,14 @@ _scope.renderAcademicsDashboardWidget = async (containerId) => {
         examCountdownsHtml = `<p class="text-xs text-zinc-400">Unable to load exam countdowns.</p>`;
     }
 
-    // Calculate actual study streak from activity history
     let streakDays = 0;
     try {
-        const activityDates = JSON.parse(localStorage.getItem('duevinci_activity_dates')) || [];
+        const activityDates = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_activity_dates'))) || [];
         streakDays = calculateStudyStreak(activityDates);
     } catch (err) {
         console.error("Error calculating streak:", err);
     }
 
-    // Calculate 7-Day Workload & Stress Radar
     let workloadHtml = '';
     try {
         const days = [];
@@ -151,21 +146,20 @@ _scope.renderAcademicsDashboardWidget = async (containerId) => {
             const dateStr = d.toISOString().split('T')[0];
             const dayName = i === 0 ? 'Today' : (i === 1 ? 'Tmrw' : d.toLocaleDateString('en-US', { weekday: 'short' }));
             const displayDate = `${d.getMonth() + 1}/${d.getDate()}`;
-            
+
             let dayTasks = 0;
             let hasExam = false;
             if (assignmentsData && assignmentsData.length > 0) {
                 dayTasks = assignmentsData.filter(a => !a.is_completed && a.due_date === dateStr).length;
                 hasExam = assignmentsData.some(a => !a.is_completed && a.due_date === dateStr && /(exam|final|midterm|test)/i.test(a.title));
             }
-            
-            const { intensityClass, statusLabel } = getWorkloadIntensity(dayTasks, hasExam);
 
+            const intensity = getWorkloadIntensity(dayTasks, hasExam);
             days.push(`
-                <div class="flex-1 min-w-[70px] p-2 rounded-lg border text-center ${intensityClass} transition hover:scale-105">
+                <div class="flex-1 min-w-[70px] p-2 rounded-lg border text-center ${intensity.intensityClass} transition hover:scale-105">
                     <div class="text-[10px] font-bold uppercase tracking-wider opacity-75">${dayName}</div>
                     <div class="text-xs font-black my-0.5">${displayDate}</div>
-                    <div class="text-[10px] font-bold truncate">${statusLabel}</div>
+                    <div class="text-[10px] font-bold truncate">${intensity.statusLabel}</div>
                 </div>
             `);
         }
@@ -215,9 +209,9 @@ _scope.renderAcademicsDashboardWidget = async (containerId) => {
     } else {
         container.insertBefore(analyticsDiv, container.firstChild);
     }
-};
+}
 
-_scope.injectAcademicsSettingsToggle = () => {
+export function injectAcademicsSettingsToggle() {
     if (typeof document === 'undefined') return;
     const appearanceTab = document.getElementById('content-appearance');
     if (!appearanceTab || document.getElementById('academicsToggleContainer')) return;
@@ -225,7 +219,7 @@ _scope.injectAcademicsSettingsToggle = () => {
     const toggleDiv = document.createElement('div');
     toggleDiv.id = 'academicsToggleContainer';
     toggleDiv.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700';
-    
+
     const isHidden = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_academics') === 'true';
     toggleDiv.innerHTML = `
         <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Academics Widget</label>
@@ -235,14 +229,14 @@ _scope.injectAcademicsSettingsToggle = () => {
         </div>
     `;
     appearanceTab.appendChild(toggleDiv);
-};
+}
 
-_scope.toggleAcademicsVisibility = (show) => {
+export function toggleAcademicsVisibility(show) {
     if (typeof localStorage === 'undefined') return;
     if (show) {
         localStorage.removeItem('duevinci_hide_academics');
-        if (typeof _scope.renderAcademicsDashboardWidget === 'function') {
-            _scope.renderAcademicsDashboardWidget('dashboardGrid');
+        if (typeof renderAcademicsDashboardWidget === 'function') {
+            renderAcademicsDashboardWidget('dashboardGrid');
         }
     } else {
         localStorage.setItem('duevinci_hide_academics', 'true');
@@ -250,9 +244,9 @@ _scope.toggleAcademicsVisibility = (show) => {
             document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
         }
     }
-};
+}
 
-_scope.renderResourceLinksSection = (courseId, containerId) => {
+export function renderResourceLinksSection(courseId, containerId) {
     if (typeof document === 'undefined') return;
     let container = document.getElementById(containerId);
     if (!container) {
@@ -277,9 +271,9 @@ _scope.renderResourceLinksSection = (courseId, containerId) => {
     });
     html += `</div><div class="flex gap-2 mt-2"><input type="text" id="resTitle_${courseId}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><input type="url" id="resUrl_${courseId}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><button onclick="addResourceLink('${courseId}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button></div></div>`;
     container.innerHTML = html;
-};
+}
 
-_scope.addResourceLink = (courseId) => {
+export function addResourceLink(courseId) {
     if (typeof document === 'undefined') return;
     const titleInput = document.getElementById(`resTitle_${courseId}`);
     const urlInput = document.getElementById(`resUrl_${courseId}`);
@@ -290,33 +284,31 @@ _scope.addResourceLink = (courseId) => {
     let savedLinks = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem(`resources_${courseId}`))) || [];
     savedLinks.push({ title, url });
     if (typeof localStorage !== 'undefined') localStorage.setItem(`resources_${courseId}`, JSON.stringify(savedLinks));
-    _scope.renderResourceLinksSection(courseId, 'courseResourceSection');
-};
+    renderResourceLinksSection(courseId, 'courseResourceSection');
+}
 
-_scope.removeResourceLink = (courseId, index) => {
+export function removeResourceLink(courseId, index) {
     if (typeof document === 'undefined') return;
     let savedLinks = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem(`resources_${courseId}`))) || [];
     savedLinks.splice(index, 1);
     if (typeof localStorage !== 'undefined') localStorage.setItem(`resources_${courseId}`, JSON.stringify(savedLinks));
-    _scope.renderResourceLinksSection(courseId, 'courseResourceSection');
-};
+    renderResourceLinksSection(courseId, 'courseResourceSection');
+}
+
+const _scope = typeof window !== 'undefined' ? window : globalThis;
+_scope.calculateStudyStreak = calculateStudyStreak;
+_scope.calculateDaysRemaining = calculateDaysRemaining;
+_scope.getWorkloadIntensity = getWorkloadIntensity;
+_scope.calculateCumulativeGpa = calculateCumulativeGpa;
+_scope.renderAcademicsDashboardWidget = renderAcademicsDashboardWidget;
+_scope.injectAcademicsSettingsToggle = injectAcademicsSettingsToggle;
+_scope.toggleAcademicsVisibility = toggleAcademicsVisibility;
+_scope.renderResourceLinksSection = renderResourceLinksSection;
+_scope.addResourceLink = addResourceLink;
+_scope.removeResourceLink = removeResourceLink;
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(_scope.injectAcademicsSettingsToggle, 400);
+        setTimeout(injectAcademicsSettingsToggle, 400);
     });
-}
-
-_scope.calculateStudyStreak = calculateStudyStreak;
-_scope.calculateCumulativeGpa = calculateCumulativeGpa;
-_scope.getWorkloadIntensity = getWorkloadIntensity;
-_scope.calculateDaysRemaining = calculateDaysRemaining;
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        calculateStudyStreak,
-        calculateCumulativeGpa,
-        getWorkloadIntensity,
-        calculateDaysRemaining
-    };
 }
