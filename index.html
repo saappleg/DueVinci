@@ -47,6 +47,29 @@
                 </div>
             </form>
             <p id="authMessage" class="text-sm hidden"></p>
+
+            <!-- Passkey sign-in (shown only when WebAuthn is available) -->
+            <div id="passkeySignInSection" class="hidden mt-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
+                    <span class="text-xs text-zinc-400 dark:text-zinc-500 whitespace-nowrap">or</span>
+                    <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
+                </div>
+                <button
+                    id="passkeySignInBtn"
+                    type="button"
+                    onclick="signInWithPasskey()"
+                    class="w-full flex items-center justify-center gap-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all duration-150 shadow-sm"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C9.238 2 7 4.238 7 7c0 1.547.677 2.937 1.75 3.906A7.002 7.002 0 0 0 5 17v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a7.002 7.002 0 0 0-3.75-6.094A4.994 4.994 0 0 0 17 7c0-2.762-2.238-5-5-5z"/>
+                        <circle cx="12" cy="7" r="2"/>
+                    </svg>
+                    Sign in with Passkey
+                </button>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-2">Use Face ID, Touch ID, or a security key</p>
+            </div>
+
             <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700 text-xs text-zinc-400 dark:text-zinc-500">
                 By signing in, you agree to our <a href="terms.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Terms</a> & <a href="privacy.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Privacy Policy</a>.
             </div>
@@ -154,6 +177,19 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
+                    <!-- Register Passkey button (only visible when WebAuthn is supported) -->
+                    <button
+                        id="registerPasskeyBtn"
+                        type="button"
+                        onclick="registerPasskey()"
+                        title="Register a passkey for passwordless sign-in"
+                        class="hidden items-center gap-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition border border-indigo-200 dark:border-indigo-700"
+                    >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                        </svg>
+                        <span class="hidden sm:inline">🔑 Register Passkey</span>
+                    </button>
                     <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
                         <span class="hidden sm:inline">Sign out</span>

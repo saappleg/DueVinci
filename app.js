@@ -23,7 +23,11 @@ if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1') || cu
 }
 
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+        experimental: { passkey: true }
+    }
+});
 
 // --- END SUPABASE CONFIG ---
 
@@ -567,6 +571,51 @@ window.logout = async () => {
     await supabaseClient.auth.signOut();
     window.location.href = 'index.html';
 };
+
+// --- PASSKEY SIGN-IN ---
+// Uses WebAuthn discoverable credentials — browser shows its native passkey picker.
+// No email required from the user.
+window.signInWithPasskey = async () => {
+    if (!window.PublicKeyCredential) {
+        showAuthMessage('Passkeys are not supported by this browser.', 'text-red-500');
+        return;
+    }
+    const btn = document.getElementById('passkeySignInBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Waiting for passkey…'; }
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPasskey();
+        if (error) throw error;
+        // Session is set automatically; the onAuthStateChange listener will handle UI.
+    } catch (err) {
+        const msg = err?.message || 'Passkey sign-in failed.';
+        showAuthMessage(msg, 'text-red-500');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign in with Passkey'; }
+    }
+};
+
+// --- PASSKEY REGISTRATION (requires active session) ---
+window.registerPasskey = async () => {
+    if (!window.PublicKeyCredential) {
+        alert('Passkeys are not supported by this browser.');
+        return;
+    }
+    const btn = document.getElementById('registerPasskeyBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Registering…'; }
+    try {
+        const { data, error } = await supabaseClient.auth.registerPasskey();
+        if (error) throw error;
+        const name = data?.friendly_name ? ` (${data.friendly_name})` : '';
+        alert(`✅ Passkey registered successfully${name}!\nNext time you can sign in without a password.`);
+    } catch (err) {
+        const msg = err?.message || 'Passkey registration failed.';
+        if (!msg.includes('cancel')) alert(`❌ ${msg}`);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔑 Register Passkey'; }
+    }
+};
+
+
 
 // --- ACTIONABLE, NON-LOOPING WALKTHROUGH ---
 window.startWalkthrough = (manualStart = false) => {
@@ -2806,6 +2855,26 @@ document.addEventListener('DOMContentLoaded', () => {
             window.updateTourButtonVisibility();
         }
     }, 400);
+
+    // --- Passkey UI visibility ---
+    // Show the "Sign in with Passkey" section only if WebAuthn is available.
+    if (window.PublicKeyCredential) {
+        const passkeySection = document.getElementById('passkeySignInSection');
+        if (passkeySection) passkeySection.classList.remove('hidden');
+    }
+});
+
+// Show/hide the "Register Passkey" button when auth state changes.
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    const registerBtn = document.getElementById('registerPasskeyBtn');
+    if (!registerBtn) return;
+    if (session && window.PublicKeyCredential) {
+        registerBtn.classList.remove('hidden');
+        registerBtn.classList.add('flex');
+    } else {
+        registerBtn.classList.add('hidden');
+        registerBtn.classList.remove('flex');
+    }
 });
 
 checkUser();
