@@ -1,0 +1,26 @@
+{
+  "name": "duevinci",
+  "version": "1.1.0",
+  "description": "Smart academic planner, syllabus AI parser, GPA tracker, and Pomodoro timer.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check:syntax": "node --check js/app.js && node --check js/modules/config.js && node --check js/modules/utils.js && node --check js/modules/auth.js && node --check js/modules/academics.js && node --check js/modules/timers.js && node --check js/modules/courses.js && node --check js/modules/grades.js && node --check js/modules/calendar.js && node --check js/modules/flashcards.js && node --check js/modules/backup.js && node --check js/modules/tour.js && node --check js/modules/easterEggs.js && node --check js/modules/pwa.js && node --check js/modules/ui.js && node --check sw.js"
+  },
+  "keywords": [
+    "academic-planner",
+    "student-workspace",
+    "gpa-calculator",
+    "pomodoro-timer",
+    "gemini-ai",
+    "pwa"
+  ],
+  "author": "DueVinci Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  }
+}

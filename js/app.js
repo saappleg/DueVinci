@@ -1,0 +1,223 @@
+// --- DUEVINCI APPLICATION ENTRY POINT ---
+
+import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/config.js';
+import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm } from './modules/utils.js';
+import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
+import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
+import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager } from './modules/timers.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment } from './modules/courses.js';
+import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
+import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
+import { generateQuizQuestions, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard } from './modules/flashcards.js';
+import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
+import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
+import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
+import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
+import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
+
+// Re-export for external and test suite imports
+export {
+    supabaseClient,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    currentUser,
+    checkUser,
+    handleAuth,
+    showAuthMessage,
+    signInWithEmail,
+    signUpWithEmail,
+    logout,
+    signInWithPasskey,
+    registerPasskey,
+    getCurrentPageName,
+    smartParseDate,
+    parseInputDate,
+    fireConfetti,
+    recordStudyActivity,
+    playTimerAlarm,
+    calculateStudyStreak,
+    calculateDaysRemaining,
+    getWorkloadIntensity,
+    calculateCumulativeGpa,
+    renderAcademicsDashboardWidget,
+    injectAcademicsSettingsToggle,
+    toggleAcademicsVisibility,
+    createTimerState,
+    stepTimerState,
+    formatTimerTime,
+    activeTimers,
+    addNewTimer,
+    deleteTimer,
+    toggleMultiTimerRun,
+    initMultiTimersUI,
+    renderTimersManager,
+    localCourses,
+    loadDashboardStats,
+    loadCoursesPage,
+    renderTermFolders,
+    renderAlphabeticals,
+    openCourseModal,
+    closeCourseModal,
+    openTermModal,
+    closeTermModal,
+    loadAssignments,
+    toggleAssignment,
+    isSimulatingGrades,
+    simulatedGradesMap,
+    loadGradesPage,
+    toggleGradeSimulator,
+    resetGradeSimulation,
+    simulateAssignmentGrade,
+    updateAssignmentGrade,
+    toggleExcludeGpa,
+    calendarInstance,
+    generateICSString,
+    initCalendar,
+    loadCalendarCourses,
+    exportToICS,
+    openEventModal,
+    closeEventModal,
+    deleteCustomEvent,
+    generateQuizQuestions,
+    generateStudyDeck,
+    renderFlashcardView,
+    flipCurrentCard,
+    nextFlashcard,
+    prevFlashcard,
+    buildBackupPayload,
+    validateBackupPayload,
+    exportUserDataJSON,
+    importUserDataJSON,
+    startWalkthrough,
+    updateTourButtonVisibility,
+    replayTourFromSettings,
+    openWhatsNewModal,
+    closeWhatsNewModal,
+    checkWhatsNewOnLaunch,
+    toggleCommandPalette,
+    filterCommandPalette,
+    executeCmd,
+    triggerMaestroRain,
+    triggerNightOwlFlight,
+    triggerKonamiEasterEgg,
+    triggerPWAInstall,
+    dismissPWABanner,
+    initPWA,
+    changeTheme,
+    toggleGreekTheme,
+    updateDateFormat,
+    toggleMuteAlarm,
+    updateGpaScale,
+    toggleSidebar,
+    openSettingsModal,
+    closeSettingsModal,
+    switchSettingsTab,
+    openSupportModal,
+    closeSupportModal,
+    switchSupportTab,
+    submitSupportMessage,
+    sendDirectMailto,
+    confirmAccountDeletion
+};
+
+// Bind everything to window / globalThis for HTML inline handlers & Vitest
+const _rootScope = typeof window !== 'undefined' ? window : globalThis;
+_rootScope.supabaseClient = supabaseClient;
+_rootScope.checkUser = checkUser;
+_rootScope.handleAuth = handleAuth;
+_rootScope.signInWithEmail = signInWithEmail;
+_rootScope.signUpWithEmail = signUpWithEmail;
+_rootScope.logout = logout;
+_rootScope.signOut = logout;
+_rootScope.signInWithPasskey = signInWithPasskey;
+_rootScope.registerPasskey = registerPasskey;
+_rootScope.getCurrentPageName = getCurrentPageName;
+_rootScope.smartParseDate = smartParseDate;
+_rootScope.parseInputDate = parseInputDate;
+_rootScope.fireConfetti = fireConfetti;
+_rootScope.recordStudyActivity = recordStudyActivity;
+_rootScope.playTimerAlarm = playTimerAlarm;
+_rootScope.calculateStudyStreak = calculateStudyStreak;
+_rootScope.calculateDaysRemaining = calculateDaysRemaining;
+_rootScope.getWorkloadIntensity = getWorkloadIntensity;
+_rootScope.calculateCumulativeGpa = calculateCumulativeGpa;
+_rootScope.renderAcademicsDashboardWidget = renderAcademicsDashboardWidget;
+_rootScope.injectAcademicsSettingsToggle = injectAcademicsSettingsToggle;
+_rootScope.toggleAcademicsVisibility = toggleAcademicsVisibility;
+_rootScope.createTimerState = createTimerState;
+_rootScope.stepTimerState = stepTimerState;
+_rootScope.formatTimerTime = formatTimerTime;
+_rootScope.loadDashboardStats = loadDashboardStats;
+_rootScope.loadCoursesPage = loadCoursesPage;
+_rootScope.renderTermFolders = renderTermFolders;
+_rootScope.renderAlphabeticals = renderAlphabeticals;
+_rootScope.openCourseModal = openCourseModal;
+_rootScope.closeCourseModal = closeCourseModal;
+_rootScope.openTermModal = openTermModal;
+_rootScope.closeTermModal = closeTermModal;
+_rootScope.loadAssignments = loadAssignments;
+_rootScope.toggleAssignment = toggleAssignment;
+_rootScope.loadGradesPage = loadGradesPage;
+_rootScope.toggleGradeSimulator = toggleGradeSimulator;
+_rootScope.resetGradeSimulation = resetGradeSimulation;
+_rootScope.simulateAssignmentGrade = simulateAssignmentGrade;
+_rootScope.updateAssignmentGrade = updateAssignmentGrade;
+_rootScope.toggleExcludeGpa = toggleExcludeGpa;
+_rootScope.generateICSString = generateICSString;
+_rootScope.initCalendar = initCalendar;
+_rootScope.loadCalendarCourses = loadCalendarCourses;
+_rootScope.exportToICS = exportToICS;
+_rootScope.openEventModal = openEventModal;
+_rootScope.closeEventModal = closeEventModal;
+_rootScope.deleteCustomEvent = deleteCustomEvent;
+_rootScope.generateQuizQuestions = generateQuizQuestions;
+_rootScope.generateStudyDeck = generateStudyDeck;
+_rootScope.renderFlashcardView = renderFlashcardView;
+_rootScope.flipCurrentCard = flipCurrentCard;
+_rootScope.nextFlashcard = nextFlashcard;
+_rootScope.prevFlashcard = prevFlashcard;
+_rootScope.buildBackupPayload = buildBackupPayload;
+_rootScope.validateBackupPayload = validateBackupPayload;
+_rootScope.exportUserDataJSON = exportUserDataJSON;
+_rootScope.importUserDataJSON = importUserDataJSON;
+_rootScope.startWalkthrough = startWalkthrough;
+_rootScope.updateTourButtonVisibility = updateTourButtonVisibility;
+_rootScope.replayTourFromSettings = replayTourFromSettings;
+_rootScope.openWhatsNewModal = openWhatsNewModal;
+_rootScope.closeWhatsNewModal = closeWhatsNewModal;
+_rootScope.checkWhatsNewOnLaunch = checkWhatsNewOnLaunch;
+_rootScope.toggleCommandPalette = toggleCommandPalette;
+_rootScope.filterCommandPalette = filterCommandPalette;
+_rootScope.executeCmd = executeCmd;
+_rootScope.triggerMaestroRain = triggerMaestroRain;
+_rootScope.triggerNightOwlFlight = triggerNightOwlFlight;
+_rootScope.triggerKonamiEasterEgg = triggerKonamiEasterEgg;
+_rootScope.triggerPWAInstall = triggerPWAInstall;
+_rootScope.dismissPWABanner = dismissPWABanner;
+_rootScope.changeTheme = changeTheme;
+_rootScope.toggleGreekTheme = toggleGreekTheme;
+_rootScope.updateDateFormat = updateDateFormat;
+_rootScope.toggleMuteAlarm = toggleMuteAlarm;
+_rootScope.updateGpaScale = updateGpaScale;
+_rootScope.toggleSidebar = toggleSidebar;
+_rootScope.openSettingsModal = openSettingsModal;
+_rootScope.closeSettingsModal = closeSettingsModal;
+_rootScope.switchSettingsTab = switchSettingsTab;
+_rootScope.openSupportModal = openSupportModal;
+_rootScope.closeSupportModal = closeSupportModal;
+_rootScope.switchSupportTab = switchSupportTab;
+_rootScope.submitSupportMessage = submitSupportMessage;
+_rootScope.sendDirectMailto = sendDirectMailto;
+_rootScope.confirmAccountDeletion = confirmAccountDeletion;
+
+// Bootstrap application on page load
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            checkWhatsNewOnLaunch();
+            updateTourButtonVisibility();
+        }, 400);
+    });
+
+    checkUser();
+}

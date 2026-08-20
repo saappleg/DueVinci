@@ -1,5 +1,5 @@
 // DueVinci Service Worker - Offline Caching
-const CACHE_NAME = 'duevinci-v2.0';
+const CACHE_NAME = 'duevinci-v3.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,12 +8,29 @@ const ASSETS_TO_CACHE = [
   './calendar.html',
   './privacy.html',
   './terms.html',
-  './app.js',
-  './timers.js',
-  './academics.js',
+  './assets/css/greek-theme.css',
   './manifest.json',
-  './maestro-logo.svg',
-  './maestro-logo.png'
+  './assets/images/maestro-logo.svg',
+  './assets/images/maestro-logo.png',
+  './assets/images/wgu-owl.png',
+  './assets/icons/icon-192x192.png',
+  './assets/icons/icon-512x512.png',
+  './assets/icons/favicon.ico',
+  './js/app.js',
+  './js/modules/config.js',
+  './js/modules/utils.js',
+  './js/modules/auth.js',
+  './js/modules/academics.js',
+  './js/modules/timers.js',
+  './js/modules/courses.js',
+  './js/modules/grades.js',
+  './js/modules/calendar.js',
+  './js/modules/flashcards.js',
+  './js/modules/backup.js',
+  './js/modules/tour.js',
+  './js/modules/easterEggs.js',
+  './js/modules/pwa.js',
+  './js/modules/ui.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -39,14 +56,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle http/https requests
   if (!event.request.url.startsWith('http')) return;
-  
-  // Network first, falling back to cache
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone and store in cache if valid GET request
         if (event.request.method === 'GET' && response.status === 200 && response.type === 'basic') {
           const resClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
