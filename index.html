@@ -177,19 +177,6 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <!-- Register Passkey button (only visible when WebAuthn is supported) -->
-                    <button
-                        id="registerPasskeyBtn"
-                        type="button"
-                        onclick="registerPasskey()"
-                        title="Register a passkey for passwordless sign-in"
-                        class="hidden items-center gap-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition border border-indigo-200 dark:border-indigo-700"
-                    >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                        </svg>
-                        <span class="hidden sm:inline">🔑 Register Passkey</span>
-                    </button>
                     <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
                         <span class="hidden sm:inline">Sign out</span>

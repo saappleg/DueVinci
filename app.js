@@ -606,13 +606,109 @@ window.registerPasskey = async () => {
         const { data, error } = await supabaseClient.auth.registerPasskey();
         if (error) throw error;
         const name = data?.friendly_name ? ` (${data.friendly_name})` : '';
-        alert(`✅ Passkey registered successfully${name}!\nNext time you can sign in without a password.`);
+        // Refresh the list in settings after successful registration
+        await window.loadPasskeyList();
+        // Mark that a passkey has been set so the toast won't show again
+        localStorage.setItem('passkeyToastDismissed', 'true');
+        // Show success inside the passkey list area
+        const listEl = document.getElementById('passkeyList');
+        if (listEl) {
+            const flash = document.createElement('p');
+            flash.className = 'text-green-600 dark:text-green-400 font-semibold not-italic';
+            flash.textContent = `✅ Passkey registered${name}!`;
+            listEl.prepend(flash);
+            setTimeout(() => flash.remove(), 4000);
+        }
     } catch (err) {
         const msg = err?.message || 'Passkey registration failed.';
-        if (!msg.includes('cancel')) alert(`❌ ${msg}`);
+        if (!msg.toLowerCase().includes('cancel')) alert(`❌ ${msg}`);
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '🔑 Register Passkey'; }
+        if (btn) { btn.disabled = false; btn.textContent = '+ Add Passkey'; }
     }
+};
+
+// --- LOAD PASSKEY LIST into Settings panel ---
+window.loadPasskeyList = async () => {
+    const listEl = document.getElementById('passkeyList');
+    if (!listEl) return;
+    if (!window.PublicKeyCredential) {
+        listEl.textContent = 'Passkeys are not supported by this browser.';
+        return;
+    }
+    try {
+        const { data: passkeys, error } = await supabaseClient.auth.passkey.list();
+        if (error) throw error;
+        if (!passkeys || passkeys.length === 0) {
+            listEl.innerHTML = '<span>No passkeys registered yet.</span>';
+            return;
+        }
+        listEl.innerHTML = passkeys.map(pk => {
+            const label = pk.friendly_name || 'Unnamed passkey';
+            const date = pk.created_at ? new Date(pk.created_at).toLocaleDateString() : '';
+            return `<div class="flex items-center justify-between gap-2 py-1.5 border-b border-zinc-100 dark:border-brand-700/60 last:border-0 not-italic">
+                <div>
+                    <span class="text-zinc-700 dark:text-zinc-300 font-medium not-italic">${label}</span>
+                    ${date ? `<span class="ml-2 text-zinc-400 text-[11px]">Added ${date}</span>` : ''}
+                </div>
+                <button onclick="window.deletePasskey('${pk.id}')" class="text-red-400 hover:text-red-600 dark:hover:text-red-300 text-[11px] font-bold transition" title="Remove this passkey">Remove</button>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        listEl.textContent = 'Could not load passkeys.';
+    }
+};
+
+// --- DELETE A PASSKEY ---
+window.deletePasskey = async (passkeyId) => {
+    if (!confirm('Remove this passkey? You can always add a new one.')) return;
+    try {
+        const { error } = await supabaseClient.auth.passkey.delete({ passkeyId });
+        if (error) throw error;
+        await window.loadPasskeyList();
+    } catch (err) {
+        alert(`❌ ${err?.message || 'Could not remove passkey.'}`);
+    }
+};
+
+// --- ONE-TIME PASSKEY TOAST ---
+// Fires once per browser session after sign-in if WebAuthn is available and
+// the user has never dismissed the tip. Clicking it opens Settings > Profile.
+window.showPasskeyToastIfNeeded = async () => {
+    if (!window.PublicKeyCredential) return;
+    if (localStorage.getItem('passkeyToastDismissed')) return;
+
+    // Check if user already has passkeys registered; if so, suppress the toast.
+    try {
+        const { data: passkeys } = await supabaseClient.auth.passkey.list();
+        if (passkeys && passkeys.length > 0) {
+            localStorage.setItem('passkeyToastDismissed', 'true');
+            return;
+        }
+    } catch (_) { /* non-fatal */ }
+
+    // Build the toast
+    const toast = document.createElement('div');
+    toast.id = 'passkeyToast';
+    toast.className = [
+        'fixed bottom-6 right-6 z-[9999]',
+        'flex items-start gap-3 max-w-sm',
+        'bg-white dark:bg-brand-800',
+        'border border-indigo-200 dark:border-indigo-700',
+        'rounded-2xl shadow-2xl p-4',
+        'animate-in slide-in-from-bottom-4 duration-300'
+    ].join(' ');
+    toast.innerHTML = `
+        <div class="text-2xl leading-none mt-0.5">🔑</div>
+        <div class="flex-1">
+            <p class="font-bold text-sm text-zinc-900 dark:text-white">Passkeys available!</p>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Sign in faster with Face ID or Touch ID. Set one up in Settings.</p>
+            <button onclick="window.openSettingsModal(); document.getElementById('passkeyToast')?.remove();" class="mt-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Open Settings →</button>
+        </div>
+        <button onclick="localStorage.setItem('passkeyToastDismissed','true'); document.getElementById('passkeyToast')?.remove();" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg leading-none ml-1 transition" title="Dismiss">✕</button>
+    `;
+    document.body.appendChild(toast);
+    // Auto-dismiss after 12 seconds
+    setTimeout(() => toast.remove(), 12000);
 };
 
 
@@ -858,6 +954,20 @@ window.ensureSettingsModalExists = () => {
                             <button type="button" onclick="replayTourFromSettings()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">Replay Tour 🎓</button>
                         </div>
 
+                        <!-- Passkeys / WebAuthn -->
+                        <div id="settingsPasskeySection" class="pt-4 border-t border-zinc-200 dark:border-brand-700 space-y-3">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <div class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        🔑 Passkeys
+                                    </div>
+                                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Sign in with Face ID, Touch ID, or a security key — no password needed.</div>
+                                </div>
+                                <button type="button" id="registerPasskeyBtn" onclick="registerPasskey()" class="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap">+ Add Passkey</button>
+                            </div>
+                            <div id="passkeyList" class="text-xs text-zinc-400 dark:text-zinc-500 italic">Loading passkeys…</div>
+                        </div>
+
                         <!-- Danger Zone: Self-Service Deletion -->
                         <div class="pt-6 border-t border-red-200 dark:border-red-900/50 space-y-3">
                             <div class="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold text-sm">
@@ -1004,6 +1114,15 @@ window.openSettingsModal = () => {
 
     const modal = document.getElementById('settingsModal');
     if (modal) modal.classList.remove('hidden');
+
+    // Refresh passkey list whenever Settings is opened
+    if (window.PublicKeyCredential) {
+        window.loadPasskeyList();
+    } else {
+        // Hide the passkey section entirely on unsupported browsers
+        const pkSection = document.getElementById('settingsPasskeySection');
+        if (pkSection) pkSection.style.display = 'none';
+    }
 };
 
 window.closeSettingsModal = () => {
@@ -2864,16 +2983,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Show/hide the "Register Passkey" button when auth state changes.
+// Show the one-time passkey toast after sign-in.
 supabaseClient.auth.onAuthStateChange((event, session) => {
-    const registerBtn = document.getElementById('registerPasskeyBtn');
-    if (!registerBtn) return;
-    if (session && window.PublicKeyCredential) {
-        registerBtn.classList.remove('hidden');
-        registerBtn.classList.add('flex');
-    } else {
-        registerBtn.classList.add('hidden');
-        registerBtn.classList.remove('flex');
+    if (event === 'SIGNED_IN' && session) {
+        // Slight delay so the app screen is rendered first
+        setTimeout(() => window.showPasskeyToastIfNeeded?.(), 1500);
     }
 });
 
