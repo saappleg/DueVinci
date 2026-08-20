@@ -5,10 +5,14 @@ import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recor
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
-import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment } from './modules/courses.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateScratchpadPreview } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
-import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard } from './modules/flashcards.js';
+import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery } from './modules/flashcards.js';
+import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
+import { generateBalancedStudyPlan, renderStudyPlanDashboardWidget } from './modules/studyPlan.js';
+import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
+import { DueVinciSidebar } from './modules/components.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
@@ -74,6 +78,7 @@ export {
     closeTermModal,
     loadAssignments,
     toggleAssignment,
+    updateScratchpadPreview,
     isSimulatingGrades,
     simulatedGradesMap,
     loadGradesPage,
@@ -97,6 +102,20 @@ export {
     flipCurrentCard,
     nextFlashcard,
     prevFlashcard,
+    calculateSM2Repetition,
+    rateFlashcardSM2,
+    getSavedDeckMastery,
+    saveCardMastery,
+    formatMathFormula,
+    renderMarkdownToHtml,
+    generateBalancedStudyPlan,
+    renderStudyPlanDashboardWidget,
+    getOfflineDb,
+    cacheDataLocally,
+    getLocalCachedData,
+    queueOfflineMutation,
+    initNetworkStatusListeners,
+    DueVinciSidebar,
     buildBackupPayload,
     validateBackupPayload,
     exportUserDataJSON,
@@ -187,6 +206,7 @@ _rootScope.openTermModal = openTermModal;
 _rootScope.closeTermModal = closeTermModal;
 _rootScope.loadAssignments = loadAssignments;
 _rootScope.toggleAssignment = toggleAssignment;
+_rootScope.updateScratchpadPreview = updateScratchpadPreview;
 _rootScope.loadGradesPage = loadGradesPage;
 _rootScope.toggleGradeSimulator = toggleGradeSimulator;
 _rootScope.resetGradeSimulation = resetGradeSimulation;
@@ -207,6 +227,19 @@ _rootScope.renderFlashcardView = renderFlashcardView;
 _rootScope.flipCurrentCard = flipCurrentCard;
 _rootScope.nextFlashcard = nextFlashcard;
 _rootScope.prevFlashcard = prevFlashcard;
+_rootScope.calculateSM2Repetition = calculateSM2Repetition;
+_rootScope.rateFlashcardSM2 = rateFlashcardSM2;
+_rootScope.getSavedDeckMastery = getSavedDeckMastery;
+_rootScope.saveCardMastery = saveCardMastery;
+_rootScope.formatMathFormula = formatMathFormula;
+_rootScope.renderMarkdownToHtml = renderMarkdownToHtml;
+_rootScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
+_rootScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
+_rootScope.getOfflineDb = getOfflineDb;
+_rootScope.cacheDataLocally = cacheDataLocally;
+_rootScope.getLocalCachedData = getLocalCachedData;
+_rootScope.queueOfflineMutation = queueOfflineMutation;
+_rootScope.initNetworkStatusListeners = initNetworkStatusListeners;
 _rootScope.buildBackupPayload = buildBackupPayload;
 _rootScope.validateBackupPayload = validateBackupPayload;
 _rootScope.exportUserDataJSON = exportUserDataJSON;
@@ -247,6 +280,14 @@ if (typeof document !== 'undefined') {
         applyTimerCollapse();
         updateTimerDisplay();
         initMultiTimersUI();
+        initNetworkStatusListeners();
+
+        // Render Study Plan widget on Dashboard
+        const currentPage = getCurrentPageName();
+        if (currentPage === 'index' || currentPage === 'index.html' || currentPage === '') {
+            renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+        }
+
         setTimeout(() => {
             checkWhatsNewOnLaunch();
             updateTourButtonVisibility();

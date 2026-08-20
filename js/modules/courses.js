@@ -458,8 +458,27 @@ export function renderStaticCoursePanels(course) {
     const scratchPanel = document.getElementById('panel-scratchpad');
     if (scratchPanel) {
         scratchPanel.innerHTML = `
-            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-2">📝 Course Scratchpad & Notes</h3>
-            <textarea oninput="saveCourseScratchpad('${course.id}', this.value)" rows="10" placeholder="Jot down quick lecture notes, formulas, or study reminders..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed">${course.scratchpad || ''}</textarea>
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">📝 Course Scratchpad & Study Notes</h3>
+                <div class="flex gap-2">
+                    <button type="button" onclick="switchCourseTab('studyquiz'); generateStudyDeck('${course.id}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition shadow-sm">
+                        ⚡ Generate Test from Notes
+                    </button>
+                </div>
+            </div>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2">Supports Markdown headings, bullet points, code blocks, and math formulas like <code>$E = mc^2$</code> or <code>$$\\Delta x$$</code>.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Editor</div>
+                    <textarea id="scratchpadTextarea_${course.id}" oninput="saveCourseScratchpad('${course.id}', this.value); updateScratchpadPreview('${course.id}', this.value)" rows="10" placeholder="Type lecture notes, definitions (e.g. Term: definition), or formulas ($E=mc^2$)..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono">${course.scratchpad || ''}</textarea>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Live Markdown & Math Preview</div>
+                    <div id="scratchpadPreview_${course.id}" class="w-full h-[180px] sm:h-[190px] overflow-y-auto text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-700 bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                        ${window.renderMarkdownToHtml ? window.renderMarkdownToHtml(course.scratchpad || '*No notes yet. Type on the left to see live formatted math & markdown preview.*') : (course.scratchpad || 'No notes yet.')}
+                    </div>
+                </div>
+            </div>
         `;
     }
 }
@@ -498,6 +517,13 @@ export async function saveCourseScratchpad(courseId, val) {
     const course = localCourses.find(c => c.id === courseId);
     if (course) course.scratchpad = val;
     await supabaseClient.from('courses').update({ scratchpad: val }).eq('id', courseId);
+}
+
+export function updateScratchpadPreview(courseId, val) {
+    const previewEl = document.getElementById(`scratchpadPreview_${courseId}`);
+    if (previewEl && window.renderMarkdownToHtml) {
+        previewEl.innerHTML = renderMarkdownToHtml(val || '*No notes yet.*');
+    }
 }
 
 export async function parseSyllabusPDF() {
@@ -881,6 +907,7 @@ if (typeof window !== 'undefined') {
     window.addCourseResourceLink = addCourseResourceLink;
     window.removeCourseResourceLink = removeCourseResourceLink;
     window.saveCourseScratchpad = saveCourseScratchpad;
+    window.updateScratchpadPreview = updateScratchpadPreview;
     window.parseSyllabusPDF = parseSyllabusPDF;
     window.parseLessonsImage = parseLessonsImage;
     window.deleteCurrentCourse = deleteCurrentCourse;

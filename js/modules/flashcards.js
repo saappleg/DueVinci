@@ -1,6 +1,7 @@
-// --- AI FLASHCARDS & STUDENT NOTES PRACTICE QUIZ MODULE ---
+// --- AI FLASHCARDS, STUDENT NOTES QUIZ & SM-2 SPACED REPETITION ENGINE ---
 import { supabaseClient } from './config.js';
 import { fireConfetti } from './utils.js';
+import { renderMarkdownToHtml } from './markdown.js';
 
 export let currentDeckCards = [];
 export let currentCardIndex = 0;
@@ -12,12 +13,55 @@ export let currentStudyMode = 'flashcards'; // 'flashcards' | 'quiz'
 export let currentDeckCourseId = null;
 
 /**
+ * SuperMemo SM-2 Spaced Repetition Algorithm.
+ * @param {Object} card Card state { repetitions, interval, easinessFactor, nextReviewDate }
+ * @param {number} quality Grade from 0 (blackout) to 5 (perfect recall). 3=Hard, 4=Good, 5=Easy.
+ * @returns {Object} Updated card state
+ */
+export function calculateSM2Repetition(card = {}, quality = 4) {
+    const q = Math.max(0, Math.min(5, quality));
+    let repetitions = card.repetitions || 0;
+    let interval = card.interval || 1;
+    let ef = card.easinessFactor !== undefined ? card.easinessFactor : 2.5;
+
+    // Calculate new easiness factor
+    ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+    if (ef < 1.3) ef = 1.3;
+
+    if (q < 3) {
+        // Failed recall: reset repetitions and start interval over
+        repetitions = 0;
+        interval = 1;
+    } else {
+        // Successful recall
+        if (repetitions === 0) {
+            interval = 1;
+        } else if (repetitions === 1) {
+            interval = 6;
+        } else {
+            interval = Math.round(interval * ef);
+        }
+        repetitions += 1;
+    }
+
+    const nextReviewDate = new Date(Date.now() + (interval * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+    return {
+        ...card,
+        repetitions,
+        interval,
+        easinessFactor: parseFloat(ef.toFixed(2)),
+        nextReviewDate,
+        lastReviewed: new Date().toISOString().split('T')[0]
+    };
+}
+
+/**
  * Extracts key concepts and terms from student submitted notes text.
  */
 export function extractConceptsFromNotes(notesText = '') {
     if (!notesText || typeof notesText !== 'string') return [];
 
-    // Split notes by lines, bullet points, semicolons, or numbered lists
     const lines = notesText
         .split(/\r?\n|•|\*|;|--+/)
         .map(l => l.replace(/^[\s\d.\-–—:>)\]]+/, '').trim())
@@ -25,7 +69,6 @@ export function extractConceptsFromNotes(notesText = '') {
 
     const concepts = [];
     for (const line of lines) {
-        // Look for definition patterns like "Term: definition" or "Term - definition" or "Term is/means definition"
         const colonMatch = line.match(/^([^:–—=-]{2,40})[:–—=-]\s*(.+)$/i);
         const isMatch = line.match(/^([^.?!]{2,35})\s+(?:is|means|refers to|represents|defined as)\s+(.+)$/i);
 
@@ -40,7 +83,6 @@ export function extractConceptsFromNotes(notesText = '') {
                 definition: isMatch[2].trim()
             });
         } else if (line.length > 15 && line.length < 220) {
-            // General notable sentence or fact
             const words = line.split(/\s+/);
             const keyTerm = words.slice(0, 3).join(' ');
             concepts.push({
@@ -107,7 +149,7 @@ export function generateQuizFromNotes(notesText, course = {}) {
 }
 
 /**
- * Generates multiple choice questions (supports course assignments, student notes, or defaults).
+ * Generates multiple choice questions.
  */
 export function generateQuizQuestions(course, assignments = [], notesText = '') {
     if (notesText && notesText.trim().length > 10) {
@@ -190,7 +232,37 @@ export function generateQuizQuestions(course, assignments = [], notesText = '') 
 }
 
 /**
- * Generates flashcards deck and practice quiz from student notes.
+ * Loads stored SM-2 flashcards mastery database from localStorage.
+ */
+export function getSavedDeckMastery(courseId) {
+    if (typeof localStorage === 'undefined' || !courseId) return {};
+    const key = `duevinci_flashcards_mastery_${courseId}`;
+    try {
+        return JSON.parse(localStorage.getItem(key)) || {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Persists updated SM-2 flashcard state to localStorage.
+ */
+export function saveCardMastery(courseId, cardId, updatedCard) {
+    if (typeof localStorage === 'undefined' || !courseId || !cardId) return;
+    const key = `duevinci_flashcards_mastery_${courseId}`;
+    const all = getSavedDeckMastery(courseId);
+    all[cardId] = {
+        repetitions: updatedCard.repetitions,
+        interval: updatedCard.interval,
+        easinessFactor: updatedCard.easinessFactor,
+        nextReviewDate: updatedCard.nextReviewDate,
+        lastReviewed: updatedCard.lastReviewed
+    };
+    localStorage.setItem(key, JSON.stringify(all));
+}
+
+/**
+ * Generates flashcards deck and practice quiz from student notes with SM-2 Spaced Repetition.
  */
 export async function generateStudyDeck(courseId, submittedNotes = null) {
     if (typeof document === 'undefined') return;
@@ -199,8 +271,8 @@ export async function generateStudyDeck(courseId, submittedNotes = null) {
     if (!course) return;
 
     currentDeckCourseId = courseId;
+    const savedMastery = getSavedDeckMastery(courseId);
 
-    // Use passed submitted notes, or get from course scratchpad, or query database
     let notes = submittedNotes !== null ? submittedNotes : (course.scratchpad || '');
     if (!notes && courseId) {
         try {
@@ -218,26 +290,29 @@ export async function generateStudyDeck(courseId, submittedNotes = null) {
     const deck = [];
 
     if (concepts.length > 0) {
-        concepts.forEach(c => {
+        concepts.forEach((c, idx) => {
+            const cardId = `c_${idx}_${c.term.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            const m = savedMastery[cardId] || { repetitions: 0, interval: 1, easinessFactor: 2.5 };
             deck.push({
+                id: cardId,
                 term: `${course.code}: ${c.term}`,
-                definition: c.definition
+                definition: c.definition,
+                ...m
             });
         });
     } else {
-        // Fallback when student has not yet entered notes
         deck.push(
             {
+                id: 'default_1',
                 term: `📝 Add Student Notes for ${course.code}`,
-                definition: `You haven't added lecture notes yet! Open the "Scratchpad" tab or paste notes in the box below to generate customized quizzes and flashcards directly from your class notes.`
+                definition: `You haven't added lecture notes yet! Open the "Scratchpad" tab or paste notes in the box below to generate customized quizzes and flashcards directly from your class notes with math ($E=mc^2$) and SM-2 Spaced Repetition.`,
+                repetitions: 0, interval: 1, easinessFactor: 2.5
             },
             {
-                term: `${course.code}: Core Fundamentals`,
-                definition: 'Key definitions, problem-solving techniques, and exam concepts recorded during lecture sessions.'
-            },
-            {
-                term: `${course.code}: Active Recall Strategy`,
-                definition: 'Testing yourself with note-derived practice questions improves long-term memory retention by up to 150% compared to passive reading.'
+                id: 'default_2',
+                term: `${course.code}: Active Recall & Spaced Repetition`,
+                definition: 'Testing yourself at optimal time intervals (SM-2 Algorithm) boosts retention up to 150% compared to passive re-reading.',
+                repetitions: 0, interval: 1, easinessFactor: 2.5
             }
         );
     }
@@ -262,22 +337,22 @@ export function renderStudyQuizContainer(course, notesText = '') {
             <!-- Mode Toggle Header -->
             <div class="flex items-center justify-between p-3 bg-zinc-100 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="switchStudyMode('flashcards')" id="modeBtn_flashcards" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${currentStudyMode === 'flashcards' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">🎴 Flashcards (${currentDeckCards.length})</button>
+                    <button type="button" onclick="switchStudyMode('flashcards')" id="modeBtn_flashcards" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${currentStudyMode === 'flashcards' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">🎴 Spaced Flashcards (${currentDeckCards.length})</button>
                     <button type="button" onclick="switchStudyMode('quiz')" id="modeBtn_quiz" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${currentStudyMode === 'quiz' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">📝 Practice Quiz (${currentQuizQuestions.length} Qs)</button>
                 </div>
-                <button type="button" onclick="toggleNotesInputSection()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
-                    ✍️ Edit / Submit Notes
+                <button type="button" onclick="toggleNotesInputSection()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1">
+                    ✍️ Notes & Formulas
                 </button>
             </div>
 
             <!-- Notes Quick Editor / Submitter (Collapsible) -->
             <div id="notesInputSection" class="hidden p-4 bg-indigo-50/50 dark:bg-brand-900/60 rounded-xl border border-indigo-200 dark:border-brand-700 space-y-2">
-                <label class="block text-xs font-bold text-zinc-800 dark:text-zinc-200">Submit Lecture & Study Notes for ${course?.code || 'Course'}</label>
-                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Paste your class notes, key definitions (e.g. <code>Term: definition</code>), formulas, or summaries to generate custom questions.</p>
-                <textarea id="studyNotesInput" rows="5" class="w-full text-xs p-3 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed" placeholder="e.g.&#10;Mitochondria: Powerhouse of the cell generating ATP via oxidative phosphorylation.&#10;Photosynthesis: Process by which plants convert light energy into chemical glucose.">${notesText || ''}</textarea>
+                <label class="block text-xs font-bold text-zinc-800 dark:text-zinc-200">Submit Lecture & Study Notes (Markdown & LaTeX Math Supported)</label>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Type notes, definitions (e.g. <code>Term: definition</code>), and math formulas (e.g. <code>$E = mc^2$</code> or <code>$$\\Delta x$$</code>).</p>
+                <textarea id="studyNotesInput" rows="5" class="w-full text-xs p-3 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono" placeholder="e.g.&#10;Mitochondria: Cellular powerhouse generating ATP via oxidative phosphorylation.&#10;Kinetic Energy: $KE = \\frac{1}{2}mv^2$ energy possessed by an object due to motion.">${notesText || ''}</textarea>
                 <div class="flex justify-end gap-2">
                     <button type="button" onclick="applySubmittedNotes()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm">
-                        ⚡ Generate Quizzes & Flashcards from Notes
+                        ⚡ Generate Spaced Decks & Quizzes
                     </button>
                 </div>
             </div>
@@ -318,29 +393,77 @@ export function switchStudyMode(mode) {
     renderStudyQuizContainer(course, course?.scratchpad || '');
 }
 
+export function rateFlashcardSM2(qualityRating) {
+    const card = currentDeckCards[currentCardIndex];
+    if (!card) return;
+
+    const updated = calculateSM2Repetition(card, qualityRating);
+    currentDeckCards[currentCardIndex] = updated;
+
+    if (currentDeckCourseId && card.id) {
+        saveCardMastery(currentDeckCourseId, card.id, updated);
+    }
+
+    if (qualityRating >= 4) {
+        fireConfetti();
+    }
+
+    nextFlashcard();
+}
+
 export function getFlashcardsHtml() {
     if (currentDeckCards.length === 0) return '<div class="p-6 text-center text-xs text-zinc-400">No flashcards available. Submit notes above to generate.</div>';
     const card = currentDeckCards[currentCardIndex];
+    const reps = card.repetitions || 0;
+    const interval = card.interval || 1;
+    const masteryBadge = reps === 0 ? '🌱 New' : (reps < 3 ? `⚡ Learning (${interval}d)` : `🏆 Mastered (${interval}d)`);
+
+    const rawContent = isCardFlipped ? card.definition : card.term;
+    const formattedContent = renderMarkdownToHtml(rawContent);
 
     return `
         <div class="space-y-4 text-center">
             <div class="flex justify-between items-center text-xs text-zinc-400 font-bold px-2">
+                <span class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">${masteryBadge}</span>
                 <span>Card ${currentCardIndex + 1} of ${currentDeckCards.length}</span>
                 <span class="text-indigo-500 font-medium">Click card to flip 🔄</span>
             </div>
-            <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[170px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.01]">
+
+            <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[180px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.01]">
                 <div class="text-[11px] uppercase tracking-wider font-extrabold ${isCardFlipped ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-400'} mb-2">
-                    ${isCardFlipped ? '💡 Note Meaning / Definition' : '📖 Term / Note Concept'}
+                    ${isCardFlipped ? '💡 Note Meaning & Concept' : '📖 Term / Note Concept'}
                 </div>
                 <div class="font-bold text-sm sm:text-base dark:text-white leading-relaxed max-w-md">
-                    ${isCardFlipped ? card.definition : card.term}
+                    ${formattedContent}
                 </div>
             </div>
-            <div class="flex justify-between gap-2">
-                <button type="button" onclick="prevFlashcard()" ${currentCardIndex === 0 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}>← Prev</button>
-                <button type="button" onclick="flipCurrentCard()" class="px-4 py-2 bg-indigo-50 dark:bg-brand-700/60 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold border border-indigo-200 dark:border-brand-600 transition">Flip 🔄</button>
-                <button type="button" onclick="nextFlashcard()" ${currentCardIndex === currentDeckCards.length - 1 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"'}>Next →</button>
-            </div>
+
+            ${isCardFlipped ? `
+                <!-- SM-2 Spaced Repetition Response Rating Buttons -->
+                <div class="p-3 bg-zinc-100 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-1.5">
+                    <div class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Rate Recall for Spaced Scheduling (SM-2):</div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" onclick="rateFlashcardSM2(1)" class="p-2 bg-red-100 hover:bg-red-200 dark:bg-red-950/60 dark:hover:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-xs font-bold transition">
+                            ❌ Again<br/><span class="text-[10px] opacity-75">1 day</span>
+                        </button>
+                        <button type="button" onclick="rateFlashcardSM2(3)" class="p-2 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold transition">
+                            ⚠️ Hard<br/><span class="text-[10px] opacity-75">${Math.max(1, Math.round(interval * 1.2))}d</span>
+                        </button>
+                        <button type="button" onclick="rateFlashcardSM2(4)" class="p-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold transition">
+                            👍 Good<br/><span class="text-[10px] opacity-75">${Math.max(6, Math.round(interval * (card.easinessFactor || 2.5)))}d</span>
+                        </button>
+                        <button type="button" onclick="rateFlashcardSM2(5)" class="p-2 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold transition">
+                            ⭐ Easy<br/><span class="text-[10px] opacity-75">${Math.max(8, Math.round(interval * (card.easinessFactor || 2.5) * 1.3))}d</span>
+                        </button>
+                    </div>
+                </div>
+            ` : `
+                <div class="flex justify-between gap-2">
+                    <button type="button" onclick="prevFlashcard()" ${currentCardIndex === 0 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}>← Prev</button>
+                    <button type="button" onclick="flipCurrentCard()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">Flip Card 🔄</button>
+                    <button type="button" onclick="nextFlashcard()" ${currentCardIndex === currentDeckCards.length - 1 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}>Next →</button>
+                </div>
+            `}
         </div>
     `;
 }
@@ -353,19 +476,19 @@ export function getQuizHtml() {
         <div class="space-y-4">
             <div class="flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400 font-bold px-1">
                 <span>Question ${currentQuizIndex + 1} of ${currentQuizQuestions.length}</span>
-                <span class="text-indigo-600 dark:text-indigo-400">Score: ${quizScore} / ${currentQuizIndex}</span>
+                <span class="text-indigo-600 dark:text-indigo-400 font-bold">Score: ${quizScore} / ${currentQuizIndex}</span>
             </div>
 
             <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
                 <div class="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1.5">Note Topic: ${q.topic}</div>
-                <h4 class="font-bold text-sm text-zinc-900 dark:text-white leading-relaxed">${q.question}</h4>
+                <h4 class="font-bold text-sm text-zinc-900 dark:text-white leading-relaxed">${renderMarkdownToHtml(q.question)}</h4>
             </div>
 
             <div class="space-y-2" id="quizOptionsList">
                 ${q.options.map((opt, oIdx) => `
                     <button type="button" onclick="submitQuizAnswer(${oIdx})" class="w-full text-left p-3.5 rounded-xl border border-zinc-200 dark:border-brand-700 bg-white dark:bg-brand-800 hover:border-indigo-500 dark:hover:border-indigo-400 transition text-xs flex items-start gap-3">
                         <span class="w-6 h-6 rounded-full bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 font-bold flex items-center justify-center shrink-0 text-[11px]">${String.fromCharCode(65 + oIdx)}</span>
-                        <span class="text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed">${opt}</span>
+                        <span class="text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed">${renderMarkdownToHtml(opt)}</span>
                     </button>
                 `).join('')}
             </div>
@@ -401,13 +524,13 @@ export function submitQuizAnswer(selectedIdx) {
         fireConfetti();
         if (feedbackBox) {
             feedbackBox.className = "p-3 rounded-xl text-xs bg-green-50 text-green-800 dark:bg-green-950/50 dark:text-green-300 border border-green-200 dark:border-green-800";
-            feedbackBox.innerHTML = `<strong>✔ Correct!</strong> ${q.explanation}`;
+            feedbackBox.innerHTML = `<strong>✔ Correct!</strong> ${renderMarkdownToHtml(q.explanation)}`;
             feedbackBox.classList.remove('hidden');
         }
     } else {
         if (feedbackBox) {
             feedbackBox.className = "p-3 rounded-xl text-xs bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800";
-            feedbackBox.innerHTML = `<strong>Note Concept:</strong> ${q.explanation}`;
+            feedbackBox.innerHTML = `<strong>Note Concept:</strong> ${renderMarkdownToHtml(q.explanation)}`;
             feedbackBox.classList.remove('hidden');
         }
     }
@@ -460,6 +583,8 @@ export function prevFlashcard() {
 
 // Bind to window & globalThis
 const _scope = typeof window !== 'undefined' ? window : globalThis;
+_scope.calculateSM2Repetition = calculateSM2Repetition;
+_scope.rateFlashcardSM2 = rateFlashcardSM2;
 _scope.extractConceptsFromNotes = extractConceptsFromNotes;
 _scope.generateQuizFromNotes = generateQuizFromNotes;
 _scope.generateQuizQuestions = generateQuizQuestions;
