@@ -4,7 +4,7 @@ import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/confi
 import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm } from './modules/utils.js';
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
-import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
+import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
 import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
@@ -48,6 +48,7 @@ export {
     activeTimers,
     addNewTimer,
     deleteTimer,
+    resetMultiTimer,
     toggleMultiTimerRun,
     initMultiTimersUI,
     renderTimersManager,
@@ -57,6 +58,7 @@ export {
     toggleTimerSettings,
     saveTimerSettings,
     toggleTimerCollapse,
+    toggleCustomTimersSection,
     dismissFloatingTimer,
     updateTimerDisplay,
     updateFloatingTimer,
@@ -160,6 +162,7 @@ _rootScope.stepTimerState = stepTimerState;
 _rootScope.formatTimerTime = formatTimerTime;
 _rootScope.addNewTimer = addNewTimer;
 _rootScope.deleteTimer = deleteTimer;
+_rootScope.resetMultiTimer = resetMultiTimer;
 _rootScope.toggleMultiTimerRun = toggleMultiTimerRun;
 _rootScope.initMultiTimersUI = initMultiTimersUI;
 _rootScope.renderTimersManager = renderTimersManager;
@@ -169,6 +172,7 @@ _rootScope.skipTimer = skipTimer;
 _rootScope.toggleTimerSettings = toggleTimerSettings;
 _rootScope.saveTimerSettings = saveTimerSettings;
 _rootScope.toggleTimerCollapse = toggleTimerCollapse;
+_rootScope.toggleCustomTimersSection = toggleCustomTimersSection;
 _rootScope.dismissFloatingTimer = dismissFloatingTimer;
 _rootScope.updateTimerDisplay = updateTimerDisplay;
 _rootScope.updateFloatingTimer = updateFloatingTimer;
@@ -242,6 +246,7 @@ if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         applyTimerCollapse();
         updateTimerDisplay();
+        initMultiTimersUI();
         setTimeout(() => {
             checkWhatsNewOnLaunch();
             updateTourButtonVisibility();

@@ -11,6 +11,7 @@ export let timerEndTime = (typeof localStorage !== 'undefined' && parseInt(local
 export let timerRunning = typeof localStorage !== 'undefined' ? (localStorage.getItem('timerRunning') === 'true') : false;
 export let timeLeft = (typeof localStorage !== 'undefined' && parseInt(localStorage.getItem('timeLeft'))) || (focusMinutes * 60);
 export let timerCollapsed = typeof localStorage !== 'undefined' ? (localStorage.getItem('timerCollapsed') === 'true') : false;
+export let customTimersExpanded = typeof localStorage !== 'undefined' ? (localStorage.getItem('customTimersExpanded') === 'true') : true;
 export let floatingTimerDismissed = false;
 
 // Sync active state from timestamp on script load
@@ -43,8 +44,9 @@ export function updateFloatingTimer() {
     let floatWidget = document.getElementById('floatingTimerWidget');
     const aside = document.querySelector('aside');
     const sidebarHidden = aside ? aside.classList.contains('hidden') : false;
+    const runningCustomTimers = activeTimers.filter(t => t.running);
 
-    const shouldFloat = timerRunning && !floatingTimerDismissed && (timerCollapsed || sidebarHidden);
+    const shouldFloat = (timerRunning || runningCustomTimers.length > 0) && !floatingTimerDismissed && (timerCollapsed || sidebarHidden);
 
     if (!shouldFloat) {
         if (floatWidget) floatWidget.classList.add('hidden');
@@ -62,6 +64,23 @@ export function updateFloatingTimer() {
     const min = Math.floor(timeLeft / 60);
     const sec = timeLeft % 60;
     const label = isWorking ? 'Focus Session' : 'Break Time';
+
+    let customHtml = '';
+    if (runningCustomTimers.length > 0) {
+        customHtml = `
+            <div class="mt-2 pt-2 border-t border-zinc-700 space-y-1.5 max-h-32 overflow-y-auto">
+                <div class="text-[10px] uppercase font-bold text-zinc-400">Custom Timers (${runningCustomTimers.length})</div>
+                ${runningCustomTimers.map(t => `
+                    <div class="flex justify-between items-center bg-zinc-800/90 px-2 py-1 rounded text-xs">
+                        <span class="font-bold truncate max-w-[100px]">${t.name}</span>
+                        <span class="font-mono text-indigo-300 font-bold">${formatTimerTime(t.timeLeft)}</span>
+                        <button onclick="toggleMultiTimerRun('${t.id}')" class="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold">⏸</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     floatWidget.innerHTML = `
         <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
             <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
@@ -69,8 +88,9 @@ export function updateFloatingTimer() {
         </div>
         <div class="flex justify-between items-center">
             <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
-            <button onclick="toggleTimer()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs font-bold transition">⏸ Pause</button>
+            <button onclick="toggleTimer()" class="px-3 py-1.5 ${timerRunning ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-zinc-700 hover:bg-zinc-600'} rounded-lg text-white text-xs font-bold transition">${timerRunning ? '⏸ Pause' : '▶ Start'}</button>
         </div>
+        ${customHtml}
     `;
 }
 
@@ -187,8 +207,14 @@ export function toggleTimerCollapse() {
     updateFloatingTimer();
 }
 
+export function toggleCustomTimersSection() {
+    customTimersExpanded = !customTimersExpanded;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('customTimersExpanded', customTimersExpanded);
+    initMultiTimersUI();
+}
+
 // --- MULTI-TIMER STATE MACHINE ---
-export function createTimerState(id = 'default', name = 'Focus Session', focusMin = 25, breakMin = 5) {
+export function createTimerState(id = 'default', name = 'Deep Work', focusMin = 25, breakMin = 5) {
     return {
         id,
         name,
@@ -226,7 +252,8 @@ export function stepTimerState(state) {
 }
 
 export let activeTimers = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_timers'))) || [
-    createTimerState('default', 'Focus Session', 25, 5)
+    createTimerState('t_deep_work', 'Deep Work', 50, 10),
+    createTimerState('t_quick_review', 'Quick Review', 15, 3)
 ];
 
 export function saveTimersToStorage() {
@@ -245,7 +272,7 @@ export function saveTimersToStorage() {
 
 export function initMultiTimersUI() {
     if (typeof document === 'undefined') return;
-    renderFloatingTimerWidget();
+    updateFloatingTimer();
 
     let container = document.getElementById('timersManagerContainer');
     if (!container) {
@@ -253,7 +280,7 @@ export function initMultiTimersUI() {
         if (sidebarTimerContent) {
             container = document.createElement('div');
             container.id = 'timersManagerContainer';
-            container.className = 'mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700 w-full';
+            container.className = 'mt-3 pt-3 border-t border-zinc-200 dark:border-brand-700 w-full';
             sidebarTimerContent.appendChild(container);
         }
     }
@@ -263,10 +290,12 @@ export function initMultiTimersUI() {
 export function addNewTimer() {
     if (typeof document === 'undefined') return;
     const nameInput = document.getElementById('newTimerNameInput');
-    const name = nameInput ? nameInput.value.trim() : 'Study Block';
+    const minInput = document.getElementById('newTimerMinInput');
+    const name = nameInput ? nameInput.value.trim() : '';
+    const focusMin = parseInt(minInput?.value) || 25;
     if (!name) return;
 
-    const newTimer = createTimerState('timer_' + Date.now(), name, 25, 5);
+    const newTimer = createTimerState('timer_' + Date.now(), name, focusMin, 5);
     activeTimers.push(newTimer);
     saveTimersToStorage();
     if (nameInput) nameInput.value = '';
@@ -274,16 +303,22 @@ export function addNewTimer() {
 }
 
 export function deleteTimer(id) {
-    if (activeTimers.length <= 1) {
-        if (typeof alert === 'function') alert('You must keep at least one active timer.');
-        return;
-    }
     const idx = activeTimers.findIndex(t => t.id === id);
     if (idx !== -1) {
         activeTimers.splice(idx, 1);
         saveTimersToStorage();
         initMultiTimersUI();
     }
+}
+
+export function resetMultiTimer(id) {
+    const timer = activeTimers.find(t => t.id === id);
+    if (!timer) return;
+    timer.running = false;
+    timer.isWorking = true;
+    timer.timeLeft = timer.focusMin * 60;
+    saveTimersToStorage();
+    initMultiTimersUI();
 }
 
 export function toggleMultiTimerRun(id) {
@@ -293,64 +328,94 @@ export function toggleMultiTimerRun(id) {
     timer.running = !timer.running;
     saveTimersToStorage();
     initMultiTimersUI();
+    updateFloatingTimer();
 }
 
 export function updateTimersDisplayDOM() {
     if (typeof document === 'undefined') return;
     activeTimers.forEach(t => {
-        const min = Math.floor(t.timeLeft / 60);
-        const sec = t.timeLeft % 60;
         const displayEl = document.getElementById(`multiTimerDisplay_${t.id}`);
-        if (displayEl) displayEl.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        if (displayEl) displayEl.innerText = formatTimerTime(t.timeLeft);
 
         const btnEl = document.getElementById(`multiTimerBtn_${t.id}`);
         if (btnEl) btnEl.innerHTML = t.running ? '⏸' : '▶';
     });
-    renderFloatingTimerWidget();
-}
-
-export function renderFloatingTimerWidget() {
-    if (typeof document === 'undefined') return;
-    let floatWidget = document.getElementById('floatingTimerWidget');
-    const runningTimers = activeTimers.filter(t => t.running);
-
-    if (runningTimers.length === 0 && !timerRunning) {
-        if (floatWidget) floatWidget.classList.add('hidden');
-        return;
-    }
+    updateFloatingTimer();
 }
 
 export function renderTimersManager(container) {
     if (!container) return;
     let html = `
-        <div class="w-full space-y-3">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Custom Timers</h4>
-            <div class="flex gap-1.5">
-                <input type="text" id="newTimerNameInput" placeholder="Timer name (e.g. Coding)" class="flex-1 text-xs px-2.5 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
-                <button onclick="addNewTimer()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-bold transition">+ Add</button>
+        <div class="w-full space-y-2.5">
+            <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleCustomTimersSection()">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                    <span>⏱️</span> Custom Timers (${activeTimers.length})
+                </h4>
+                <span class="text-xs text-zinc-400 font-bold">${customTimersExpanded ? '▲' : '▼'}</span>
             </div>
-            <div class="space-y-2 max-h-44 overflow-y-auto pr-1">
+
+            <div class="${customTimersExpanded ? 'block' : 'hidden'} space-y-2">
+                <!-- Add Custom Timer Form -->
+                <div class="space-y-1.5 bg-zinc-50 dark:bg-brand-900 p-2 rounded-xl border border-zinc-200 dark:border-brand-700">
+                    <div class="flex gap-1.5">
+                        <input type="text" id="newTimerNameInput" placeholder="Timer name (e.g. Coding)" class="flex-1 text-xs px-2 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white focus:outline-none focus:border-indigo-500">
+                        <input type="number" id="newTimerMinInput" placeholder="Min" value="25" min="1" max="180" class="w-14 text-xs px-1.5 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white focus:outline-none focus:border-indigo-500 text-center">
+                    </div>
+                    <button type="button" onclick="addNewTimer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">+ Add Custom Timer</button>
+                </div>
+
+                <!-- Custom Timers List -->
+                <div class="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
     `;
 
-    activeTimers.forEach(t => {
-        const min = Math.floor(t.timeLeft / 60);
-        const sec = t.timeLeft % 60;
-        html += `
-            <div class="flex items-center justify-between p-2.5 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
-                <div>
-                    <p class="font-bold text-zinc-800 dark:text-zinc-200">${t.name}</p>
-                    <p id="multiTimerDisplay_${t.id}" class="font-mono font-bold text-indigo-500 text-sm">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</p>
+    if (activeTimers.length === 0) {
+        html += `<p class="text-[11px] text-zinc-400 text-center py-2">No custom timers yet. Add one above!</p>`;
+    } else {
+        activeTimers.forEach(t => {
+            html += `
+                <div class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border ${t.running ? 'border-indigo-500 ring-1 ring-indigo-500/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
+                    <div class="min-w-0 flex-1 pr-1">
+                        <p class="font-bold text-zinc-800 dark:text-zinc-200 truncate ${t.running ? 'text-indigo-600 dark:text-indigo-400' : ''}">${t.name}</p>
+                        <p id="multiTimerDisplay_${t.id}" class="font-mono font-bold ${t.running ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-zinc-500'} text-xs">${formatTimerTime(t.timeLeft)}</p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" id="multiTimerBtn_${t.id}" onclick="toggleMultiTimerRun('${t.id}')" class="w-6 h-6 rounded ${t.running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold flex items-center justify-center text-xs transition shadow-sm" title="${t.running ? 'Pause' : 'Start'}">${t.running ? '⏸' : '▶'}</button>
+                        <button type="button" onclick="resetMultiTimer('${t.id}')" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-bold px-1 text-xs transition" title="Reset">↺</button>
+                        <button type="button" onclick="deleteTimer('${t.id}')" class="text-zinc-400 hover:text-red-500 font-bold px-1 text-xs transition" title="Delete">✕</button>
+                    </div>
                 </div>
-                <div class="flex gap-1.5">
-                    <button id="multiTimerBtn_${t.id}" onclick="toggleMultiTimerRun('${t.id}')" class="w-7 h-7 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center justify-center transition">${t.running ? '⏸' : '▶'}</button>
-                    <button onclick="deleteTimer('${t.id}')" class="text-zinc-400 hover:text-red-500 font-bold px-1 transition">✕</button>
-                </div>
-            </div>
-        `;
-    });
+            `;
+        });
+    }
 
-    html += `</div></div>`;
+    html += `</div></div></div>`;
     container.innerHTML = html;
+}
+
+// Global ticker running every second for active custom timers
+if (typeof setInterval !== 'undefined') {
+    setInterval(() => {
+        let updated = false;
+        activeTimers = activeTimers.map(t => {
+            if (t.running) {
+                updated = true;
+                const prevWorking = t.isWorking;
+                const prevTime = t.timeLeft;
+                const nextState = stepTimerState(t);
+                if (prevTime === 0 && prevWorking !== nextState.isWorking) {
+                    playTimerAlarm();
+                    fireConfetti();
+                }
+                return nextState;
+            }
+            return t;
+        });
+
+        if (updated) {
+            saveTimersToStorage();
+            updateTimersDisplayDOM();
+        }
+    }, 1000);
 }
 
 // Bind to window / globalThis for HTML events
@@ -365,20 +430,23 @@ _timerScope.toggleTimerSettings = toggleTimerSettings;
 _timerScope.saveTimerSettings = saveTimerSettings;
 _timerScope.applyTimerCollapse = applyTimerCollapse;
 _timerScope.toggleTimerCollapse = toggleTimerCollapse;
+_timerScope.toggleCustomTimersSection = toggleCustomTimersSection;
 _timerScope.createTimerState = createTimerState;
 _timerScope.stepTimerState = stepTimerState;
 _timerScope.formatTimerTime = formatTimerTime;
 _timerScope.addNewTimer = addNewTimer;
 _timerScope.deleteTimer = deleteTimer;
+_timerScope.resetMultiTimer = resetMultiTimer;
 _timerScope.toggleMultiTimerRun = toggleMultiTimerRun;
 _timerScope.initMultiTimersUI = initMultiTimersUI;
 _timerScope.renderTimersManager = renderTimersManager;
 
-// Auto-initialize timer collapse and state on DOM ready
+// Auto-initialize timer collapse, display, and multi-timers on DOM ready
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         applyTimerCollapse();
         updateTimerDisplay();
+        initMultiTimersUI();
 
         if (timerRunning && timeLeft > 0) {
             const btn = document.getElementById('timerPlayBtn');
