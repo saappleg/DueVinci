@@ -48,17 +48,14 @@ document.addEventListener('keydown', (e) => {
 function smartParseDate(dateStr) {
     if (!dateStr) return null;
     
-    // 1. Handle date ranges (e.g. "Aug 03 - Aug 10" -> extracts "Aug 10")
     if (dateStr.includes('-')) {
         dateStr = dateStr.split('-').pop().trim();
     } else if (dateStr.toLowerCase().includes(' to ')) {
         dateStr = dateStr.toLowerCase().split(' to ').pop().trim();
     }
 
-    // 2. Attempt initial parse
     let d = new Date(dateStr);
     
-    // 3. Fallback if browser fails on missing year (e.g. "Aug 10")
     if (isNaN(d.getTime())) {
         const currentYear = new Date().getFullYear();
         d = new Date(`${dateStr}, ${currentYear}`);
@@ -70,10 +67,8 @@ function smartParseDate(dateStr) {
     let day = d.getDate();
     let year = d.getFullYear();
 
-    // Fix JS quirk where missing years sometimes default to 2001
     if (year === 2001) year = now.getFullYear();
 
-    // End of year crossover logic
     if (now.getMonth() >= 10 && month <= 1) {
         year = now.getFullYear() + 1;
     } else if (now.getMonth() <= 1 && month >= 10) {
@@ -83,7 +78,6 @@ function smartParseDate(dateStr) {
     return new Date(year, month, day).toISOString().split('T')[0];
 }
 
-// --- GLOBAL DATE FORMATTER & PARSER ---
 window.formatDate = (dateString) => {
     if (!dateString) return '';
     const parts = dateString.split('T')[0].split('-');
@@ -120,7 +114,6 @@ function parseInputDate(dateStr) {
     return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
-// --- INJECT APPEARANCE & PREFERENCE SETTINGS ---
 window.injectAppearanceSettingsExtras = () => {
     const appearanceTab = document.getElementById('content-appearance');
     if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
@@ -193,43 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.injectAppearanceSettingsExtras, 400);
 });
 
-// --- INJECT CALENDAR DARK MODE FIX STYLES ---
-const calendarDarkFixStyle = document.createElement('style');
-calendarDarkFixStyle.innerHTML = `
-    .dark .fc-popover {
-        background-color: #18181b !important;
-        border-color: #27272a !important;
-        color: #f4f4f5 !important;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
-        border-radius: 0.75rem;
-        overflow: hidden;
-    }
-    .dark .fc-popover-header {
-        background-color: #27272a !important;
-        color: #f4f4f5 !important;
-        padding: 10px 14px !important;
-        border-bottom: 1px solid #3f3f46 !important;
-    }
-    .dark .fc-popover-title {
-        color: #f4f4f5 !important;
-        font-weight: 700 !important;
-        font-size: 0.875rem !important;
-    }
-    .dark .fc-popover-close {
-        color: #a1a1aa !important;
-        opacity: 0.9 !important;
-        cursor: pointer;
-    }
-    .dark .fc-popover-close:hover {
-        color: #ffffff !important;
-    }
-    .dark .fc-popover-body {
-        padding: 8px !important;
-    }
-`;
-document.head.appendChild(calendarDarkFixStyle);
-
-// --- THEME LOGIC ---
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
     if (themeValue === 'dark' || (themeValue === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -239,7 +195,6 @@ window.changeTheme = (themeValue) => {
     }
 };
 
-// --- CONFETTI & STUDY STREAK RECORDER ---
 function fireConfetti() {
     if (typeof confetti !== 'undefined') {
         confetti({
@@ -261,7 +216,6 @@ function recordStudyActivity() {
     }
 }
 
-// --- SIDEBAR TOGGLE ---
 window.toggleSidebar = () => {
     const aside = document.querySelector('aside');
     if (aside) {
@@ -270,7 +224,6 @@ window.toggleSidebar = () => {
     }
 };
 
-// --- POMODORO TIMER LOGIC ---
 let timerInterval = null;
 let focusMinutes = parseInt(localStorage.getItem('focusMinutes')) || 25;
 let breakMinutes = parseInt(localStorage.getItem('breakMinutes')) || 5;
@@ -458,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimerDisplay();
 });
 
-// --- AUTH & ROUTING LOGIC ---
+// --- AUTH, WALKTHROUGH, & ROUTING LOGIC ---
 async function checkUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     handleAuth(session);
@@ -481,6 +434,11 @@ function handleAuth(session) {
         if ((path.endsWith('index.html') || path.endsWith('/')) && document.getElementById('dashboardGrid')) {
             loadDashboardStats();
             if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
+            
+            // Trigger automatic tour if it hasn't been completed yet
+            if (localStorage.getItem('duevinci_tour_done') !== 'true') {
+                setTimeout(() => { if (typeof window.startWalkthrough === 'function') window.startWalkthrough(); }, 1200);
+            }
         }
         if (path.endsWith('courses.html') && document.getElementById('coursesGrid')) loadCoursesPage();
         if (path.endsWith('calendar.html') && document.getElementById('calendar')) {
@@ -500,9 +458,7 @@ function handleAuth(session) {
             if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.add('hidden');
         }
     }
-}
-
-function showAuthMessage(msg, colorClass = "text-red-500") {
+}function showAuthMessage(msg, colorClass = "text-red-500") {
     const msgEl = document.getElementById('authMessage');
     if(msgEl) {
         msgEl.textContent = msg;
@@ -533,95 +489,46 @@ window.signInWithEmail = async () => {
 window.logout = async () => {
     await supabaseClient.auth.signOut();
     window.location.href = 'index.html';
-};// --- MODULAR SETTINGS POPUP ---
-function ensureSettingsModalExists() {
-    if (document.getElementById('settingsModal')) return;
-    const div = document.createElement('div');
-    div.id = 'settingsModal';
-    div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
-    div.innerHTML = `
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
-            <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
-                <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
-                <nav class="space-y-1">
-                    <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
-                    <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
-                </nav>
-            </div>
-            <div class="flex-1 p-6 relative">
-                <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                <div id="content-profile" class="block space-y-6">
-                    <div>
-                        <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
-                    </div>
-                    <form id="settingsForm" class="max-w-sm space-y-4">
-                        <div>
-                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
-                            <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
-                            <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
-                        <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
-                    </form>
-                </div>
-                <div id="content-appearance" class="hidden space-y-6">
-                    <div>
-                        <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
-                    </div>
-                    <div class="max-w-sm">
-                        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
-                        <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
-                            <option value="system">💻 Follow System</option>
-                            <option value="light">☀️ Light Mode</option>
-                            <option value="dark">🌙 Dark Mode</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(div);
+};
 
-    const form = document.getElementById('settingsForm');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('profileEmail').value;
-            const password = document.getElementById('profilePassword').value;
-            const msgEl = document.getElementById('settingsMsg');
-            
-            let updates = {};
-            if(email && email !== currentUser?.email) updates.email = email;
-            if(password) updates.password = password;
-            
-            if(Object.keys(updates).length === 0) {
-                msgEl.textContent = "No changes made.";
-                msgEl.className = "text-xs text-center mt-2 text-zinc-500";
-                msgEl.classList.remove('hidden');
-                return;
-            }
-            
-            const { error } = await supabaseClient.auth.updateUser(updates);
-            if (error) {
-                msgEl.textContent = error.message;
-                msgEl.className = "text-xs text-center mt-2 text-red-500";
-            } else {
-                msgEl.textContent = "Profile updated successfully!";
-                msgEl.className = "text-xs text-center mt-2 text-green-500";
-                document.getElementById('profilePassword').value = '';
-            }
-            msgEl.classList.remove('hidden');
-        });
+// --- INTERACTIVE TOUR (DRIVER.JS) ---
+window.startWalkthrough = () => {
+    if (typeof window.driver === 'undefined') return;
+    
+    const driver = window.driver.js.driver;
+    const path = window.location.pathname;
+    
+    let steps = [
+        { popover: { title: 'Welcome to DueVinci! 🎓', description: 'Let us take a quick tour of your new academic workspace.' } },
+        { element: 'aside nav', popover: { title: 'Navigation Menu', description: 'Your main control center. Switch between your dashboard, classes, grades, and calendar here.', side: "right", align: 'start' } },
+        { element: '#timerDisplay', popover: { title: 'Integrated Pomodoro', description: 'Manage your study blocks here. If you collapse the sidebar, this timer will float so you can always see it.', side: "right" } }
+    ];
+
+    if (path.endsWith('index.html') || path.endsWith('/') || path.includes('DueVinci')) {
+        steps.push({ element: '#dashboardGrid', popover: { title: 'Dashboard Overview', description: 'Here you will see your upcoming lessons and your overall progress for each course.', side: "top" } });
+    } else if (path.endsWith('courses.html')) {
+        steps.push({ element: '#courseForm', popover: { title: 'Add a Class', description: 'Create a new course here, then drag it into a Term Folder below.', side: "bottom" } });
+    } else if (path.endsWith('grades.html')) {
+        steps.push({ element: '#gpaBadgeContainer', popover: { title: 'Cumulative GPA', description: 'Your overall GPA automatically calculates and floats in the header.', side: "bottom" } });
     }
-}
+
+    steps.push({ element: 'header .sign-out-btn', popover: { title: 'Sign Out', description: 'You are all set! You can sign out here whenever you are done.', side: "bottom", align: "end" } });
+
+    const driverObj = driver({
+      showProgress: true,
+      steps: steps,
+      onDestroyStarted: () => {
+        if (!driverObj.hasNextStep() || confirm("Are you sure you want to exit the tour?")) {
+          localStorage.setItem('duevinci_tour_done', 'true');
+          driverObj.destroy();
+        }
+      }
+    });
+    
+    driverObj.drive();
+};
 
 window.openSettingsModal = () => {
-    ensureSettingsModalExists();
     if(currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
@@ -770,7 +677,6 @@ async function loadCoursesPage() {
     });
     localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
     
-    // Safely populate the grids without overwriting the static HTML form
     renderTermFolders();
     renderAlphabeticals();
 }
@@ -852,9 +758,7 @@ function renderAlphabeticals() {
                 <div>${checkIcon}</div>
             </div>`;
     });
-}
-
-window.handleDragStart = (e, courseId) => {
+}window.handleDragStart = (e, courseId) => {
     e.dataTransfer.setData('text/plain', courseId);
 };
 
@@ -963,7 +867,9 @@ window.openTermModal = (termName) => {
 window.closeTermModal = () => {
     const modal = document.getElementById('termModal');
     if (modal) modal.classList.add('hidden');
-};window.deleteCurrentTermFolder = async () => {
+};
+
+window.deleteCurrentTermFolder = async () => {
     if (activeTermModalName === 'Unassigned') {
         if (confirm('Delete Unassigned folder and all unassigned classes inside it?')) {
             const termCourses = localCourses.filter(c => !c.term || c.term.trim() === '' || c.term.trim() === 'Unassigned');
@@ -999,23 +905,6 @@ window.closeTermModal = () => {
     }
 };
 
-const cForm = document.getElementById('courseForm');
-if (cForm) {
-    cForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const code = document.getElementById('courseCode').value;
-        const color = document.getElementById('courseColor').value;
-        const emoji = document.getElementById('courseEmoji').value || '📚';
-        
-        const { error } = await supabaseClient.from('courses').insert([{ code, color, emoji, user_id: currentUser.id }]);
-        if (!error) {
-            document.getElementById('courseCode').value = '';
-            loadCoursesPage();
-        }
-    });
-}
-
-// --- STABLE COURSE MODAL TAB SWITCHING & RENDERING ---
 window.openCourseModal = (courseId) => {
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
@@ -1557,7 +1446,7 @@ window.deleteAssignment = async (assignId, courseId) => {
     loadAssignments(courseId, currentAssignmentPage);
 };
 
-// --- GRADES PAGE LOGIC WITH FIXED SORTING ---
+// --- GRADES PAGE LOGIC ---
 async function loadGradesPage() {
     const container = document.getElementById('gradesContainer');
     if (!container) return;
