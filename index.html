@@ -66,15 +66,23 @@
                     <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
                     </button>
-                    <div>
-                        <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
-                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Command Center</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-sm">
+                                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                                <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                                <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                                <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                                <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight text-base leading-tight">DueVinci</h1>
+                            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium leading-none mt-0.5">Student Command Center</p>
+                        </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button type="button" onclick="openSupportModal()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-brand-800 dark:hover:bg-brand-700 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-indigo-100 dark:border-brand-700">
-                        <span>💬</span> Support
-                    </button>
                     <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-3.5 py-1.5 rounded-lg text-xs font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Sign out
                     </button>

@@ -12,7 +12,7 @@ import {
     updateTimerDisplay,
     initMultiTimersUI
 } from './timers.js';
-import { openSettingsModal } from './ui.js';
+import { openSettingsModal, openSupportModal } from './ui.js';
 
 const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
 
@@ -99,6 +99,9 @@ class DueVinciSidebar extends BaseElement {
             <div class="p-4 border-t border-zinc-200 dark:border-brand-700 space-y-2">
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Settings
+                </button>
+                <button type="button" onclick="openSupportModal()" class="flex items-center gap-3 w-full text-left px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm font-medium transition">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support & Help
                 </button>
             </div>
         </aside>
