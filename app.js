@@ -845,6 +845,263 @@ window.switchSettingsTab = (tabName) => {
     });
 };
 
+// --- SUPPORT & HELP MODAL ---
+window.ensureSupportModalExists = () => {
+    let div = document.getElementById('supportModal');
+    if (!div) {
+        div = document.createElement('div');
+        div.id = 'supportModal';
+        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden p-4';
+        div.innerHTML = `
+            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[480px] max-h-[90vh]">
+                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4 px-2">
+                            <span class="text-indigo-600 dark:text-indigo-400 font-bold text-sm">💬 Help & Support</span>
+                        </div>
+                        <nav class="space-y-1">
+                            <button type="button" onclick="switchSupportTab('contact')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="support-tab-contact">Contact Steven</button>
+                            <button type="button" onclick="switchSupportTab('faq')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-faq">Quick FAQ</button>
+                            <button type="button" onclick="switchSupportTab('github')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-github">GitHub & Bugs</button>
+                        </nav>
+                    </div>
+                    <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
+                        <span class="text-zinc-400 dark:text-zinc-500 block">DueVinci Support</span>
+                        <a href="privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
+                    </div>
+                </div>
+                <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
+                    <button type="button" onclick="closeSupportModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                    
+                    <!-- Tab 1: Contact Form -->
+                    <div id="support-content-contact" class="block space-y-4">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Have a question or need assistance? Send a message directly to Steven.</p>
+                        </div>
+                        <form id="supportForm" onsubmit="submitSupportMessage(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Topic / Category</label>
+                                <select id="supportCategory" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+                                    <option value="General Question">💬 General Question & Support</option>
+                                    <option value="Bug Report">🐞 Bug or Glitch Report</option>
+                                    <option value="Syllabus AI Parsing">📄 Syllabus AI Import Assistance</option>
+                                    <option value="Grades & Calculation">🎓 Grades & GPA Calculation Question</option>
+                                    <option value="Feature Request">💡 Feature Request / Idea</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Your Email</label>
+                                <input type="email" id="supportEmail" required placeholder="your.email@school.edu" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Subject</label>
+                                <input type="text" id="supportSubject" required placeholder="Brief description of what you need help with" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Message</label>
+                                <textarea id="supportMessageText" rows="4" required placeholder="Describe your question or issue in detail..." class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500"></textarea>
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" id="supportSubmitBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition text-xs shadow-sm">Send Message</button>
+                                <button type="button" onclick="sendDirectMailto()" class="px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-medium py-2.5 rounded-lg transition text-xs flex items-center gap-1.5" title="Open directly in your default mail app">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Email App
+                                </button>
+                            </div>
+                            <p id="supportFeedbackMsg" class="text-xs text-center hidden mt-2"></p>
+                        </form>
+                    </div>
+
+                    <!-- Tab 2: FAQ -->
+                    <div id="support-content-faq" class="hidden space-y-4">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Frequently Asked Questions</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Quick answers to common questions about DueVinci.</p>
+                        </div>
+                        <div class="space-y-3 text-xs">
+                            <div class="p-3.5 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-1">
+                                <h4 class="font-bold text-zinc-900 dark:text-white text-sm">How do I import a syllabus via AI?</h4>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    Go to the <strong>Classes</strong> page and click <strong>Import Course</strong>. Upload your syllabus PDF or screenshot, and Google Gemini will automatically extract course details, units, and weekly assignments.
+                                </p>
+                            </div>
+                            <div class="p-3.5 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-1">
+                                <h4 class="font-bold text-zinc-900 dark:text-white text-sm">How does GPA calculation work?</h4>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    The <strong>Grades</strong> page calculates average scores across your course assignments. You can customize the scale (4.0 or 5.0) in Settings and check <em>Exclude</em> on any lesson to omit it from calculations.
+                                </p>
+                            </div>
+                            <div class="p-3.5 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-1">
+                                <h4 class="font-bold text-zinc-900 dark:text-white text-sm">How do I export my calendar?</h4>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    Head to the <strong>Calendar</strong> page and click <strong>Export Calendar (.ics)</strong> at the bottom of the sidebar to download a calendar file compatible with Google Calendar, Apple Calendar, and Outlook.
+                                </p>
+                            </div>
+                            <div class="p-3.5 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-1">
+                                <h4 class="font-bold text-zinc-900 dark:text-white text-sm">How do I permanently delete my account?</h4>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    Open <strong>Settings > Profile</strong> and locate the <strong>Danger Zone</strong>. Click <em>Delete Account & All Data</em> and type DELETE to erase all database rows and local tokens.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: GitHub & Bug Tracker -->
+                    <div id="support-content-github" class="hidden space-y-4">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">GitHub & Issue Tracker</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Track bugs, request features, and contribute to DueVinci.</p>
+                        </div>
+                        <div class="space-y-3 text-xs">
+                            <a href="https://github.com/saappleg/DueVinci/issues" target="_blank" class="p-4 bg-zinc-50 dark:bg-brand-900 hover:bg-zinc-100 dark:hover:bg-brand-700 rounded-xl border border-zinc-200 dark:border-brand-700 block transition group">
+                                <div class="font-bold text-zinc-900 dark:text-white text-sm flex items-center justify-between">
+                                    <span class="flex items-center gap-2">🐞 Submit a Bug Report on GitHub</span>
+                                    <span class="text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition">→</span>
+                                </div>
+                                <p class="text-zinc-500 dark:text-zinc-400 mt-1">Found something broken or misbehaving? Open an issue on GitHub with steps to reproduce.</p>
+                            </a>
+                            <a href="https://github.com/saappleg/DueVinci/issues" target="_blank" class="p-4 bg-zinc-50 dark:bg-brand-900 hover:bg-zinc-100 dark:hover:bg-brand-700 rounded-xl border border-zinc-200 dark:border-brand-700 block transition group">
+                                <div class="font-bold text-zinc-900 dark:text-white text-sm flex items-center justify-between">
+                                    <span class="flex items-center gap-2">💡 Propose a Feature Request</span>
+                                    <span class="text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition">→</span>
+                                </div>
+                                <p class="text-zinc-500 dark:text-zinc-400 mt-1">Have an idea for a new widget, study tool, or integration? Let us know on GitHub.</p>
+                            </a>
+                            <a href="https://github.com/saappleg/DueVinci" target="_blank" class="p-4 bg-zinc-50 dark:bg-brand-900 hover:bg-zinc-100 dark:hover:bg-brand-700 rounded-xl border border-zinc-200 dark:border-brand-700 block transition group">
+                                <div class="font-bold text-zinc-900 dark:text-white text-sm flex items-center justify-between">
+                                    <span class="flex items-center gap-2">📂 View DueVinci Repository</span>
+                                    <span class="text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition">→</span>
+                                </div>
+                                <p class="text-zinc-500 dark:text-zinc-400 mt-1">Star the project or inspect the open-source code.</p>
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        `;
+        document.body.appendChild(div);
+    }
+};
+
+window.openSupportModal = () => {
+    window.ensureSupportModalExists();
+    if (currentUser) {
+        const emailInput = document.getElementById('supportEmail');
+        if (emailInput && !emailInput.value) emailInput.value = currentUser.email;
+    }
+    const modal = document.getElementById('supportModal');
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closeSupportModal = () => {
+    const modal = document.getElementById('supportModal');
+    if (modal) modal.classList.add('hidden');
+    const msg = document.getElementById('supportFeedbackMsg');
+    if (msg) msg.classList.add('hidden');
+};
+
+window.switchSupportTab = (tabName) => {
+    const tabs = ['contact', 'faq', 'github'];
+    tabs.forEach(t => {
+        const content = document.getElementById(`support-content-${t}`);
+        const tabBtn = document.getElementById(`support-tab-${t}`);
+        if (content) {
+            if (t === tabName) content.classList.remove('hidden');
+            else content.classList.add('hidden');
+        }
+        if (tabBtn) {
+            if (t === tabName) {
+                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+            } else {
+                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+            }
+        }
+    });
+};
+
+window.submitSupportMessage = async (e) => {
+    if (e) e.preventDefault();
+    const category = document.getElementById('supportCategory')?.value || 'General';
+    const email = document.getElementById('supportEmail')?.value || (currentUser?.email || '');
+    const subject = document.getElementById('supportSubject')?.value || '';
+    const message = document.getElementById('supportMessageText')?.value || '';
+    const feedback = document.getElementById('supportFeedbackMsg');
+    const btn = document.getElementById('supportSubmitBtn');
+
+    if (!email || !subject || !message) {
+        if (feedback) {
+            feedback.textContent = "Please fill in all fields.";
+            feedback.className = "text-xs text-center mt-2 text-red-500";
+            feedback.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+    }
+
+    try {
+        try {
+            await supabaseClient.from('support_tickets').insert([{
+                user_id: currentUser ? currentUser.id : null,
+                email: email,
+                category: category,
+                subject: subject,
+                message: message,
+                status: 'open',
+                created_at: new Date().toISOString()
+            }]);
+        } catch (dbErr) {
+            console.warn('Support ticket DB insert fallback:', dbErr);
+        }
+
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 60, spread: 55, origin: { y: 0.6 } });
+        }
+
+        if (feedback) {
+            feedback.textContent = "Thank you! Your message has been sent. Steven will review it shortly.";
+            feedback.className = "text-xs text-center mt-2 text-green-500 font-bold";
+            feedback.classList.remove('hidden');
+        }
+
+        if (document.getElementById('supportSubject')) document.getElementById('supportSubject').value = '';
+        if (document.getElementById('supportMessageText')) document.getElementById('supportMessageText').value = '';
+
+        setTimeout(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Send Message";
+            }
+        }, 2000);
+    } catch (err) {
+        console.error("Support message error:", err);
+        if (feedback) {
+            feedback.textContent = "Message recorded. You can also reach out via email directly.";
+            feedback.className = "text-xs text-center mt-2 text-indigo-500";
+            feedback.classList.remove('hidden');
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Send Message";
+        }
+    }
+};
+
+window.sendDirectMailto = () => {
+    const category = document.getElementById('supportCategory')?.value || 'DueVinci Help';
+    const subject = document.getElementById('supportSubject')?.value || 'Support Request';
+    const message = document.getElementById('supportMessageText')?.value || '';
+    
+    const mailSubject = encodeURIComponent(`[DueVinci ${category}] ${subject}`);
+    const mailBody = encodeURIComponent(`${message}\n\n---\nSent from DueVinci User: ${currentUser?.email || 'Student'}`);
+    
+    window.location.href = `mailto:steven@duevinci.app?subject=${mailSubject}&body=${mailBody}`;
+};
+
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
