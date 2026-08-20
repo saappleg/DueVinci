@@ -9,16 +9,17 @@ const currentHost = window.location.hostname;
 let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
-// Determine environment based on hostname. Use Production DB for the live site (GitHub Pages or custom domain)
-if (currentHost.includes('github.io') || currentHost.includes('duevinci.tech')) {
-    SUPABASE_URL = PROD_SUPABASE_URL;
-    SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
-    console.log('🚀 Running in Production Mode (DueVinci-Prod)');
-} else {
-    // For local environments (localhost, 127.0.0.1, file:///), use Dev Database
+// Determine environment based on hostname. Any non-local host is treated as production (GitHub Pages, custom domains, etc.).
+if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1') || currentHost.startsWith('file')) {
+    // Development environment
     SUPABASE_URL = DEV_SUPABASE_URL;
     SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
+} else {
+    // Production environment – includes GitHub Pages, custom domains, etc.
+    SUPABASE_URL = PROD_SUPABASE_URL;
+    SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
+    console.log('🚀 Running in Production Mode (DueVinci-Prod)');
 }
 
 
