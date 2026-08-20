@@ -256,15 +256,16 @@ window.changeTheme = (themeValue) => {
     }
 };
 
-// --- GREEK THEME TOGGLE ----------------------------------------------------
-window.toggleGreekTheme = () => {
-  const enabled = document.documentElement.classList.toggle('greek-theme');
-  localStorage.setItem('greekTheme', enabled ? 'on' : 'off');
+// --- RENAISSANCE THEME TOGGLE -----------------------------------------------
+window.toggleRenaissanceTheme = () => {
+  const enabled = document.documentElement.classList.toggle('renaissance-theme');
+  localStorage.setItem('renaissanceTheme', enabled ? 'on' : 'off');
+  return enabled;
 };
 
-// Restore Greek theme on load
-if (localStorage.getItem('greekTheme') === 'on') {
-  document.documentElement.classList.add('greek-theme');
+// Restore Renaissance theme on load
+if (localStorage.getItem('renaissanceTheme') === 'on') {
+  document.documentElement.classList.add('renaissance-theme');
 }
 
 // Existing fireConfetti
@@ -2528,13 +2529,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.triggerKonamiEasterEgg = () => {
-    if (typeof confetti === 'function') {
-        confetti({ particleCount: 120, spread: 100, origin: { y: 0.4 } });
-        setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 250);
-        setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 400);
+    const enabled = window.toggleRenaissanceTheme();
+    if (enabled) {
+        if (typeof confetti === 'function') {
+            confetti({ particleCount: 120, spread: 100, origin: { y: 0.4 }, colors: ['#b8860b','#6b1a2a','#2d4a22','#d4a017','#f5ead0'] });
+            setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#b8860b','#6b1a2a','#d4a017'] }), 250);
+            setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#b8860b','#6b1a2a','#d4a017'] }), 400);
+        }
+        alert('🎨 Da Vinci Renaissance Gold Mode Activated!\nThe spirit of the Renaissance illuminates your studies.\nEnter the code again to return to the modern age.');
+    } else {
+        alert('🖋️ Renaissance Mode Deactivated.\nWelcome back to the present.');
     }
-    alert("🎨 Secret Easter Egg Unlocked!\nYou discovered the Da Vinci Renaissance Gold mode! +100 Focus Mastery.");
 };
+
 
 window.ensureCommandPaletteExists = () => {
     if (document.getElementById('commandPaletteModal')) return;

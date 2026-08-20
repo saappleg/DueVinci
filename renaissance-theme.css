@@ -1,0 +1,156 @@
+/* renaissance-theme.css */
+/* -----------------------------------------------------------------------
+   DueVinci – Renaissance / Da Vinci Gold Mode
+   Palette: aged parchment, deep burgundy, forest green, antique gold
+   ----------------------------------------------------------------------- */
+
+:root.renaissance-theme {
+  --ren-parchment: #f5ead0;
+  --ren-parchment-dark: #ede0bc;
+  --ren-ink: #2b1b0e;
+  --ren-burgundy: #6b1a2a;
+  --ren-gold: #b8860b;
+  --ren-gold-light: #d4a017;
+  --ren-green: #2d4a22;
+  --ren-red: #8b2020;
+  --ren-border: #c0a870;
+  --ren-shadow: rgba(43,27,14,0.18);
+}
+
+:root.renaissance-theme,
+.renaissance-theme body {
+  background-color: var(--ren-parchment) !important;
+  color: var(--ren-ink) !important;
+  font-family: 'Palatino Linotype','Book Antiqua',Palatino,Georgia,serif !important;
+}
+
+/* Full-app container background */
+.renaissance-theme #appScreen,
+.renaissance-theme #authScreen {
+  background-color: var(--ren-parchment) !important;
+  color: var(--ren-ink) !important;
+}
+
+/* Sidebar */
+.renaissance-theme aside {
+  background-color: var(--ren-parchment-dark) !important;
+  border-color: var(--ren-border) !important;
+  color: var(--ren-ink) !important;
+}
+
+/* Any Tailwind bg-zinc-* / bg-white / brand */
+.renaissance-theme [class~="bg-zinc-50"],
+.renaissance-theme [class~="bg-zinc-100"],
+.renaissance-theme [class~="bg-zinc-200"],
+.renaissance-theme [class~="bg-white"] {
+  background-color: var(--ren-parchment) !important;
+  color: var(--ren-ink) !important;
+}
+
+/* dark: variants override */
+.dark.renaissance-theme body,
+.dark .renaissance-theme body,
+html.dark.renaissance-theme body {
+  background-color: var(--ren-parchment) !important;
+  color: var(--ren-ink) !important;
+}
+
+/* Borders */
+.renaissance-theme [class*="border-zinc"],
+.renaissance-theme [class*="border-brand"],
+.renaissance-theme [class*="border-"] {
+  border-color: var(--ren-border) !important;
+}
+
+/* Headings */
+.renaissance-theme h1,
+.renaissance-theme h2,
+.renaissance-theme h3,
+.renaissance-theme h4 {
+  color: var(--ren-burgundy) !important;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+/* Text colour overrides */
+.renaissance-theme [class*="text-zinc"],
+.renaissance-theme [class*="text-white"] {
+  color: var(--ren-ink) !important;
+}
+
+/* Accent indigo → gold */
+.renaissance-theme [class*="text-indigo"] {
+  color: var(--ren-gold) !important;
+}
+
+/* Buttons */
+.renaissance-theme button,
+.renaissance-theme [class*="bg-indigo"],
+.renaissance-theme [class*="bg-zinc-800"],
+.renaissance-theme [class*="bg-zinc-600"],
+.renaissance-theme [class*="bg-brand-7"],
+.renaissance-theme [class*="bg-brand-8"] {
+  background-color: var(--ren-burgundy) !important;
+  color: var(--ren-parchment) !important;
+  border: 1px solid var(--ren-gold) !important;
+  border-radius: 4px !important;
+  font-family: inherit !important;
+}
+
+.renaissance-theme button:hover {
+  background-color: var(--ren-red) !important;
+  box-shadow: 0 2px 8px var(--ren-shadow) !important;
+}
+
+/* Inputs */
+.renaissance-theme input,
+.renaissance-theme textarea,
+.renaissance-theme select {
+  background-color: #fdf5e0 !important;
+  color: var(--ren-ink) !important;
+  border: 1px solid var(--ren-border) !important;
+  font-family: inherit !important;
+}
+
+.renaissance-theme input::placeholder,
+.renaissance-theme textarea::placeholder {
+  color: #8b7355 !important;
+}
+
+.renaissance-theme input:focus,
+.renaissance-theme textarea:focus {
+  outline: 2px solid var(--ren-gold) !important;
+}
+
+/* Links */
+.renaissance-theme a {
+  color: var(--ren-burgundy) !important;
+}
+.renaissance-theme a:hover {
+  color: var(--ren-gold) !important;
+}
+
+/* Selection */
+.renaissance-theme ::selection {
+  background: rgba(184,134,11,0.35) !important;
+  color: var(--ren-ink) !important;
+}
+
+/* Scrollbar */
+.renaissance-theme ::-webkit-scrollbar { width:8px; background:var(--ren-parchment-dark); }
+.renaissance-theme ::-webkit-scrollbar-thumb { background:var(--ren-gold); border-radius:4px; }
+
+/* Decorative top banner */
+.renaissance-theme body::before {
+  content: "✦  Da Vinci Renaissance Gold Mode  ✦";
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: linear-gradient(90deg, var(--ren-burgundy), var(--ren-gold), var(--ren-green), var(--ren-gold), var(--ren-burgundy));
+  color: var(--ren-parchment);
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  padding: 4px 0;
+  font-family: 'Palatino Linotype',Palatino,Georgia,serif;
+  font-variant: small-caps;
+}
