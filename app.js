@@ -1,20 +1,24 @@
 // --- DYNAMIC SUPABASE ENVIRONMENT ROUTING ---
+const DEV_SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+const DEV_SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+
+const PROD_SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
+const PROD_SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
+
+const currentHost = window.location.hostname;
 let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 
-const currentHost = window.location.hostname;
-
-// If we are on the live GitHub Pages website, use Production Keys
+// If we are on the live GitHub Pages website, use Production Database
 if (currentHost.includes('github.io')) {
-    // REMEMBER TO PASTE YOUR ACTUAL PRODUCTION KEYS HERE
-    SUPABASE_URL = 'YOUR_PRODUCTION_URL_HERE'; 
-    SUPABASE_ANON_KEY = 'YOUR_PRODUCTION_ANON_KEY_HERE';
-    console.log('🚀 Running in Production Mode');
+    SUPABASE_URL = PROD_SUPABASE_URL;
+    SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
+    console.log('🚀 Running in Production Mode (DueVinci-Prod)');
 } 
-// For literally ANY other environment (localhost, local IP, or file:///), use Dev Keys
+// For local environments (localhost, 127.0.0.1, file:///), use Dev Database
 else {
-    SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
-    SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+    SUPABASE_URL = DEV_SUPABASE_URL;
+    SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 }
 
