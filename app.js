@@ -1,20 +1,23 @@
 // --- DYNAMIC SUPABASE ENVIRONMENT ROUTING ---
-let SUPABASE_URL = '';
-let SUPABASE_ANON_KEY = '';
+const DEFAULT_SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
 
 const currentHost = window.location.hostname;
+let SUPABASE_URL = DEFAULT_SUPABASE_URL;
+let SUPABASE_ANON_KEY = DEFAULT_SUPABASE_ANON_KEY;
 
-// If we are on the live GitHub Pages website, use Production Keys
+// If we are on the live GitHub Pages website, use production keys if provided, or default to the active project
 if (currentHost.includes('github.io')) {
-    // REMEMBER TO PASTE YOUR ACTUAL PRODUCTION KEYS HERE
-    SUPABASE_URL = 'YOUR_PRODUCTION_URL_HERE'; 
-    SUPABASE_ANON_KEY = 'YOUR_PRODUCTION_ANON_KEY_HERE';
-    console.log('🚀 Running in Production Mode');
-} 
-// For literally ANY other environment (localhost, local IP, or file:///), use Dev Keys
-else {
-    SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
-    SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+    // You can customize production keys here if you have a separate Supabase production project
+    const PROD_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+    const PROD_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+    
+    SUPABASE_URL = (PROD_URL && !PROD_URL.startsWith('YOUR_')) ? PROD_URL : DEFAULT_SUPABASE_URL;
+    SUPABASE_ANON_KEY = (PROD_KEY && !PROD_KEY.startsWith('YOUR_')) ? PROD_KEY : DEFAULT_SUPABASE_ANON_KEY;
+    console.log('🚀 Running in Production Mode (DueVinci)');
+} else {
+    SUPABASE_URL = DEFAULT_SUPABASE_URL;
+    SUPABASE_ANON_KEY = DEFAULT_SUPABASE_ANON_KEY;
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 }
 

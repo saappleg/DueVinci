@@ -27,7 +27,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=21" defer></script>
+    <script src="app.js?v=22" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -36,11 +36,11 @@
             <h1 class="text-3xl font-bold text-indigo-600 dark:text-white mb-2">DueVinci</h1>
             <p class="text-zinc-500 dark:text-zinc-400 mb-6">Your study materials in one place.</p>
             
-            <form id="emailAuthForm" class="space-y-4 mb-4">
+            <form id="emailAuthForm" onsubmit="event.preventDefault(); signInWithEmail();" class="space-y-4 mb-4">
                 <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500 transition">
                 <input type="password" id="authPassword" placeholder="Password" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500 transition">
                 <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="signInWithEmail()" class="w-1/2 bg-white dark:bg-zinc-100 text-zinc-900 font-bold py-2.5 rounded-xl hover:bg-zinc-200 transition">Sign In</button>
+                    <button type="submit" class="w-1/2 bg-white dark:bg-zinc-100 text-zinc-900 font-bold py-2.5 rounded-xl hover:bg-zinc-200 transition">Sign In</button>
                     <button type="button" onclick="signUpWithEmail()" class="w-1/2 bg-zinc-800 dark:bg-brand-700 text-white font-medium py-2.5 rounded-xl hover:bg-zinc-900 dark:hover:bg-brand-600 transition">Sign Up</button>
                 </div>
             </form>
