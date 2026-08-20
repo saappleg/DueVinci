@@ -32,7 +32,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=18" defer></script>
+    <script src="app.js?v=19" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -92,7 +92,7 @@
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Settings
                 </button>
-                <button type="button" onclick="startWalkthrough()" class="mt-2 flex items-center gap-3 w-full text-left px-4 py-2.5 bg-indigo-50 dark:bg-brand-700/50 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-brand-700 transition shadow-sm border border-indigo-100 dark:border-brand-600">
+                <button type="button" id="tourNavButton" onclick="startWalkthrough(true)" class="mt-2 flex items-center gap-3 w-full text-left px-4 py-2.5 bg-indigo-50 dark:bg-brand-700/50 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-brand-700 transition shadow-sm border border-indigo-100 dark:border-brand-600">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Interactive Tour
                 </button>
             </div>
