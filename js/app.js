@@ -4,11 +4,11 @@ import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/confi
 import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm } from './modules/utils.js';
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
-import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager } from './modules/timers.js';
+import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
 import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
-import { generateQuizQuestions, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard } from './modules/flashcards.js';
+import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard } from './modules/flashcards.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
@@ -51,6 +51,16 @@ export {
     toggleMultiTimerRun,
     initMultiTimersUI,
     renderTimersManager,
+    toggleTimer,
+    resetTimer,
+    skipTimer,
+    toggleTimerSettings,
+    saveTimerSettings,
+    toggleTimerCollapse,
+    dismissFloatingTimer,
+    updateTimerDisplay,
+    updateFloatingTimer,
+    applyTimerCollapse,
     localCourses,
     loadDashboardStats,
     loadCoursesPage,
@@ -79,6 +89,7 @@ export {
     closeEventModal,
     deleteCustomEvent,
     generateQuizQuestions,
+    generateQuizFromNotes,
     generateStudyDeck,
     renderFlashcardView,
     flipCurrentCard,
@@ -147,6 +158,21 @@ _rootScope.toggleAcademicsVisibility = toggleAcademicsVisibility;
 _rootScope.createTimerState = createTimerState;
 _rootScope.stepTimerState = stepTimerState;
 _rootScope.formatTimerTime = formatTimerTime;
+_rootScope.addNewTimer = addNewTimer;
+_rootScope.deleteTimer = deleteTimer;
+_rootScope.toggleMultiTimerRun = toggleMultiTimerRun;
+_rootScope.initMultiTimersUI = initMultiTimersUI;
+_rootScope.renderTimersManager = renderTimersManager;
+_rootScope.toggleTimer = toggleTimer;
+_rootScope.resetTimer = resetTimer;
+_rootScope.skipTimer = skipTimer;
+_rootScope.toggleTimerSettings = toggleTimerSettings;
+_rootScope.saveTimerSettings = saveTimerSettings;
+_rootScope.toggleTimerCollapse = toggleTimerCollapse;
+_rootScope.dismissFloatingTimer = dismissFloatingTimer;
+_rootScope.updateTimerDisplay = updateTimerDisplay;
+_rootScope.updateFloatingTimer = updateFloatingTimer;
+_rootScope.applyTimerCollapse = applyTimerCollapse;
 _rootScope.loadDashboardStats = loadDashboardStats;
 _rootScope.loadCoursesPage = loadCoursesPage;
 _rootScope.renderTermFolders = renderTermFolders;
@@ -171,6 +197,7 @@ _rootScope.openEventModal = openEventModal;
 _rootScope.closeEventModal = closeEventModal;
 _rootScope.deleteCustomEvent = deleteCustomEvent;
 _rootScope.generateQuizQuestions = generateQuizQuestions;
+_rootScope.generateQuizFromNotes = generateQuizFromNotes;
 _rootScope.generateStudyDeck = generateStudyDeck;
 _rootScope.renderFlashcardView = renderFlashcardView;
 _rootScope.flipCurrentCard = flipCurrentCard;
@@ -213,6 +240,8 @@ _rootScope.confirmAccountDeletion = confirmAccountDeletion;
 // Bootstrap application on page load
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
+        applyTimerCollapse();
+        updateTimerDisplay();
         setTimeout(() => {
             checkWhatsNewOnLaunch();
             updateTourButtonVisibility();
