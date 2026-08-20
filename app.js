@@ -184,6 +184,12 @@ window.toggleAcademicsVisibility = (show) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.injectAppearanceSettingsExtras, 400);
+    
+    // Auto-hide the tour button if the tour has been completed
+    if (localStorage.getItem('duevinci_tour_done') === 'true') {
+        const tourBtn = document.getElementById('tourNavButton');
+        if (tourBtn) tourBtn.classList.add('hidden');
+    }
 });
 
 window.changeTheme = (themeValue) => {
@@ -430,15 +436,15 @@ function handleAuth(session) {
             document.getElementById('appScreen').classList.remove('hidden');
         }
         
+        // Universal tour trigger based on state across all pages
+        if (localStorage.getItem('duevinci_tour_done') !== 'true') {
+            setTimeout(() => { if (typeof window.startWalkthrough === 'function') window.startWalkthrough(); }, 1200);
+        }
+        
         const path = window.location.pathname;
         if ((path.endsWith('index.html') || path.endsWith('/')) && document.getElementById('dashboardGrid')) {
             loadDashboardStats();
             if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
-            
-            // Trigger automatic tour if it hasn't been completed yet
-            if (localStorage.getItem('duevinci_tour_done') !== 'true') {
-                setTimeout(() => { if (typeof window.startWalkthrough === 'function') window.startWalkthrough(); }, 1200);
-            }
         }
         if (path.endsWith('courses.html') && document.getElementById('coursesGrid')) loadCoursesPage();
         if (path.endsWith('calendar.html') && document.getElementById('calendar')) {
@@ -458,7 +464,9 @@ function handleAuth(session) {
             if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.add('hidden');
         }
     }
-}function showAuthMessage(msg, colorClass = "text-red-500") {
+}
+
+function showAuthMessage(msg, colorClass = "text-red-500") {
     const msgEl = document.getElementById('authMessage');
     if(msgEl) {
         msgEl.textContent = msg;
@@ -491,38 +499,104 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- INTERACTIVE TOUR (DRIVER.JS) ---
-window.startWalkthrough = () => {
+// --- MULTI-PAGE INTERACTIVE TOUR ROUTER (DRIVER.JS) ---
+window.startWalkthrough = (manualStart = false) => {
     if (typeof window.driver === 'undefined') return;
     
-    const driver = window.driver.js.driver;
-    const path = window.location.pathname;
-    
-    let steps = [
-        { popover: { title: 'Welcome to DueVinci! 🎓', description: 'Let us take a quick tour of your new academic workspace.' } },
-        { element: 'aside nav', popover: { title: 'Navigation Menu', description: 'Your main control center. Switch between your dashboard, classes, grades, and calendar here.', side: "right", align: 'start' } },
-        { element: '#timerDisplay', popover: { title: 'Integrated Pomodoro', description: 'Manage your study blocks here. If you collapse the sidebar, this timer will float so you can always see it.', side: "right" } }
-    ];
+    if (manualStart) {
+        localStorage.removeItem('duevinci_tour_done');
+        localStorage.setItem('duevinci_tour_stage', 'dashboard');
+        
+        const tourBtn = document.getElementById('tourNavButton');
+        if (tourBtn) tourBtn.classList.remove('hidden');
 
-    if (path.endsWith('index.html') || path.endsWith('/') || path.includes('DueVinci')) {
-        steps.push({ element: '#dashboardGrid', popover: { title: 'Dashboard Overview', description: 'Here you will see your upcoming lessons and your overall progress for each course.', side: "top" } });
-    } else if (path.endsWith('courses.html')) {
-        steps.push({ element: '#courseForm', popover: { title: 'Add a Class', description: 'Create a new course here, then drag it into a Term Folder below.', side: "bottom" } });
-    } else if (path.endsWith('grades.html')) {
-        steps.push({ element: '#gpaBadgeContainer', popover: { title: 'Cumulative GPA', description: 'Your overall GPA automatically calculates and floats in the header.', side: "bottom" } });
+        if (!window.location.pathname.endsWith('index.html') && !window.location.pathname.endsWith('/')) {
+            window.location.href = 'index.html';
+            return;
+        }
     }
 
-    steps.push({ element: 'header .sign-out-btn', popover: { title: 'Sign Out', description: 'You are all set! You can sign out here whenever you are done.', side: "bottom", align: "end" } });
+    if (localStorage.getItem('duevinci_tour_done') === 'true') {
+        const tourBtn = document.getElementById('tourNavButton');
+        if (tourBtn) tourBtn.classList.add('hidden');
+        return;
+    }
+
+    const driver = window.driver.js.driver;
+    const path = window.location.pathname;
+    const stage = localStorage.getItem('duevinci_tour_stage') || 'dashboard';
+
+    let steps = [];
+
+    if ((path.endsWith('index.html') || path.endsWith('/') || path.includes('DueVinci')) && stage === 'dashboard') {
+        steps = [
+            { popover: { title: 'Welcome to DueVinci! 🎓', description: 'Let us take a quick tour of your new academic workspace.' } },
+            { element: 'aside nav', popover: { title: 'Navigation Menu', description: 'Your main control center. Switch between your dashboard, classes, grades, and calendar here.', side: "right", align: 'start' } },
+            { element: '#timerDisplay', popover: { title: 'Integrated Pomodoro', description: 'Manage your study blocks here. If you collapse the sidebar, this timer will float so you can always see it.', side: "right" } },
+            { element: '#dashboardGrid', popover: { title: 'Dashboard Overview', description: 'View your upcoming lessons and course progress goals here.', side: "top" } },
+            { element: 'a[href="courses.html"]', popover: { title: 'Next Stop: Classes', description: 'Click Done to automatically head over to the Classes page to continue the tour.', side: "right" } }
+        ];
+    } else if (path.endsWith('courses.html') && stage === 'courses') {
+        steps = [
+            { popover: { title: 'Classes & Syllabus 📚', description: 'This is where you manage your curriculum.' } },
+            { element: '#courseFormContainer', popover: { title: 'Add a Class', description: 'Create a new course here with custom emojis and color tags.', side: "bottom" } },
+            { element: '#newTermInput', popover: { title: 'Term Folders', description: 'Create folders for your semesters (e.g., Fall 2026) and drag-and-drop your classes into them.', side: "bottom" } },
+            { element: '#alphabeticalCourseList', popover: { title: 'Course Settings', description: 'Click any class card to upload a PDF syllabus, scan screenshots, or manage assignments manually.', side: "top" } },
+            { element: 'a[href="grades.html"]', popover: { title: 'Next Stop: Grades', description: 'Click Done to jump to the Grades tracker.', side: "right" } }
+        ];
+    } else if (path.endsWith('grades.html') && stage === 'grades') {
+        steps = [
+            { popover: { title: 'Academic Grades 💯', description: 'Track your performance in real-time.' } },
+            { element: '#gradesContainer', popover: { title: 'Grade Inputs', description: 'Enter grades for your completed coursework here. Course averages will calculate automatically.', side: "top" } },
+            { element: '#gpaBadgeContainer', popover: { title: 'Cumulative GPA', description: 'Your overall GPA lives up here. You can change the scale (4.0/5.0) in Settings.', side: "bottom" } },
+            { element: 'a[href="calendar.html"]', popover: { title: 'Next Stop: Calendar', description: 'Click Done to jump to your Schedule.', side: "right" } }
+        ];
+    } else if (path.endsWith('calendar.html') && stage === 'calendar') {
+        steps = [
+            { popover: { title: 'Interactive Calendar 📅', description: 'Visualize your deadlines.' } },
+            { element: '#calendar', popover: { title: 'Schedule View', description: 'All your course assignments automatically populate here. Click assignments to instantly mark them complete!', side: "top" } },
+            { element: 'button[onclick="openEventModal()"]', popover: { title: 'Custom Events', description: 'Add your own personal study sessions or reminders here.', side: "bottom" } },
+            { element: 'button[onclick="exportToICS()"]', popover: { title: 'Export Schedule', description: 'Export your schedule to Apple Calendar or Google Calendar.', side: "bottom" } },
+            { element: 'header .sign-out-btn', popover: { title: 'Tour Complete! 🎉', description: 'You are all set. Enjoy using DueVinci!', side: "bottom", align: "end" } }
+        ];
+    }
+
+    if (steps.length === 0) return;
 
     const driverObj = driver({
-      showProgress: true,
-      steps: steps,
-      onDestroyStarted: () => {
-        if (!driverObj.hasNextStep() || confirm("Are you sure you want to exit the tour?")) {
-          localStorage.setItem('duevinci_tour_done', 'true');
-          driverObj.destroy();
+        showProgress: true,
+        steps: steps,
+        onDestroyStarted: () => {
+            if (!driverObj.hasNextStep()) {
+                if (stage === 'dashboard') {
+                    localStorage.setItem('duevinci_tour_stage', 'courses');
+                    driverObj.destroy();
+                    window.location.href = 'courses.html';
+                } else if (stage === 'courses') {
+                    localStorage.setItem('duevinci_tour_stage', 'grades');
+                    driverObj.destroy();
+                    window.location.href = 'grades.html';
+                } else if (stage === 'grades') {
+                    localStorage.setItem('duevinci_tour_stage', 'calendar');
+                    driverObj.destroy();
+                    window.location.href = 'calendar.html';
+                } else if (stage === 'calendar') {
+                    localStorage.setItem('duevinci_tour_done', 'true');
+                    localStorage.removeItem('duevinci_tour_stage');
+                    const tourBtn = document.getElementById('tourNavButton');
+                    if (tourBtn) tourBtn.classList.add('hidden');
+                    driverObj.destroy();
+                }
+            } else {
+                if (confirm("Are you sure you want to exit the tour?")) {
+                    localStorage.setItem('duevinci_tour_done', 'true');
+                    localStorage.removeItem('duevinci_tour_stage');
+                    const tourBtn = document.getElementById('tourNavButton');
+                    if (tourBtn) tourBtn.classList.add('hidden');
+                    driverObj.destroy();
+                }
+            }
         }
-      }
     });
     
     driverObj.drive();
@@ -758,7 +832,9 @@ function renderAlphabeticals() {
                 <div>${checkIcon}</div>
             </div>`;
     });
-}window.handleDragStart = (e, courseId) => {
+}
+
+window.handleDragStart = (e, courseId) => {
     e.dataTransfer.setData('text/plain', courseId);
 };
 
