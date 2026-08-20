@@ -592,6 +592,37 @@ window.startWalkthrough = (manualStart = false) => {
     driverObj.drive();
 };
 
+window.confirmAccountDeletion = async () => {
+    const confirmed = confirm("Are you sure you want to permanently delete your account and all academic data? This will immediately remove all your courses, assignments, grades, notes, and calendar events. This action CANNOT be undone.");
+    if (!confirmed) return;
+
+    const typed = prompt("To confirm permanent deletion of your account and all data, please type DELETE in capital letters:");
+    if (typed !== "DELETE") {
+        alert("Deletion canceled. You must type DELETE to confirm.");
+        return;
+    }
+
+    try {
+        if (currentUser && currentUser.id) {
+            await supabaseClient.from('assignments').delete().eq('user_id', currentUser.id);
+            await supabaseClient.from('courses').delete().eq('user_id', currentUser.id);
+            await supabaseClient.from('custom_events').delete().eq('user_id', currentUser.id);
+        }
+
+        localStorage.clear();
+        sessionStorage.clear();
+        if (typeof deleteCookie === 'function') deleteCookie('duevinci_tour_done');
+
+        await supabaseClient.auth.signOut();
+
+        alert("Your account and all associated data have been permanently deleted.");
+        window.location.href = 'index.html';
+    } catch (err) {
+        console.error("Account deletion error:", err);
+        alert("An error occurred while deleting your data: " + err.message);
+    }
+};
+
 window.ensureSettingsModalExists = () => {
     let div = document.getElementById('settingsModal');
     if (!div) {
@@ -599,20 +630,29 @@ window.ensureSettingsModalExists = () => {
         div.id = 'settingsModal';
         div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
-                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
-                    <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
-                    <nav class="space-y-1">
-                        <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
-                        <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
-                    </nav>
+            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[460px] max-h-[90vh]">
+                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                        <nav class="space-y-1">
+                            <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                            <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                            <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
+                        </nav>
+                    </div>
+                    <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
+                        <a href="privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
+                        <a href="terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
+                    </div>
                 </div>
-                <div class="flex-1 p-6 relative">
+                <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
                     <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                    
+                    <!-- Tab: Profile -->
                     <div id="content-profile" class="block space-y-6">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Profile & Security</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
                             <div>
@@ -623,14 +663,31 @@ window.ensureSettingsModalExists = () => {
                                 <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
                                 <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
-                            <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
+                            <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition shadow-sm">Save Profile Changes</button>
                             <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
                         </form>
+
+                        <!-- Danger Zone: Self-Service Deletion -->
+                        <div class="pt-6 border-t border-red-200 dark:border-red-900/50 space-y-3">
+                            <div class="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold text-sm">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                Danger Zone: Permanent Data Deletion
+                            </div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                Permanently wipe all your enrolled classes, assignments, grades, study notes, calendar events, and account information from our database. This action cannot be undone.
+                            </p>
+                            <button type="button" onclick="confirmAccountDeletion()" class="px-4 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-xs font-bold rounded-lg border border-red-200 dark:border-red-800/60 transition flex items-center gap-2">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Delete Account & All Data
+                            </button>
+                        </div>
                     </div>
+
+                    <!-- Tab: Appearance -->
                     <div id="content-appearance" class="hidden space-y-6">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Appearance & Preferences</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks and operates on this device.</p>
                         </div>
                         <div class="max-w-sm">
                             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
@@ -641,6 +698,53 @@ window.ensureSettingsModalExists = () => {
                             </select>
                         </div>
                     </div>
+
+                    <!-- Tab: Privacy & AI -->
+                    <div id="content-privacy" class="hidden space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Privacy & AI Data Transparency</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">How your student information and AI requests are protected.</p>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <!-- Gemini AI Card -->
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                                <div class="flex items-center gap-2 font-bold text-sm text-indigo-600 dark:text-indigo-400">
+                                    <span>🤖</span> Google Gemini AI Processing
+                                </div>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    <strong>What is sent:</strong> Only uploaded syllabus text or schedule screenshots strictly for automated assignment parsing.<br>
+                                    <strong>What is never sent:</strong> Student passwords, IDs, grades, or personal profile details.<br>
+                                    <strong>Zero Model Training:</strong> Processed transiently in-memory and <em>never</em> used to train Google's foundation AI models.
+                                </p>
+                            </div>
+
+                            <!-- Supabase Storage & Backups Card -->
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                                <div class="flex items-center gap-2 font-bold text-sm text-indigo-600 dark:text-indigo-400">
+                                    <span>🛡️</span> Data Retention & Supabase Backups
+                                </div>
+                                <p class="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                                    <strong>Active Storage:</strong> Encrypted PostgreSQL with Row Level Security (RLS) guarantees total account isolation.<br>
+                                    <strong>Immediate Deletion:</strong> Any course, assignment, or event you delete is permanently removed from live database tables immediately.<br>
+                                    <strong>Backup Retention:</strong> Automated encrypted disaster recovery snapshots are kept on a rolling 7–30 day lifecycle before being overwritten and destroyed.
+                                </p>
+                            </div>
+
+                            <!-- User Rights & Policy Links -->
+                            <div class="p-4 bg-indigo-50/50 dark:bg-brand-900 rounded-xl border border-indigo-100 dark:border-brand-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                    <div class="font-bold text-zinc-900 dark:text-white">Live Legal & Compliance Policies</div>
+                                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400">Review our complete data retention and terms documentation.</div>
+                                </div>
+                                <div class="flex gap-2 shrink-0">
+                                    <a href="privacy.html" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition">Privacy Policy ↗</a>
+                                    <a href="terms.html" class="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded-lg font-bold text-xs transition">Terms of Use ↗</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         `;
@@ -719,21 +823,22 @@ window.closeSettingsModal = () => {
 };
 
 window.switchSettingsTab = (tabName) => {
-    const cp = document.getElementById('content-profile');
-    const ca = document.getElementById('content-appearance');
-    if (cp) cp.classList.add('hidden');
-    if (ca) ca.classList.add('hidden');
-
-    const tp = document.getElementById('tab-profile');
-    const ta = document.getElementById('tab-appearance');
-    if (tp) tp.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
-    if (ta) ta.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
-
-    const contentTarget = document.getElementById(`content-${tabName}`);
-    if (contentTarget) contentTarget.classList.remove('hidden');
-
-    const tabTarget = document.getElementById(`tab-${tabName}`);
-    if (tabTarget) tabTarget.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+    const tabs = ['profile', 'appearance', 'privacy'];
+    tabs.forEach(t => {
+        const content = document.getElementById(`content-${t}`);
+        const tabBtn = document.getElementById(`tab-${t}`);
+        if (content) {
+            if (t === tabName) content.classList.remove('hidden');
+            else content.classList.add('hidden');
+        }
+        if (tabBtn) {
+            if (t === tabName) {
+                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+            } else {
+                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+            }
+        }
+    });
 };
 
 async function loadDashboardStats() {
