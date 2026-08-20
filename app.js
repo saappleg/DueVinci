@@ -20,7 +20,7 @@ if (currentHost.includes('github.io') || currentHost.includes('duevinci.tech')) 
     SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
     console.log('🔧 Running in Development Mode (DueVinci-Dev)');
 }
-}
+
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
