@@ -13,10 +13,12 @@
     </script>
     <script>
         const theme = localStorage.getItem('theme') || 'system';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
     </script>
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon-16x16.png">
     <link rel="stylesheet" href="../assets/css/greek-theme.css" />
+    <link rel="stylesheet" href="../assets/css/renaissance-theme.css" />
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans min-h-screen transition-colors duration-200 selection:bg-indigo-500/30">
 

@@ -46,4 +46,5 @@ jobs:
           test -f sw.js || { echo "Missing sw.js"; exit 1; }
           test -f js/app.js || { echo "Missing js/app.js"; exit 1; }
           test -f assets/css/greek-theme.css || { echo "Missing greek-theme.css"; exit 1; }
+          test -f assets/css/renaissance-theme.css || { echo "Missing renaissance-theme.css"; exit 1; }
           echo "All core assets verified successfully!"

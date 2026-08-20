@@ -159,7 +159,7 @@ export function triggerMaestroRain() {
     badge.style.animation = 'maestroBadgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
     badge.innerHTML = `
         <div class="w-9 h-9 rounded-xl bg-[#eae7dc] p-1 flex items-center justify-center shadow-inner">
-            <img src="assets/images/maestro-logo.svg" alt="Maestro" class="w-full h-full object-contain">
+            <img src="${getBasePath()}assets/images/maestro-logo.svg" alt="Maestro" class="w-full h-full object-contain">
         </div>
         <div>
             <div class="text-xs font-black tracking-wider uppercase text-amber-400">Maestro University</div>
