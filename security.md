@@ -1,5 +1,6 @@
 DueVinci Privacy, Security, and Data Retention Policy
 Last Updated: August 19, 2026
+
 At DueVinci, your privacy and data security are our highest priorities. This policy outlines how your information is collected, used, protected, and retained when you use the DueVinci web application.
 1. Information We Collect
 To provide you with a personalized academic planning experience, we collect the following types of information:
