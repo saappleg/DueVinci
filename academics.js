@@ -15,18 +15,20 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
     let completedCount = 0;
     let totalCount = 0;
     let examCountdownsHtml = '';
+    let assignmentsData = [];
 
     try {
         const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code, emoji)');
+        assignmentsData = assignments || [];
         
-        if (assignments) {
+        if (assignmentsData.length > 0) {
             // Count ONLY individual lessons or review exams/tests/finals
-            const validItems = assignments.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
+            const validItems = assignmentsData.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
             totalCount = validItems.length;
             completedCount = validItems.filter(a => a.is_completed).length;
 
             // Filter uncompleted assignments matching exams, finals, midterms, or tests
-            const uncompletedExams = assignments.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
+            const uncompletedExams = assignmentsData.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
             
             if (uncompletedExams.length > 0) {
                 examCountdownsHtml = uncompletedExams.map(exam => {
@@ -69,26 +71,87 @@ window.renderAcademicsDashboardWidget = async (containerId) => {
         console.error("Error calculating streak:", err);
     }
 
+    // Calculate 7-Day Workload & Stress Radar
+    let workloadHtml = '';
+    try {
+        const days = [];
+        const now = new Date();
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(now);
+            d.setDate(now.getDate() + i);
+            const dateStr = d.toISOString().split('T')[0];
+            const dayName = i === 0 ? 'Today' : (i === 1 ? 'Tmrw' : d.toLocaleDateString('en-US', { weekday: 'short' }));
+            const displayDate = `${d.getMonth() + 1}/${d.getDate()}`;
+            
+            let dayTasks = 0;
+            let hasExam = false;
+            if (assignmentsData && assignmentsData.length > 0) {
+                dayTasks = assignmentsData.filter(a => !a.is_completed && a.due_date === dateStr).length;
+                hasExam = assignmentsData.some(a => !a.is_completed && a.due_date === dateStr && /(exam|final|midterm|test)/i.test(a.title));
+            }
+            
+            let intensityClass = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800';
+            let statusLabel = 'Chill';
+            if (hasExam) {
+                intensityClass = 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-700 animate-pulse';
+                statusLabel = '🔥 Exam';
+            } else if (dayTasks >= 4) {
+                intensityClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-800';
+                statusLabel = `${dayTasks} Tasks`;
+            } else if (dayTasks >= 2) {
+                intensityClass = 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+                statusLabel = `${dayTasks} Tasks`;
+            } else if (dayTasks === 1) {
+                intensityClass = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800';
+                statusLabel = '1 Task';
+            }
+
+            days.push(`
+                <div class="flex-1 min-w-[70px] p-2 rounded-lg border text-center ${intensityClass} transition hover:scale-105">
+                    <div class="text-[10px] font-bold uppercase tracking-wider opacity-75">${dayName}</div>
+                    <div class="text-xs font-black my-0.5">${displayDate}</div>
+                    <div class="text-[10px] font-bold truncate">${statusLabel}</div>
+                </div>
+            `);
+        }
+        workloadHtml = `
+            <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                        <span>📊</span> 7-Day Workload & Stress Radar
+                    </span>
+                    <span class="text-[11px] text-zinc-400">Green = Light • Amber = Moderate • Red = Exam/Heavy</span>
+                </div>
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                    ${days.join('')}
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error("Error calculating workload radar:", err);
+    }
+
     const analyticsDiv = document.createElement('div');
     analyticsDiv.id = 'academicsAnalyticsWidget';
-    analyticsDiv.className = 'mb-6';
+    analyticsDiv.className = 'mb-6 bg-white dark:bg-brand-800 p-5 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm';
     analyticsDiv.innerHTML = `
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/80 dark:border-brand-700">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Study Streak</h4>
                 <p class="text-2xl font-extrabold text-emerald-500">🔥 ${streakDays} Day${streakDays === 1 ? '' : 's'}</p>
             </div>
-            <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/80 dark:border-brand-700">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Tasks Completed</h4>
                 <p id="tasksCompletedCount" class="text-2xl font-extrabold text-amber-500">${completedCount} / ${totalCount}</p>
             </div>
-            <div class="bg-white dark:bg-brand-800 p-4 rounded-xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/80 dark:border-brand-700">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Exams & Finals Countdown</h4>
-                <div class="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                <div class="mt-1 space-y-1 max-h-16 overflow-y-auto pr-1">
                     ${examCountdownsHtml}
                 </div>
             </div>
         </div>
+        ${workloadHtml}
     `;
 
     const headerTitle = container.querySelector('.flex.justify-between.items-end');

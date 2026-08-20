@@ -37,18 +37,35 @@ let lastProcessedSessionToken = null;
 
 // --- COOKIE HELPERS FOR TOUR STATE ---
 window.setCookie = (name, value, days = 365) => {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    document.cookie = `${name}=${value};path=/;expires=${d.toUTCString()}`;
+    try {
+        const d = new Date();
+        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};path=/;expires=${d.toUTCString()}`;
+    } catch (e) {}
+    try {
+        localStorage.setItem(`cookie_${name}`, value);
+    } catch (e) {}
 };
 
 window.getCookie = (name) => {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
+    try {
+        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        if (match) return match[2];
+    } catch (e) {}
+    try {
+        return localStorage.getItem(`cookie_${name}`);
+    } catch (e) {
+        return null;
+    }
 };
 
 window.deleteCookie = (name) => {
-    document.cookie = `${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+    try {
+        document.cookie = `${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+    } catch (e) {}
+    try {
+        localStorage.removeItem(`cookie_${name}`);
+    } catch (e) {}
 };
 
 // --- STRICT PAGE PATH DETECTOR ---
@@ -589,11 +606,108 @@ window.startWalkthrough = (manualStart = false) => {
         steps: steps,
         onDestroyStarted: () => {
             setCookie('duevinci_tour_done', 'true');
+            if (typeof window.updateTourButtonVisibility === 'function') window.updateTourButtonVisibility();
             driverObj.destroy();
         }
     });
 
     driverObj.drive();
+};
+
+window.updateTourButtonVisibility = () => {
+    const isDone = getCookie('duevinci_tour_done') === 'true';
+    document.querySelectorAll('#interactiveTourSidebarBtn').forEach(btn => {
+        if (isDone) {
+            btn.classList.add('hidden');
+        } else {
+            btn.classList.remove('hidden');
+        }
+    });
+};
+
+window.replayTourFromSettings = () => {
+    if (typeof window.closeSettingsModal === 'function') window.closeSettingsModal();
+    deleteCookie('duevinci_tour_done');
+    if (typeof window.updateTourButtonVisibility === 'function') window.updateTourButtonVisibility();
+    setTimeout(() => {
+        startWalkthrough(true);
+    }, 200);
+};
+
+// --- WHAT'S NEW IN DUEVINCI MODAL ---
+window.ensureWhatsNewModalExists = () => {
+    if (document.getElementById('whatsNewModal')) return;
+    const div = document.createElement('div');
+    div.id = 'whatsNewModal';
+    div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/70 backdrop-blur-sm hidden p-4';
+    div.innerHTML = `
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="p-6 pb-4 border-b border-zinc-100 dark:border-brand-700 flex items-center justify-between bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">✨</span>
+                    <div>
+                        <h3 class="font-black text-lg text-zinc-900 dark:text-white">What's New in DueVinci</h3>
+                        <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version 2.2 Feature Drop</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
+            </div>
+            <div class="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto text-xs">
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">🎯</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">"What-If" Grade Simulator</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Experiment with hypothetical scores on upcoming exams on the Grades page to see exactly what score you need to keep your target GPA.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">📊</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">7-Day Workload & Stress Radar</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Visualize your upcoming academic load across the next 7 days right on your Dashboard to avoid crunch weeks.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">🎴</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">AI Flashcards & Practice Quizzes</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Generate interactive study flashcard decks and 5-minute practice checks directly inside your course drawer.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">📱</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Installable App & Offline Mode</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Install DueVinci on your laptop or phone as a standalone PWA with offline caching.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-zinc-50 dark:bg-brand-900/80 border-t border-zinc-200/70 dark:border-brand-700 flex justify-end">
+                <button type="button" onclick="closeWhatsNewModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md">
+                    Explore New Features 🚀
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(div);
+};
+
+window.openWhatsNewModal = () => {
+    window.ensureWhatsNewModalExists();
+    const m = document.getElementById('whatsNewModal');
+    if (m) m.classList.remove('hidden');
+};
+
+window.closeWhatsNewModal = () => {
+    localStorage.setItem('duevinci_whats_new_seen', 'v2.2');
+    const m = document.getElementById('whatsNewModal');
+    if (m) m.classList.add('hidden');
+};
+
+window.checkWhatsNewOnLaunch = () => {
+    if (localStorage.getItem('duevinci_whats_new_seen') !== 'v2.2') {
+        setTimeout(window.openWhatsNewModal, 900);
+    }
 };
 
 window.confirmAccountDeletion = async () => {
@@ -645,6 +759,7 @@ window.ensureSettingsModalExists = () => {
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
+                        <button type="button" onclick="openWhatsNewModal()" class="block text-indigo-600 dark:text-indigo-400 font-bold hover:underline">What's New ✨</button>
                         <a href="privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                         <a href="terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
@@ -670,6 +785,15 @@ window.ensureSettingsModalExists = () => {
                             <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition shadow-sm">Save Profile Changes</button>
                             <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
                         </form>
+
+                        <!-- Guided Tour Refresher -->
+                        <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl">
+                            <div>
+                                <div class="font-bold text-sm text-zinc-900 dark:text-white">Interactive Walkthrough</div>
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400">Relaunch the step-by-step tour anytime</div>
+                            </div>
+                            <button type="button" onclick="replayTourFromSettings()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-sm">Replay Tour 🎓</button>
+                        </div>
 
                         <!-- Danger Zone: Self-Service Deletion -->
                         <div class="pt-6 border-t border-red-200 dark:border-red-900/50 space-y-3">
@@ -1176,14 +1300,51 @@ async function loadDashboardStats() {
             const complete = cAssign.filter(a => a.is_completed).length;
             let pct = course.is_completed ? 100 : (cAssign.length ? Math.round((complete/cAssign.length)*100) : 0);
             
+            const runnerPos = Math.min(Math.max(pct, 0), 94);
+            const isWinner = pct === 100;
+            
             goalsListEl.innerHTML += `
-                <div>
-                    <div class="flex justify-between text-sm mb-2"><span class="font-bold text-zinc-700 dark:text-zinc-300">${course.emoji} ${course.code}</span><span class="font-bold" style="color: ${course.color}">${pct}%</span></div>
-                    <div class="w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${course.color}"></div></div>
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-sm items-center">
+                        <span class="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                            <span>${course.emoji}</span> ${course.code}
+                        </span>
+                        <span class="font-extrabold text-xs flex items-center gap-1" style="color: ${course.color}">
+                            ${isWinner ? '<span class="animate-bounce">🏆</span>' : ''} ${pct}%
+                        </span>
+                    </div>
+                    <!-- Sprint Track with Running Man Easter Egg -->
+                    <div class="relative w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-3.5 overflow-visible my-1 flex items-center">
+                        <div class="h-3.5 rounded-full transition-all duration-700 shadow-sm" style="width: ${pct}%; background-color: ${course.color}"></div>
+                        <!-- Animated Runner -->
+                        <div onclick="celebrateRunner(this, ${pct})" class="absolute top-1/2 -translate-y-1/2 transition-all duration-700 cursor-pointer select-none text-sm hover:scale-135 drop-shadow-sm z-10" style="left: calc(${runnerPos}% - 7px);" title="${isWinner ? 'Goal completed! Winner! 🏆 (Click to celebrate)' : 'Keep pushing! 🏃‍♂️ (Click me!)'}">
+                            ${isWinner ? '🥇' : '🏃‍♂️'}
+                        </div>
+                        <!-- Finish Flag -->
+                        <div class="absolute right-0.5 top-1/2 -translate-y-1/2 text-xs select-none pointer-events-none opacity-85">
+                            🏁
+                        </div>
+                    </div>
                 </div>`;
         });
     }
 }
+
+window.celebrateRunner = (el, pct) => {
+    if (typeof confetti === 'function') {
+        confetti({ 
+            particleCount: pct === 100 ? 50 : 25, 
+            spread: 50, 
+            origin: { y: 0.65 } 
+        });
+    }
+    if (el) {
+        el.style.transform = 'translateY(-50%) rotate(360deg) scale(1.4)';
+        setTimeout(() => {
+            el.style.transform = 'translateY(-50%)';
+        }, 500);
+    }
+};
 
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
@@ -1496,7 +1657,7 @@ window.closeCourseModal = () => {
 };
 
 window.switchCourseTab = (tabName) => {
-    ['overview', 'resources', 'scratchpad'].forEach(t => {
+    ['overview', 'resources', 'scratchpad', 'studyquiz'].forEach(t => {
         const panel = document.getElementById(`panel-${t}`);
         const btn = document.getElementById(`tabBtn-${t}`);
         if (panel) panel.classList.toggle('hidden', t !== tabName);
@@ -1983,7 +2144,32 @@ window.deleteAssignment = async (assignId, courseId) => {
     loadAssignments(courseId, currentAssignmentPage);
 };
 
-async function loadGradesPage() {
+let isSimulatingGrades = false;
+let simulatedGradesMap = {};
+
+window.toggleGradeSimulator = () => {
+    isSimulatingGrades = !isSimulatingGrades;
+    if (!isSimulatingGrades) {
+        simulatedGradesMap = {};
+    }
+    loadGradesPage();
+};
+
+window.resetGradeSimulation = () => {
+    simulatedGradesMap = {};
+    loadGradesPage();
+};
+
+window.simulateAssignmentGrade = (assignId, gradeVal) => {
+    if (gradeVal === '' || gradeVal === null) {
+        delete simulatedGradesMap[assignId];
+    } else {
+        simulatedGradesMap[assignId] = parseFloat(gradeVal);
+    }
+    loadGradesPage(true);
+};
+
+async function loadGradesPage(isFastRecalc = false) {
     const container = document.getElementById('gradesContainer');
     if (!container) return;
 
@@ -1994,6 +2180,33 @@ async function loadGradesPage() {
     container.innerHTML = '';
     let totalGradePoints = 0;
     let gradedCount = 0;
+
+    // Simulator Top Control Banner
+    const simBanner = `
+        <div class="mb-6 p-5 rounded-2xl border transition-all ${isSimulatingGrades ? 'bg-indigo-50/50 dark:bg-indigo-950/40 border-indigo-500 shadow-md ring-2 ring-indigo-500/20' : 'bg-white dark:bg-brand-800 border-zinc-200 dark:border-brand-700 shadow-sm'}">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${isSimulatingGrades ? 'bg-indigo-600 text-white animate-pulse' : 'bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400'}">🎯</div>
+                    <div>
+                        <h3 class="font-extrabold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+                            "What-If" Target Grade Simulator
+                            ${isSimulatingGrades ? '<span class="px-2 py-0.5 bg-indigo-500 text-white rounded text-[10px] uppercase font-bold tracking-wider animate-pulse">Simulator Active</span>' : ''}
+                        </h3>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            ${isSimulatingGrades ? 'Type hypothetical exam or lesson scores below to see projected GPA in real time. (Your real saved grades are never changed).' : 'Test hypothetical exam scores to calculate what score you need to reach your target GPA.'}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                    ${isSimulatingGrades ? '<button type="button" onclick="resetGradeSimulation()" class="px-3.5 py-2 bg-zinc-200 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition hover:bg-zinc-300">Reset Sim</button>' : ''}
+                    <button type="button" onclick="toggleGradeSimulator()" class="px-4 py-2 ${isSimulatingGrades ? 'bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+                        ${isSimulatingGrades ? 'Exit Simulator ✕' : 'Launch Simulator 🎯'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    container.innerHTML = simBanner;
 
     courses.forEach(course => {
         const cAssignments = assignments.filter(a => a.course_id === course.id && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
@@ -2027,19 +2240,25 @@ async function loadGradesPage() {
             });
 
             unitsMap[uNum].forEach(item => {
-                if (item.grade !== null && item.grade !== undefined && !item.exclude_from_gpa) {
-                    courseTotal += parseFloat(item.grade);
+                const activeGrade = isSimulatingGrades && simulatedGradesMap[item.id] !== undefined ? simulatedGradesMap[item.id] : item.grade;
+                const isSimulatedVal = isSimulatingGrades && simulatedGradesMap[item.id] !== undefined;
+
+                if (activeGrade !== null && activeGrade !== undefined && !item.exclude_from_gpa) {
+                    courseTotal += parseFloat(activeGrade);
                     courseGraded++;
                 }
+
+                const inputHandler = isSimulatingGrades ? `oninput="simulateAssignmentGrade('${item.id}', this.value)"` : `onchange="updateAssignmentGrade('${item.id}', this.value)"`;
+
                 lessonsHtml += `
-                    <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
-                        <span class="font-bold truncate flex-1">${item.title}</span>
+                    <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border ${isSimulatedVal ? 'border-indigo-400 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
+                        <span class="font-bold truncate flex-1 ${isSimulatedVal ? 'text-indigo-600 dark:text-indigo-400' : ''}">${item.title}</span>
                         <div class="flex items-center gap-3">
                             <label class="flex items-center gap-1.5 text-[11px] text-zinc-400 cursor-pointer">
                                 <input type="checkbox" ${item.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa('${item.id}', this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
                             </label>
                             <div class="flex items-center gap-1">
-                                <input type="number" min="0" max="100" value="${item.grade !== null && item.grade !== undefined ? item.grade : ''}" placeholder="--" onchange="updateAssignmentGrade('${item.id}', this.value)" class="w-16 text-center text-xs font-bold p-1 rounded border dark:bg-brand-800 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                                <input type="number" min="0" max="100" value="${activeGrade !== null && activeGrade !== undefined ? activeGrade : ''}" placeholder="--" ${inputHandler} class="w-16 text-center text-xs font-bold p-1 rounded border ${isSimulatedVal ? 'border-indigo-500 bg-indigo-50 dark:bg-brand-800 text-indigo-600 font-black' : 'dark:bg-brand-800 dark:border-brand-600'} focus:outline-none focus:border-indigo-500">
                                 <span class="text-zinc-400">%</span>
                             </div>
                         </div>
@@ -2061,7 +2280,7 @@ async function loadGradesPage() {
         }
 
         container.innerHTML += `
-            <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm">
+            <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm mb-4">
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-brand-700">
                     <div class="flex items-center gap-3">
                         <span class="text-2xl">${course.emoji || '📚'}</span>
@@ -2092,6 +2311,89 @@ window.updateAssignmentGrade = async (assignId, gradeVal) => {
 window.toggleExcludeGpa = async (assignId, excluded) => {
     await supabaseClient.from('assignments').update({ exclude_from_gpa: excluded }).eq('id', assignId);
     loadGradesPage();
+};
+
+// --- AI STUDY FLASHCARDS & PRACTICE QUIZ ---
+let currentDeckCards = [];
+let currentCardIndex = 0;
+let isCardFlipped = false;
+
+window.generateStudyDeck = async (courseId) => {
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
+
+    const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
+    const topics = assignments ? assignments.map(a => a.title.replace('↳', '').trim()).filter(Boolean) : [];
+    
+    const deck = [];
+    if (topics.length > 0) {
+        topics.slice(0, 8).forEach((t, idx) => {
+            deck.push({
+                term: `${course.code}: ${t}`,
+                definition: `Key concept in Unit ${Math.floor(idx/3)+1}. Review core principles, active recall points, and test requirements for ${t}.`
+            });
+        });
+    } else {
+        deck.push(
+            { term: `${course.code} Overview`, definition: 'Core fundamentals, introductory terminology, and foundational course methodologies.' },
+            { term: 'Methodology & Application', definition: 'Key analytical problem-solving techniques and formulas applied throughout the semester.' },
+            { term: 'Midterm Review Focus', definition: 'High-frequency exam concepts, synthetic problem sets, and practical applications.' }
+        );
+    }
+    
+    currentDeckCards = deck;
+    currentCardIndex = 0;
+    isCardFlipped = false;
+    renderFlashcardView();
+};
+
+window.renderFlashcardView = () => {
+    const container = document.getElementById('studyQuizContainer');
+    if (!container || currentDeckCards.length === 0) return;
+    
+    const card = currentDeckCards[currentCardIndex];
+    container.innerHTML = `
+        <div class="space-y-4 text-center">
+            <div class="flex justify-between items-center text-xs text-zinc-400 font-bold px-2">
+                <span>Card ${currentCardIndex + 1} of ${currentDeckCards.length}</span>
+                <span class="text-indigo-500 font-medium">Click card to flip 🔄</span>
+            </div>
+            <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[160px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.02]">
+                <div class="text-[11px] uppercase tracking-wider font-extrabold ${isCardFlipped ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-400'} mb-2">
+                    ${isCardFlipped ? '💡 Concept / Definition' : '📖 Term / Topic'}
+                </div>
+                <div class="font-bold text-base dark:text-white leading-relaxed">
+                    ${isCardFlipped ? card.definition : card.term}
+                </div>
+            </div>
+            <div class="flex justify-between gap-2">
+                <button onclick="prevFlashcard()" ${currentCardIndex === 0 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-200 transition"'}">← Prev</button>
+                <button onclick="flipCurrentCard()" class="px-4 py-2 bg-indigo-50 dark:bg-brand-700/60 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold border border-indigo-200 dark:border-brand-600 transition">Flip 🔄</button>
+                <button onclick="nextFlashcard()" ${currentCardIndex === currentDeckCards.length - 1 ? 'disabled class="opacity-40 px-4 py-2 bg-zinc-200 dark:bg-brand-700 rounded-lg text-xs font-bold"' : 'class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"'}">Next →</button>
+            </div>
+        </div>
+    `;
+};
+
+window.flipCurrentCard = () => {
+    isCardFlipped = !isCardFlipped;
+    renderFlashcardView();
+};
+
+window.nextFlashcard = () => {
+    if (currentCardIndex < currentDeckCards.length - 1) {
+        currentCardIndex++;
+        isCardFlipped = false;
+        renderFlashcardView();
+    }
+};
+
+window.prevFlashcard = () => {
+    if (currentCardIndex > 0) {
+        currentCardIndex--;
+        isCardFlipped = false;
+        renderFlashcardView();
+    }
 };
 
 function initCalendar() {
@@ -2189,5 +2491,145 @@ window.exportToICS = () => {
     link.click();
     document.body.removeChild(link);
 };
+
+// --- SECRET EASTER EGGS SUITE & GLOBAL COMMAND PALETTE ---
+const konamiSequence = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+let konamiPos = 0;
+
+document.addEventListener('keydown', (e) => {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k === konamiSequence[konamiPos] || e.key === konamiSequence[konamiPos]) {
+        konamiPos++;
+        if (konamiPos === konamiSequence.length) {
+            konamiPos = 0;
+            triggerKonamiEasterEgg();
+        }
+    } else {
+        konamiPos = 0;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        toggleCommandPalette();
+    }
+});
+
+window.triggerKonamiEasterEgg = () => {
+    if (typeof confetti === 'function') {
+        confetti({ particleCount: 120, spread: 100, origin: { y: 0.4 } });
+        setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 250);
+        setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 400);
+    }
+    alert("🎨 Secret Easter Egg Unlocked!\nYou discovered the Da Vinci Renaissance Gold mode! +100 Focus Mastery.");
+};
+
+window.ensureCommandPaletteExists = () => {
+    if (document.getElementById('commandPaletteModal')) return;
+    const div = document.createElement('div');
+    div.id = 'commandPaletteModal';
+    div.className = 'fixed inset-0 z-50 flex items-start justify-center pt-24 bg-zinc-900/60 backdrop-blur-sm hidden p-4';
+    div.innerHTML = `
+        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="p-4 border-b border-zinc-200 dark:border-brand-700 flex items-center gap-3">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-400" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="cmdInput" oninput="filterCommandPalette(this.value)" onkeydown="handleCmdKey(event)" placeholder="Search pages, actions, or secret commands (/party)..." class="w-full bg-transparent text-sm focus:outline-none dark:text-white">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-brand-700 text-zinc-400 font-mono">ESC</span>
+            </div>
+            <div id="cmdResults" class="p-2 max-h-72 overflow-y-auto space-y-1 text-xs">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    `;
+    document.body.appendChild(div);
+};
+
+window.toggleCommandPalette = () => {
+    window.ensureCommandPaletteExists();
+    const m = document.getElementById('commandPaletteModal');
+    if (!m) return;
+    const isHidden = m.classList.contains('hidden');
+    if (isHidden) {
+        m.classList.remove('hidden');
+        const input = document.getElementById('cmdInput');
+        if (input) {
+            input.value = '';
+            input.focus();
+            filterCommandPalette('');
+        }
+    } else {
+        m.classList.add('hidden');
+    }
+};
+
+window.filterCommandPalette = (query) => {
+    const results = document.getElementById('cmdResults');
+    if (!results) return;
+    const q = query.toLowerCase().trim();
+    
+    const items = [
+        { title: 'Dashboard', desc: 'Jump to main study dashboard', action: () => window.location.href = 'index.html', icon: '📊' },
+        { title: 'Classes & Coursework', desc: 'Manage courses, syllabus AI, and lessons', action: () => window.location.href = 'courses.html', icon: '📚' },
+        { title: 'Grades & GPA Tracker', desc: 'View course averages and GPA simulator', action: () => window.location.href = 'grades.html', icon: '🎓' },
+        { title: 'Master Calendar', desc: 'Deadlines, events, and .ics export', action: () => window.location.href = 'calendar.html', icon: '📅' },
+        { title: 'Help & Support', desc: 'Contact developer & view FAQs', action: () => openSupportModal(), icon: '💬' },
+        { title: 'What\'s New', desc: 'View latest features in version 2.2', action: () => openWhatsNewModal(), icon: '✨' },
+        { title: '/party', desc: 'Trigger celebratory confetti storm', action: () => { confetti({ particleCount: 100, spread: 80 }); }, icon: '🎉' },
+        { title: '/inspire', desc: 'Leonardo da Vinci wisdom quote', action: () => { alert('"Learning never exhausts the mind." — Leonardo da Vinci'); }, icon: '📜' },
+        { title: '/zen', desc: 'Activate Zen study aura', action: () => { confetti({ particleCount: 40, spread: 60, colors: ['#a78bfa', '#818cf8', '#c084fc'] }); }, icon: '🧘' }
+    ];
+
+    const filtered = q ? items.filter(i => i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)) : items;
+    results.innerHTML = filtered.map((item, idx) => `
+        <div onclick="executeCmd(${idx})" class="flex items-center justify-between p-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-brand-700 cursor-pointer transition">
+            <div class="flex items-center gap-3">
+                <span class="text-base">${item.icon}</span>
+                <div>
+                    <div class="font-bold text-zinc-800 dark:text-zinc-100">${item.title}</div>
+                    <div class="text-[11px] text-zinc-400">${item.desc}</div>
+                </div>
+            </div>
+            <span class="text-xs text-zinc-400">↵</span>
+        </div>
+    `).join('') || '<div class="p-4 text-center text-zinc-400 text-xs">No matching commands. Try <code>/party</code>, <code>/inspire</code>, or <code>/zen</code></div>';
+    window._currentCmdItems = filtered;
+};
+
+window.executeCmd = (idx) => {
+    if (window._currentCmdItems && window._currentCmdItems[idx]) {
+        toggleCommandPalette();
+        window._currentCmdItems[idx].action();
+    }
+};
+
+window.handleCmdKey = (e) => {
+    if (e.key === 'Escape') toggleCommandPalette();
+    if (e.key === 'Enter') {
+        if (window._currentCmdItems && window._currentCmdItems[0]) {
+            toggleCommandPalette();
+            window._currentCmdItems[0].action();
+        }
+    }
+};
+
+// PWA Service Worker Registration
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+            console.log('SW reg error:', err);
+        });
+    });
+}
+
+// Check What's New banner & tour visibility on launch
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (typeof window.checkWhatsNewOnLaunch === 'function') {
+            window.checkWhatsNewOnLaunch();
+        }
+        if (typeof window.updateTourButtonVisibility === 'function') {
+            window.updateTourButtonVisibility();
+        }
+    }, 400);
+});
 
 checkUser();

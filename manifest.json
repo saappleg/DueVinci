@@ -1,0 +1,17 @@
+{
+  "name": "DueVinci - Student Command Center",
+  "short_name": "DueVinci",
+  "description": "Smart academic planner, syllabus AI parser, GPA tracker, and Pomodoro timer.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#151515",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/academic-cap.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
