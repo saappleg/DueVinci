@@ -16,21 +16,51 @@ DueVinci is a comprehensive, student-focused academic workspace and planner. Bui
 **Frontend:**
 *   HTML5 & Vanilla JavaScript
 *   Tailwind CSS (via CDN for rapid prototyping and dark mode support)
-*   [FullCalendar](https://fullcalendar.io/) (Schedule visualization)
-*   [PDF.js](https://mozilla.github.io/pdf.js/) (Client-side PDF text extraction)
+*   FullCalendar (Schedule visualization)
+*   PDF.js (Client-side PDF text extraction)
 *   Canvas Confetti (Micro-interactions and completion rewards)
 
 **Backend & APIs:**
-*   [Supabase](https://supabase.com/): PostgreSQL Database and User Authentication
+*   **Supabase:** PostgreSQL Database and User Authentication
 *   **Supabase Edge Functions:** Serverless Deno functions handling secure API requests
-*   **Google Gemini API:** AI processing for intelligent document and image parsing (`gemini-1.5-flash`)
+*   **Google Gemini API:** AI processing for intelligent document and image parsing (`gemini-1.5-flash` / `gemini-1.5-pro`)
 
 ## 🚀 Setup & Installation
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/yourusername/duevinci.git](https://github.com/yourusername/duevinci.git)
-   cd duevinci
+   git clone [https://github.com/saappleg/DueVinci.git](https://github.com/saappleg/DueVinci.git)
+   cd DueVinci
+
+```
+
+2. **Supabase Configuration:**
+* Create a new Supabase project.
+* Set up `courses`, `assignments`, and `custom_events` tables matching the frontend schemas.
+* Add your `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `app.js`.
+
+
+3. **Edge Function Deployment:**
+* Navigate to your Supabase CLI.
+* Deploy the Gemini parser Edge Function:
+```bash
+supabase functions deploy gemini-parser
+
+```
+
+
+* Set your Gemini API key in the Supabase secrets vault:
+```bash
+supabase secrets set GEMINI_API_KEY=your_google_ai_key
+
+```
+
+
+
+
+4. **Launch:**
+Serve the static files using any local development server (e.g., Live Server extension in VS Code) and open `index.html`.
+
 ## 🔒 Data Retention & Security
 
 DueVinci is built with privacy and data security in mind, utilizing modern backend architecture to keep student data safe.
@@ -46,5 +76,16 @@ DueVinci is built with privacy and data security in mind, utilizing modern backe
 DueVinci/
 ├── index.html       # Main student dashboard (Up Next & Goals)
 ├── courses.html     # Class management & PDF syllabus parser
+├── grades.html      # Grade tracking & GPA calculations
 ├── calendar.html    # FullCalendar view & custom event manager
 └── app.js           # Core business logic, Supabase hooks, and UI controllers
+
+```
+
+## 👨‍💻 Author
+
+Created and developed by **Steven Applegate**.
+
+```
+
+```
