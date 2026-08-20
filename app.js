@@ -2575,7 +2575,8 @@ window.filterCommandPalette = (query) => {
         { title: 'What\'s New', desc: 'View latest features in version 2.2', action: () => openWhatsNewModal(), icon: '✨' },
         { title: '/party', desc: 'Trigger celebratory confetti storm', action: () => { confetti({ particleCount: 100, spread: 80 }); }, icon: '🎉' },
         { title: '/inspire', desc: 'Leonardo da Vinci wisdom quote', action: () => { alert('"Learning never exhausts the mind." — Leonardo da Vinci'); }, icon: '📜' },
-        { title: '/zen', desc: 'Activate Zen study aura', action: () => { confetti({ particleCount: 40, spread: 60, colors: ['#a78bfa', '#818cf8', '#c084fc'] }); }, icon: '🧘' }
+        { title: '/zen', desc: 'Activate Zen study aura', action: () => { confetti({ particleCount: 40, spread: 60, colors: ['#a78bfa', '#818cf8', '#c084fc'] }); }, icon: '🧘' },
+        { title: '/maestro', desc: 'Rain Maestro University crests & shields', action: () => triggerMaestroRain(), icon: '🛡️' }
     ];
 
     const filtered = q ? items.filter(i => i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)) : items;
@@ -2590,7 +2591,7 @@ window.filterCommandPalette = (query) => {
             </div>
             <span class="text-xs text-zinc-400">↵</span>
         </div>
-    `).join('') || '<div class="p-4 text-center text-zinc-400 text-xs">No matching commands. Try <code>/party</code>, <code>/inspire</code>, or <code>/zen</code></div>';
+    `).join('') || '<div class="p-4 text-center text-zinc-400 text-xs">No matching commands. Try <code>/maestro</code>, <code>/party</code>, or <code>/zen</code></div>';
     window._currentCmdItems = filtered;
 };
 
@@ -2609,6 +2610,161 @@ window.handleCmdKey = (e) => {
             window._currentCmdItems[0].action();
         }
     }
+};
+
+// --- SECRET MAESTRO UNIVERSITY RAIN ANIMATION ---
+window.triggerMaestroRain = () => {
+    const existing = document.getElementById('maestroRainOverlay');
+    if (existing) existing.remove();
+
+    if (!document.getElementById('maestroRainStyle')) {
+        const style = document.createElement('style');
+        style.id = 'maestroRainStyle';
+        style.innerHTML = `
+            @keyframes maestroFall {
+                0% {
+                    transform: translateY(-90px) rotate(0deg) scale(0.9);
+                    opacity: 0;
+                }
+                10% {
+                    opacity: 1;
+                }
+                90% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(105vh) rotate(var(--maestro-rot)) scale(1.05);
+                    opacity: 0;
+                }
+            }
+            @keyframes maestroSway {
+                0%, 100% {
+                    margin-left: 0px;
+                }
+                50% {
+                    margin-left: var(--maestro-sway);
+                }
+            }
+            @keyframes maestroBadgePop {
+                0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+                50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            .maestro-shield-item {
+                position: absolute;
+                top: -80px;
+                user-select: none;
+                cursor: pointer;
+                transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35));
+                animation: maestroFall var(--fall-dur) linear forwards, maestroSway var(--sway-dur) ease-in-out infinite alternate;
+            }
+            .maestro-shield-item:hover {
+                transform: scale(1.4) rotate(15deg) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'maestroRainOverlay';
+    overlay.className = 'fixed inset-0 pointer-events-none z-[9999] overflow-hidden';
+    document.body.appendChild(overlay);
+
+    // Toast Badge
+    const badge = document.createElement('div');
+    badge.className = 'fixed top-14 left-1/2 -translate-x-1/2 z-[10000] bg-zinc-900/90 dark:bg-black/90 text-white px-5 py-3 rounded-2xl shadow-2xl border border-zinc-700 flex items-center gap-3 backdrop-blur-md transition-all pointer-events-none';
+    badge.style.animation = 'maestroBadgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+    badge.innerHTML = `
+        <div class="w-9 h-9 rounded-xl bg-[#eae7dc] p-1 flex items-center justify-center shadow-inner">
+            <img src="maestro-logo.svg" alt="Maestro" class="w-full h-full object-contain">
+        </div>
+        <div>
+            <div class="text-xs font-black tracking-wider uppercase text-amber-400">Maestro University</div>
+            <div class="text-xs text-zinc-300 font-medium">Honor & Excellence Raining Down! 🛡️🎓</div>
+        </div>
+    `;
+    overlay.appendChild(badge);
+
+    // Confetti burst
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 50,
+            spread: 80,
+            origin: { y: 0.12 },
+            colors: ['#eae7dc', '#262626', '#f59e0b', '#6366f1']
+        });
+    }
+
+    const totalLogos = 45;
+    const logoSvgMarkup = `
+        <svg viewBox="0 0 100 120" class="w-full h-full select-none pointer-events-none">
+            <path d="M 20 8 L 80 8 Q 94 8 94 22 L 94 65 C 94 95 50 116 50 116 C 50 116 6 95 6 65 L 6 22 Q 6 8 20 8 Z" fill="#eae7dc"/>
+            <rect x="32" y="34" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="56" y="34" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="20" y="46" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="44" y="46" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="68" y="46" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="32" y="58" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="56" y="58" width="12" height="12" rx="1" fill="#242424" />
+            <rect x="44" y="70" width="12" height="12" rx="1" fill="#242424" />
+        </svg>
+    `;
+
+    for (let i = 0; i < totalLogos; i++) {
+        const el = document.createElement('div');
+        el.className = 'maestro-shield-item pointer-events-auto';
+        
+        const size = Math.floor(Math.random() * 34) + 32; // 32px to 66px
+        const left = Math.random() * 92; // 0% to 92%
+        const delay = Math.random() * 2.5; // 0s to 2.5s
+        const fallDur = (Math.random() * 1.8 + 2.4).toFixed(2); // 2.4s to 4.2s
+        const swayDur = (Math.random() * 1.2 + 1.2).toFixed(2); // 1.2s to 2.4s
+        const swayAmt = (Math.random() * 60 - 30).toFixed(0) + 'px';
+        const rot = (Math.random() * 160 - 80).toFixed(0) + 'deg';
+
+        el.style.width = `${size}px`;
+        el.style.height = `${size * 1.2}px`;
+        el.style.left = `${left}%`;
+        el.style.setProperty('--fall-dur', `${fallDur}s`);
+        el.style.setProperty('--sway-dur', `${swayDur}s`);
+        el.style.setProperty('--maestro-sway', swayAmt);
+        el.style.setProperty('--maestro-rot', rot);
+        el.style.animationDelay = `${delay}s, ${delay}s`;
+
+        el.innerHTML = logoSvgMarkup;
+
+        // Click on falling shield for pop & confetti
+        el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            el.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            el.style.transform = 'scale(1.8) rotate(360deg)';
+            el.style.opacity = '0';
+            if (typeof confetti === 'function') {
+                const rect = el.getBoundingClientRect();
+                confetti({
+                    particleCount: 15,
+                    spread: 45,
+                    origin: {
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                    colors: ['#eae7dc', '#f59e0b', '#242424']
+                });
+            }
+            setTimeout(() => el.remove(), 250);
+        });
+
+        overlay.appendChild(el);
+    }
+
+    setTimeout(() => {
+        if (overlay) {
+            overlay.style.transition = 'opacity 0.6s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 600);
+        }
+    }, 6000);
 };
 
 // PWA Service Worker Registration
