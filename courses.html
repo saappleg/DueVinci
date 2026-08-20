@@ -16,6 +16,13 @@
         if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
         else { document.documentElement.classList.remove('dark'); }
     </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <style>
+        .dark .driver-popover { background-color: #1c1c1c !important; color: #f4f4f5 !important; border: 1px solid #3f3f46 !important; }
+        .dark .driver-popover-title { color: #ffffff !important; }
+        .dark .driver-popover-description { color: #a1a1aa !important; }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -25,7 +32,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=17" defer></script>
+    <script src="app.js?v=18" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -81,16 +88,18 @@
                 </nav>
             </div>
 
-            <div class="p-4">
+            <div class="p-4 border-t border-zinc-200 dark:border-brand-700">
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Settings
+                </button>
+                <button type="button" onclick="startWalkthrough()" class="mt-2 flex items-center gap-3 w-full text-left px-4 py-2.5 bg-indigo-50 dark:bg-brand-700/50 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-brand-700 transition shadow-sm border border-indigo-100 dark:border-brand-600">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Interactive Tour
                 </button>
             </div>
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-brand-900">
             
-            <!-- Global Title Header with Leonardo Da Vinci Inspired SVG Logo -->
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
                 <div class="flex items-center gap-4">
                     <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
@@ -113,7 +122,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600">
+                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
                         <span class="hidden sm:inline">Sign out</span>
                     </button>
@@ -129,8 +138,7 @@
                 </div>
                 
                 <div class="space-y-8">
-                    <!-- 1. The Safe Add Class Form -->
-                    <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 flex items-center justify-between gap-4">
+                    <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 flex items-center justify-between gap-4" id="courseFormContainer">
                         <form id="courseForm" class="flex-1 flex gap-3 items-center">
                             <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
                             <input type="text" id="courseCode" placeholder="Add a new class (e.g. BE101)" required class="flex-1 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
@@ -143,7 +151,6 @@
                         </form>
                     </div>
 
-                    <!-- 2. The Term Folders Grid safely hardcoded -->
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
@@ -155,7 +162,6 @@
                         <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
                     </div>
 
-                    <!-- 3. The Alphabetical Course List safely hardcoded -->
                     <div class="pt-6 border-t border-zinc-200 dark:border-brand-700">
                         <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
                         <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
@@ -177,17 +183,14 @@
                 </div>
             </div>
 
-            <!-- Static Tab Navigation WITHOUT Coursework Tab -->
             <div class="flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-3 gap-6 shrink-0 bg-white dark:bg-brand-800">
                 <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
                 <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
                 <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
             </div>
 
-            <!-- Modal Content Panels -->
             <div class="p-6 overflow-y-auto flex-1">
                 
-                <!-- 1. Overview & Syllabus Panel -->
                 <div id="panel-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-6">
                         <div>
@@ -213,7 +216,7 @@
                                 <input type="file" id="syllabusFile" accept=".pdf" class="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer mb-2">
                                 <label class="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none font-medium mb-2">
                                     <input type="checkbox" id="syllabusMetadataOnly" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                                    Don't auto-load lessons/units from this syllabus (Description and Objectives Only)
+                                    Don't auto-load lessons/units from this syllabus
                                 </label>
                                 <button type="button" onclick="parseSyllabusPDF()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm hover:bg-indigo-700 transition shadow-sm">Scan Syllabus Metadata & Objectives</button>
                             </div>
@@ -244,10 +247,7 @@
                     </div>
                 </div>
 
-                <!-- 2. Resources & Links Panel -->
                 <div id="panel-resources" class="hidden space-y-4"></div>
-
-                <!-- 3. Scratchpad Panel -->
                 <div id="panel-scratchpad" class="hidden space-y-4"></div>
 
             </div>
