@@ -1,7 +1,29 @@
-// Supabase Project API Keys (DueVinci-Dev)
-const SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+// --- DYNAMIC SUPABASE ENVIRONMENT ROUTING ---
+let SUPABASE_URL = '';
+let SUPABASE_ANON_KEY = '';
+
+const currentHost = window.location.hostname;
+
+// If testing locally, use the DueVinci-Dev Database
+if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    SUPABASE_URL = 'https://kinsxkeerxguqkyzrjfm.supabase.co';
+    SUPABASE_ANON_KEY = 'sb_publishable_8Paq4c7YXoFfbr0AhlXmpQ_gy-yn0RB';
+    console.log('🔧 Running in Development Mode (DueVinci-Dev)');
+} 
+// If deployed to GitHub Pages/Live, use the Production Database
+else {
+    SUPABASE_URL = 'YOUR_PRODUCTION_URL_HERE'; 
+    SUPABASE_ANON_KEY = 'YOUR_PRODUCTION_ANON_KEY_HERE';
+    console.log('🚀 Running in Production Mode');
+}
+
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// --- END SUPABASE CONFIG ---
+
+let currentUser = null;
+let calendarInstance = null;
+let localCourses = [];
 
 let currentUser = null;
 let calendarInstance = null;
