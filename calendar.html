@@ -10,7 +10,7 @@
     </script>
     <script>
         const theme = localStorage.getItem('theme') || 'system';
-        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); }
         else { document.documentElement.classList.remove('dark'); }
     </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
@@ -29,7 +29,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="timers.js" defer></script>
     <script src="academics.js" defer></script>
-    <script src="app.js?v=19" defer></script>
+    <script src="app.js?v=20" defer></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -120,7 +120,7 @@
                 </div>
                 <div class="flex items-center gap-4">
                     <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                         <span class="hidden sm:inline">Sign out</span>
                     </button>
                 </div>

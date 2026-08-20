@@ -12,6 +12,22 @@ let hideUnassignedFolder = localStorage.getItem('hideUnassigned') === 'true';
 let floatingTimerDismissed = false;
 let lastProcessedSessionToken = null;
 
+// --- COOKIE HELPERS FOR TOUR STATE ---
+window.setCookie = (name, value, days = 365) => {
+    const d = new Date();
+    d.setTime(d.getTime() + (days*24*60*60*1000));
+    document.cookie = `${name}=${value};path=/;expires=${d.toUTCString()}`;
+};
+
+window.getCookie = (name) => {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+};
+
+window.deleteCookie = (name) => {
+    document.cookie = `${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+};
+
 // --- WEB AUDIO API TIMER ALARM ---
 window.playTimerAlarm = () => {
     if (localStorage.getItem('duevinci_mute_alarm') === 'true') return;
@@ -181,16 +197,6 @@ window.toggleAcademicsVisibility = (show) => {
         document.querySelectorAll('#academicsAnalyticsWidget').forEach(el => el.remove());
     }
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(window.injectAppearanceSettingsExtras, 400);
-    
-    // Auto-hide the tour button if the tour has been completed
-    if (localStorage.getItem('duevinci_tour_done') === 'true') {
-        const tourBtn = document.getElementById('tourNavButton');
-        if (tourBtn) tourBtn.classList.add('hidden');
-    }
-});
 
 window.changeTheme = (themeValue) => {
     localStorage.setItem('theme', themeValue);
@@ -396,11 +402,17 @@ window.toggleTimerCollapse = () => {
     timerCollapsed = !timerCollapsed;
     localStorage.setItem('timerCollapsed', timerCollapsed);
     applyTimerCollapse();
-    updateFloatingTimer(); 
+    updateFloatingTimer();
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     applyTimerCollapse();
+    
+    if (getCookie('duevinci_tour_done') === 'true') {
+        const tourBtn = document.getElementById('tourNavButton');
+        if (tourBtn) tourBtn.classList.add('hidden');
+    }
+
     if (timerRunning && timeLeft > 0) {
         const btn = document.getElementById('timerPlayBtn');
         if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
@@ -417,7 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimerDisplay();
 });
 
-// --- AUTH, WALKTHROUGH, & ROUTING LOGIC ---
 async function checkUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     handleAuth(session);
@@ -436,8 +447,7 @@ function handleAuth(session) {
             document.getElementById('appScreen').classList.remove('hidden');
         }
         
-        // Universal tour trigger based on state across all pages
-        if (localStorage.getItem('duevinci_tour_done') !== 'true') {
+        if (getCookie('duevinci_tour_done') !== 'true') {
             setTimeout(() => { if (typeof window.startWalkthrough === 'function') window.startWalkthrough(); }, 1200);
         }
         
@@ -464,9 +474,7 @@ function handleAuth(session) {
             if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.add('hidden');
         }
     }
-}
-
-function showAuthMessage(msg, colorClass = "text-red-500") {
+}function showAuthMessage(msg, colorClass = "text-red-500") {
     const msgEl = document.getElementById('authMessage');
     if(msgEl) {
         msgEl.textContent = msg;
@@ -499,13 +507,13 @@ window.logout = async () => {
     window.location.href = 'index.html';
 };
 
-// --- MULTI-PAGE INTERACTIVE TOUR ROUTER (DRIVER.JS) ---
+// --- MULTI-PAGE INTERACTIVE TOUR ROUTER (COOKIE BASED) ---
 window.startWalkthrough = (manualStart = false) => {
     if (typeof window.driver === 'undefined') return;
     
     if (manualStart) {
-        localStorage.removeItem('duevinci_tour_done');
-        localStorage.setItem('duevinci_tour_stage', 'dashboard');
+        deleteCookie('duevinci_tour_done');
+        setCookie('duevinci_tour_stage', 'dashboard');
         
         const tourBtn = document.getElementById('tourNavButton');
         if (tourBtn) tourBtn.classList.remove('hidden');
@@ -516,7 +524,7 @@ window.startWalkthrough = (manualStart = false) => {
         }
     }
 
-    if (localStorage.getItem('duevinci_tour_done') === 'true') {
+    if (getCookie('duevinci_tour_done') === 'true') {
         const tourBtn = document.getElementById('tourNavButton');
         if (tourBtn) tourBtn.classList.add('hidden');
         return;
@@ -524,7 +532,7 @@ window.startWalkthrough = (manualStart = false) => {
 
     const driver = window.driver.js.driver;
     const path = window.location.pathname;
-    const stage = localStorage.getItem('duevinci_tour_stage') || 'dashboard';
+    const stage = getCookie('duevinci_tour_stage') || 'dashboard';
 
     let steps = [];
 
@@ -565,32 +573,33 @@ window.startWalkthrough = (manualStart = false) => {
 
     const driverObj = driver({
         showProgress: true,
+        allowClose: false,
         steps: steps,
         onDestroyStarted: () => {
-            if (!driverObj.hasNextStep()) {
+            if (!driverObj.hasNextStep() || driverObj.getActiveIndex() === steps.length - 1) {
                 if (stage === 'dashboard') {
-                    localStorage.setItem('duevinci_tour_stage', 'courses');
+                    setCookie('duevinci_tour_stage', 'courses');
                     driverObj.destroy();
                     window.location.href = 'courses.html';
                 } else if (stage === 'courses') {
-                    localStorage.setItem('duevinci_tour_stage', 'grades');
+                    setCookie('duevinci_tour_stage', 'grades');
                     driverObj.destroy();
                     window.location.href = 'grades.html';
                 } else if (stage === 'grades') {
-                    localStorage.setItem('duevinci_tour_stage', 'calendar');
+                    setCookie('duevinci_tour_stage', 'calendar');
                     driverObj.destroy();
                     window.location.href = 'calendar.html';
                 } else if (stage === 'calendar') {
-                    localStorage.setItem('duevinci_tour_done', 'true');
-                    localStorage.removeItem('duevinci_tour_stage');
+                    setCookie('duevinci_tour_done', 'true');
+                    deleteCookie('duevinci_tour_stage');
                     const tourBtn = document.getElementById('tourNavButton');
                     if (tourBtn) tourBtn.classList.add('hidden');
                     driverObj.destroy();
                 }
             } else {
                 if (confirm("Are you sure you want to exit the tour?")) {
-                    localStorage.setItem('duevinci_tour_done', 'true');
-                    localStorage.removeItem('duevinci_tour_stage');
+                    setCookie('duevinci_tour_done', 'true');
+                    deleteCookie('duevinci_tour_stage');
                     const tourBtn = document.getElementById('tourNavButton');
                     if (tourBtn) tourBtn.classList.add('hidden');
                     driverObj.destroy();
@@ -602,7 +611,98 @@ window.startWalkthrough = (manualStart = false) => {
     driverObj.drive();
 };
 
+window.ensureSettingsModalExists = () => {
+    let div = document.getElementById('settingsModal');
+    if (!div) {
+        div = document.createElement('div');
+        div.id = 'settingsModal';
+        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
+        div.innerHTML = `
+            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[400px]">
+                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0">
+                    <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                    <nav class="space-y-1">
+                        <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                        <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                    </nav>
+                </div>
+                <div class="flex-1 p-6 relative">
+                    <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                    <div id="content-profile" class="block space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Profile Details</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email and password.</p>
+                        </div>
+                        <form id="settingsForm" class="max-w-sm space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                                <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+                                <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition">Save Profile Changes</button>
+                            <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
+                        </form>
+                    </div>
+                    <div id="content-appearance" class="hidden space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Appearance</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks on this device.</p>
+                        </div>
+                        <div class="max-w-sm">
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
+                            <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
+                                <option value="system">💻 Follow System</option>
+                                <option value="light">☀️ Light Mode</option>
+                                <option value="dark">🌙 Dark Mode</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(div);
+    }
+    
+    const form = document.getElementById('settingsForm');
+    if (form && !form.dataset.listenerAttached) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('profileEmail').value;
+            const password = document.getElementById('profilePassword').value;
+            const msgEl = document.getElementById('settingsMsg');
+            
+            let updates = {};
+            if(email && email !== currentUser?.email) updates.email = email;
+            if(password) updates.password = password;
+            
+            if(Object.keys(updates).length === 0) {
+                msgEl.textContent = "No changes made.";
+                msgEl.className = "text-xs text-center mt-2 text-zinc-500";
+                msgEl.classList.remove('hidden');
+                return;
+            }
+            
+            const { error } = await supabaseClient.auth.updateUser(updates);
+            if (error) {
+                msgEl.textContent = error.message;
+                msgEl.className = "text-xs text-center mt-2 text-red-500";
+            } else {
+                msgEl.textContent = "Profile updated successfully!";
+                msgEl.className = "text-xs text-center mt-2 text-green-500";
+                document.getElementById('profilePassword').value = '';
+            }
+            msgEl.classList.remove('hidden');
+        });
+        form.dataset.listenerAttached = 'true';
+    }
+};
+
 window.openSettingsModal = () => {
+    window.ensureSettingsModalExists();
+    
     if(currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
@@ -655,7 +755,6 @@ window.switchSettingsTab = (tabName) => {
     if (tabTarget) tabTarget.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
 };
 
-// --- DASHBOARD LOGIC ---
 async function loadDashboardStats() {
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
@@ -739,7 +838,6 @@ async function loadDashboardStats() {
     }
 }
 
-// --- COURSES PAGE, TERMS, DRAG & DROP, & MASTER LIST ---
 async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -833,7 +931,6 @@ function renderAlphabeticals() {
             </div>`;
     });
 }
-
 window.handleDragStart = (e, courseId) => {
     e.dataTransfer.setData('text/plain', courseId);
 };
@@ -1040,8 +1137,8 @@ window.switchCourseTab = (tabName) => {
         const btn = document.getElementById(`tabBtn-${t}`);
         if (panel) panel.classList.toggle('hidden', t !== tabName);
         if (btn) {
-            btn.className = t === tabName 
-                ? 'text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition' 
+            btn.className = t === tabName
+                ? 'text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition'
                 : 'text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
         }
     });
@@ -1175,7 +1272,7 @@ window.parseSyllabusPDF = async () => {
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             openCourseModal(courseId);
             loadCoursesPage();
-            return; 
+            return;
         }
 
         let baseDate = new Date();
@@ -1496,33 +1593,6 @@ async function loadAssignments(courseId, page = 1) {
     }
 }
 
-const aForm = document.getElementById('addAssignmentForm');
-if (aForm) {
-    aForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const courseId = document.getElementById('editCourseId').value;
-        const unitNum = document.getElementById('assignUnit').value ? parseInt(document.getElementById('assignUnit').value) : null;
-        
-        await supabaseClient.from('assignments').insert([{
-            course_id: courseId, user_id: currentUser.id,
-            title: document.getElementById('assignTitle').value,
-            unit_number: unitNum,
-            due_date: document.getElementById('assignDate').value
-        }]);
-        
-        document.getElementById('assignTitle').value = '';
-        document.getElementById('assignUnit').value = '';
-        document.getElementById('assignDate').value = '';
-        loadAssignments(courseId, currentAssignmentPage);
-    });
-}
-
-window.deleteAssignment = async (assignId, courseId) => {
-    await supabaseClient.from('assignments').delete().eq('id', assignId);
-    loadAssignments(courseId, currentAssignmentPage);
-};
-
-// --- GRADES PAGE LOGIC ---
 async function loadGradesPage() {
     const container = document.getElementById('gradesContainer');
     if (!container) return;
@@ -1634,7 +1704,6 @@ window.toggleExcludeGpa = async (assignId, excluded) => {
     loadGradesPage();
 };
 
-// --- CALENDAR LOGIC ---
 function initCalendar() {
     if (calendarInstance) return;
     const calendarEl = document.getElementById('calendar');
