@@ -2955,7 +2955,77 @@ window.triggerMaestroRain = () => {
     }, 6000);
 };
 
+// --- PWA INSTALL PROMPT ---
+let _pwaInstallEvent = null;
+
+const _setPWAButtonsVisible = (visible) => {
+    const banner = document.getElementById('pwaInstallBanner');
+    const sidebarBtn = document.getElementById('sidebarInstallBtn');
+    if (banner) {
+        banner.classList.toggle('hidden', !visible);
+    }
+    if (sidebarBtn) {
+        sidebarBtn.classList.toggle('hidden', !visible);
+        sidebarBtn.classList.toggle('flex', visible);
+    }
+};
+
+// Capture the install prompt before it fires
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _pwaInstallEvent = e;
+    // Don't show if already dismissed or running standalone
+    if (
+        localStorage.getItem('pwaInstallDismissed') !== 'true' &&
+        !window.matchMedia('(display-mode: standalone)').matches &&
+        !window.navigator.standalone
+    ) {
+        // Slight delay so app UI renders first
+        setTimeout(() => _setPWAButtonsVisible(true), 800);
+    }
+});
+
+// Also show the sidebar button if dismissed-banner, so user can still install via sidebar
+window.addEventListener('beforeinstallprompt', (e) => {
+    const sidebarBtn = document.getElementById('sidebarInstallBtn');
+    if (sidebarBtn) {
+        sidebarBtn.classList.remove('hidden');
+        sidebarBtn.classList.add('flex');
+    }
+}, { once: true });
+
+// Hide everything once app is actually installed
+window.addEventListener('appinstalled', () => {
+    _pwaInstallEvent = null;
+    _setPWAButtonsVisible(false);
+    localStorage.setItem('pwaInstallDismissed', 'true');
+    // Show a quick confirmation toast
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-6 right-6 z-[9999] bg-green-600 text-white text-sm font-bold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2';
+    t.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> DueVinci installed!';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+});
+
+window.triggerPWAInstall = async () => {
+    if (!_pwaInstallEvent) return;
+    _pwaInstallEvent.prompt();
+    const { outcome } = await _pwaInstallEvent.userChoice;
+    if (outcome === 'accepted') {
+        _pwaInstallEvent = null;
+        _setPWAButtonsVisible(false);
+    }
+};
+
+window.dismissPWABanner = () => {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.classList.add('hidden');
+    localStorage.setItem('pwaInstallDismissed', 'true');
+    // Keep sidebar button visible so user can still install later
+};
+
 // PWA Service Worker Registration
+
 if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => {

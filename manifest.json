@@ -4,14 +4,17 @@
   "description": "Smart academic planner, syllabus AI parser, GPA tracker, and Pomodoro timer.",
   "start_url": "index.html",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#151515",
   "theme_color": "#4f46e5",
   "icons": [
-    {
-      "src": "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/academic-cap.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+    { "src": "icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png" },
+    { "src": "icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png" },
+    { "src": "icons/icon-144x144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "en-US"
 }
