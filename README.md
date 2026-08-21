@@ -1,6 +1,6 @@
 # DueVinci 📚
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/saappleg/DueVinci-dev/ci.yml?branch=main&label=CI)](https://github.com/saappleg/DueVinci-dev/actions) [![License](https://img.shields.io/github/license/saappleg/DueVinci-dev)](LICENSE) [![Version](https://img.shields.io/github/v/tag/saappleg/DueVinci-dev?label=Version)](https://github.com/saappleg/DueVinci-dev/tags)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/saappleg/DueVinci/ci.yml?branch=main&label=CI)](https://github.com/saappleg/DueVinci/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Security Policy](https://img.shields.io/badge/Security-Policy-brightgreen.svg)](SECURITY.md)
 
 > **DueVinci** is a comprehensive, student‑focused academic workspace and planner. It replaces fragmented productivity apps and combines coursework tracking, GPA calculation, an integrated Pomodoro timer, and AI‑powered syllabus parsing into a single, cohesive dashboard.
 
@@ -11,6 +11,7 @@
 - [Setup & Installation 🚀](#setup--installation)
 - [Project Structure 📂](#project-structure)
 - [Contributing 🤝](#contributing)
+- [Security 🔒](#security-)
 - [License 📄](#license)
 
 ---
@@ -50,11 +51,16 @@
    git clone https://github.com/saappleg/DueVinci.git
    cd DueVinci
    ```
-2. **Supabase Configuration**
+2. **Install Dev Tooling & Run Tests**
+   ```bash
+   npm install
+   npm test
+   ```
+3. **Supabase Configuration**
    - Create a new Supabase project.
    - Set up `courses`, `assignments`, and `custom_events` tables matching the frontend schemas.
    - Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `app.js`.
-3. **Edge Function Deployment**
+4. **Edge Function Deployment**
    ```bash
    supabase functions deploy gemini-parser
    ```
@@ -62,8 +68,8 @@
    ```bash
    supabase secrets set GEMINI_API_KEY=your_google_ai_key
    ```
-4. **Launch**
-   Serve the static files with any local development server (e.g., Live Server extension in VS Code) and open `index.html`.
+5. **Launch**
+   Serve the static files with any local development server (e.g., Live Server extension in VS Code) or run `npx serve .` and open `index.html`.
 
 ---
 ## Project Structure 📂
@@ -92,11 +98,11 @@ DueVinci/
 ```
 
 ---
-## Contributing 🤝
+## Contributing & Releases 🤝
 
 Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ---
 ## License 📄
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.

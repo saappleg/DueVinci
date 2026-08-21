@@ -115,8 +115,7 @@ export async function renderAcademicsDashboardWidget(containerId) {
             const uncompletedExams = assignmentsData.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
             if (uncompletedExams.length > 0) {
                 examCountdownsHtml = uncompletedExams.map(exam => {
-                    const diffTime = new Date(exam.due_date + 'T12:00:00') - new Date();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = calculateDaysRemaining(exam.due_date);
                     const timeText = diffDays >= 0 ? `${diffDays} Day${diffDays === 1 ? '' : 's'}` : `Due today/past`;
                     return `<div class="text-xs font-bold text-red-500 truncate" title="${exam.title}">• ${exam.title}: <span class="font-normal text-zinc-600 dark:text-zinc-300">${timeText}</span></div>`;
                 }).join('');

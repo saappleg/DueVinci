@@ -24,6 +24,7 @@
         .dark .driver-popover-description { color: #a1a1aa !important; }
     </style>
     <link rel="stylesheet" href="assets/css/greek-theme.css" />
+    <link rel="stylesheet" href="assets/css/renaissance-theme.css" />
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/icon-16x16.png">
@@ -34,6 +35,24 @@
     <script type="module" src="js/app.js"></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
+
+    <!-- PWA Install Banner (shown by JS when browser supports it) -->
+    <div id="pwaInstallBanner" class="hidden fixed bottom-0 left-0 right-0 z-[9998] p-4 sm:p-6 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-sm">
+        <div class="bg-white dark:bg-brand-800 border border-indigo-200 dark:border-indigo-700/60 rounded-2xl shadow-2xl p-4 flex items-center gap-4">
+            <img src="assets/icons/icon-72x72.png" alt="DueVinci" class="w-12 h-12 rounded-xl shrink-0 shadow-md">
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-sm text-zinc-900 dark:text-white">Install DueVinci</p>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">Add to your home screen for quick access</p>
+                <div class="flex items-center gap-2 mt-2.5">
+                    <button id="pwaInstallBtn" onclick="window.triggerPWAInstall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm">Install</button>
+                    <button onclick="window.dismissPWABanner()" class="px-3 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition">Not now</button>
+                </div>
+            </div>
+            <button onclick="window.dismissPWABanner()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition shrink-0 self-start">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+    </div>
 
     <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-zinc-100 dark:bg-brand-900">
         <div class="bg-white dark:bg-brand-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-zinc-200 dark:border-brand-700">
@@ -49,6 +68,29 @@
                 </div>
             </form>
             <p id="authMessage" class="text-sm hidden"></p>
+
+            <!-- Passkey sign-in (shown only when WebAuthn is available) -->
+            <div id="passkeySignInSection" class="hidden mt-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
+                    <span class="text-xs text-zinc-400 dark:text-zinc-500 whitespace-nowrap">or</span>
+                    <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
+                </div>
+                <button
+                    id="passkeySignInBtn"
+                    type="button"
+                    onclick="signInWithPasskey()"
+                    class="w-full flex items-center justify-center gap-2.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all duration-150 shadow-sm"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C9.238 2 7 4.238 7 7c0 1.547.677 2.937 1.75 3.906A7.002 7.002 0 0 0 5 17v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a7.002 7.002 0 0 0-3.75-6.094A4.994 4.994 0 0 0 17 7c0-2.762-2.238-5-5-5z"/>
+                        <circle cx="12" cy="7" r="2"/>
+                    </svg>
+                    Sign in with Passkey
+                </button>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-2">Use Face ID, Touch ID, or a security key</p>
+            </div>
+
             <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700 text-xs text-zinc-400 dark:text-zinc-500">
                 By signing in, you agree to our <a href="legal/terms.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Terms</a> & <a href="legal/privacy.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Privacy Policy</a>.
             </div>
