@@ -6,7 +6,63 @@ import { fireConfetti } from './utils.js';
 let cachedStudyPlan = [];
 
 /**
+ * Extracts unit number from an assignment or task object.
+ * @param {Object} item Assignment/task object or title string
+ * @returns {number} unit number (0 if none)
+ */
+export function getUnitNumber(item) {
+    if (!item) return 0;
+    if (typeof item === 'object') {
+        if (item.unit_number !== undefined && item.unit_number !== null && item.unit_number !== '') {
+            const parsed = parseInt(item.unit_number, 10);
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+        }
+    }
+    const title = typeof item === 'string' ? item : (item.title || item.rawTitle || '');
+    const match = title.match(/(?:unit|wk|week|module|mod)\s*([0-9]+)/i);
+    if (match) return parseInt(match[1], 10) || 0;
+    return 0;
+}
+
+/**
+ * Extracts lesson number from an assignment or task object for proper sequential ordering (Lesson 1, 2, 3, 4...).
+ * @param {Object} item Assignment/task object or title string
+ * @returns {number} lesson number (999 if unspecified)
+ */
+export function getLessonNumber(item) {
+    if (!item) return 999;
+    if (typeof item === 'object') {
+        if (item.lesson_number !== undefined && item.lesson_number !== null && item.lesson_number !== '') {
+            const parsed = parseInt(item.lesson_number, 10);
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+        }
+    }
+    const title = typeof item === 'string' ? item : (item.title || item.rawTitle || '');
+
+    // Match explicit "Lesson 1", "Lesson 2", etc.
+    const lessonMatch = title.match(/lesson\s*([0-9]+)/i);
+    if (lessonMatch) return parseInt(lessonMatch[1], 10) || 0;
+
+    // Match sub-items starting with ↳ and numbers, e.g., "↳ 1. Introduction" or "↳ 1 - Concept" or "↳ 1: Concept"
+    const subNumMatch = title.match(/^↳\s*([0-9]+)[\.\:\-\s]/);
+    if (subNumMatch) return parseInt(subNumMatch[1], 10) || 0;
+
+    // Match "Part 1", "Step 1", "Sec 1", "Section 1", "L1", "#1"
+    const partMatch = title.match(/(?:part|step|sec|section|l|#)\s*([0-9]+)/i);
+    if (partMatch) return parseInt(partMatch[1], 10) || 0;
+
+    // If it's a sub-item (↳) with any number in title
+    if (title.startsWith('↳')) {
+        const numMatch = title.replace(/[^0-9]/g, '');
+        if (numMatch) return parseInt(numMatch, 10) || 999;
+    }
+
+    return 999;
+}
+
+/**
  * Calculates a balanced daily study schedule across multiple enrolled courses.
+ * Enforces proper unit-lesson organization and strict sequential order (Lesson 1 -> Lesson 2 -> Lesson 3 -> Lesson 4).
  * @param {Array} courses List of course objects
  * @param {Array} assignments List of assignment objects
  * @param {Date} startDate Starting calculation date
@@ -36,8 +92,31 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             return daysLeft >= 0 && daysLeft <= 4;
         });
 
-        // Sort by urgency (earliest due first)
-        relevantTasks.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+        // Enforce proper Unit & Lesson organization and strict sequential order (Lesson 1 -> 2 -> 3 -> 4)
+        relevantTasks.sort((a, b) => {
+            // 1. Urgency / Due date order
+            const dateDiff = new Date(a.due_date) - new Date(b.due_date);
+            if (dateDiff !== 0) return dateDiff;
+
+            // 2. Unit number organization (e.g. Unit 1 before Unit 2)
+            const unitA = getUnitNumber(a);
+            const unitB = getUnitNumber(b);
+            if (unitA !== unitB) return unitA - unitB;
+
+            // 3. Parent Unit overview before sub-lessons
+            const isSubA = (a.title || '').startsWith('↳');
+            const isSubB = (b.title || '').startsWith('↳');
+            if (!isSubA && isSubB) return -1;
+            if (isSubA && !isSubB) return 1;
+
+            // 4. Strict Lesson sequential order (Lesson 1, 2, 3, 4...)
+            const lessonA = getLessonNumber(a);
+            const lessonB = getLessonNumber(b);
+            if (lessonA !== lessonB) return lessonA - lessonB;
+
+            // 5. Deterministic fallback sort by title
+            return (a.title || '').localeCompare(b.title || '');
+        });
 
         const allDailyBlocks = [];
         let totalEstimatedMinutes = 0;
@@ -48,6 +127,14 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             const durationMin = isExam ? 50 : 25; // 50m block for exams, 25m for regular lessons
             const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
+            const unitNum = getUnitNumber(task);
+            const lessonNum = getLessonNumber(task);
+            const hasExplicitLesson = lessonNum !== 999;
+            const isSub = (task.title || '').startsWith('↳');
+
+            let unitBadgeText = unitNum > 0 ? `Unit ${unitNum}` : '';
+            let lessonBadgeText = hasExplicitLesson ? `Lesson ${lessonNum}` : '';
+
             let dueText = 'Due today';
             if (daysLeft === 1) dueText = 'Due tomorrow';
             else if (daysLeft > 1) dueText = `Due in ${daysLeft} days`;
@@ -55,6 +142,12 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             let recommendation = 'Break task into active work sprints. Review core assignment rubrics.';
             if (isExam) {
                 recommendation = 'Active recall with flashcards, practice exam problems, and formula review.';
+            } else if (hasExplicitLesson && lessonNum === 1) {
+                recommendation = `Foundational concepts for Unit ${unitNum || 1} • Lesson 1: Master core definitions, review syllabus objectives, and build foundational notes.`;
+            } else if (hasExplicitLesson && lessonNum > 1 && lessonNum < 4) {
+                recommendation = `Sequential mastery for Lesson ${lessonNum}: Connect to prior lesson topics, complete active practice problems, and reinforce core mechanisms.`;
+            } else if (hasExplicitLesson && lessonNum >= 4) {
+                recommendation = `Advanced unit synthesis for Lesson ${lessonNum}: Consolidate earlier lessons, complete problem sets, and review cumulative unit flashcards.`;
             } else if (/reading|chapter|read|textbook/i.test(task.title)) {
                 recommendation = 'Synthesize key definitions, generate summary bullet points, and review diagrams.';
             } else if (/lab|project|code|program/i.test(task.title)) {
@@ -70,6 +163,11 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
                 courseName: course ? (course.name || course.code) : 'Course',
                 courseEmoji: course ? (course.emoji || '📚') : '📚',
                 courseColor: course ? course.color : '#4f46e5',
+                unitNumber: unitNum,
+                lessonNumber: hasExplicitLesson ? lessonNum : null,
+                unitBadgeText,
+                lessonBadgeText,
+                isSubLesson: isSub,
                 durationMinutes: durationMin,
                 isExam,
                 dueDate: task.due_date,
@@ -191,6 +289,8 @@ export async function openStudyPlanDayModal(dateStr) {
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="font-bold text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-brand-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-brand-700">${block.courseCode}</span>
+                                ${block.unitBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/70 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-brand-600">${block.unitBadgeText}</span>` : ''}
+                                ${block.lessonBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/30">📖 ${block.lessonBadgeText}</span>` : ''}
                                 <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">${block.dueText}</span>
                             </div>
                             <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${block.title}</h4>
@@ -272,7 +372,7 @@ export async function openStudyPlanDayModal(dateStr) {
             <div class="p-6 space-y-4 overflow-y-auto max-h-[55vh] bg-white dark:bg-brand-800">
                 <div class="flex justify-between items-center pb-1">
                     <h4 class="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">All Scheduled Blocks (${day.allBlocks.length})</h4>
-                    <span class="text-[11px] text-zinc-400 font-medium">Balanced for spacing effect</span>
+                    <span class="text-[11px] text-zinc-400 font-medium">Sequential Unit & Lesson Order</span>
                 </div>
                 <div class="space-y-3">
                     ${tasksHtml}
@@ -372,9 +472,11 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <div class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-sm shrink-0">${b.courseEmoji}</span>
-                            <div class="truncate">
-                                <span class="font-bold text-zinc-800 dark:text-zinc-200">${b.courseCode}</span>
-                                <span class="text-zinc-500 dark:text-zinc-400 font-medium ml-1">${b.title}</span>
+                            <div class="truncate flex items-center gap-1">
+                                <span class="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">${b.courseCode}</span>
+                                ${b.unitBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-brand-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-brand-700 shrink-0">${b.unitBadgeText}</span>` : ''}
+                                ${b.lessonBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">${b.lessonBadgeText}</span>` : ''}
+                                <span class="text-zinc-500 dark:text-zinc-400 font-medium truncate ml-0.5">${b.title}</span>
                             </div>
                         </div>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${b.isExam ? 'bg-rose-500/10 text-rose-500 font-extrabold animate-pulse' : 'bg-indigo-500/10 text-indigo-500'}">
@@ -432,6 +534,8 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
 
 // Bind to window / global
 const _studyScope = typeof window !== 'undefined' ? window : globalThis;
+_studyScope.getUnitNumber = getUnitNumber;
+_studyScope.getLessonNumber = getLessonNumber;
 _studyScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _studyScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
 _studyScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;
@@ -439,4 +543,5 @@ _studyScope.openStudyPlanDayModal = openStudyPlanDayModal;
 _studyScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
 _studyScope.startStudyPlanTimer = startStudyPlanTimer;
 _studyScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
+
 

@@ -10,7 +10,7 @@ import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimu
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
 import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
-import { generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
+import { getUnitNumber, getLessonNumber, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
@@ -117,6 +117,8 @@ export {
     exportFlashcardsAsCSV,
     formatMathFormula,
     renderMarkdownToHtml,
+    getUnitNumber,
+    getLessonNumber,
     generateBalancedStudyPlan,
     renderStudyPlanDashboardWidget,
     ensureStudyPlanDayModalExists,
@@ -258,6 +260,8 @@ _rootScope.speakCurrentFlashcard = speakCurrentFlashcard;
 _rootScope.exportFlashcardsAsCSV = exportFlashcardsAsCSV;
 _rootScope.formatMathFormula = formatMathFormula;
 _rootScope.renderMarkdownToHtml = renderMarkdownToHtml;
+_rootScope.getUnitNumber = getUnitNumber;
+_rootScope.getLessonNumber = getLessonNumber;
 _rootScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _rootScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
 _rootScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;
