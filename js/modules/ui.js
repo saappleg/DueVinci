@@ -587,24 +587,14 @@ export async function submitSupportMessage(e) {
     }
 
     try {
-        try {
-            await supabaseClient.from('support_tickets').insert([{
-                user_id: currentUser ? currentUser.id : null,
-                email: email,
-                category: category,
-                subject: subject,
-                message: message,
-                status: 'open',
-                created_at: new Date().toISOString()
-            }]);
-        } catch (dbErr) {
-            console.warn('Support ticket DB insert fallback:', dbErr);
-        }
-
+        const { data, error } = await supabaseClient.functions.invoke('submit-support-ticket', {
+            body: { category, email, subject, message }
+        });
+        if (error || !data?.success) throw new Error(data?.error || error?.message || 'Unable to send support message.');
         fireConfetti();
 
         if (feedback) {
-            feedback.textContent = "Thank you! Your message has been sent. Steven will review it shortly.";
+            feedback.textContent = "Thank you! Your message was delivered to Steven.";
             feedback.className = "text-xs text-center mt-2 text-green-500 font-bold";
             feedback.classList.remove('hidden');
         }
@@ -621,8 +611,8 @@ export async function submitSupportMessage(e) {
     } catch (err) {
         console.error("Support message error:", err);
         if (feedback) {
-            feedback.textContent = "Message recorded. You can also reach out via email directly.";
-            feedback.className = "text-xs text-center mt-2 text-indigo-500";
+            feedback.textContent = `We couldn't send that message: ${err.message || 'please try again or use Email App.'}`;
+            feedback.className = "text-xs text-center mt-2 text-red-500";
             feedback.classList.remove('hidden');
         }
         if (btn) {
