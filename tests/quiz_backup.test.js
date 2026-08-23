@@ -171,4 +171,17 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(getCurrentPageName()).toBe('terms');
         });
     });
+
+    describe('Interactive Easter Eggs & Flyover Effects', () => {
+        it('executes triggerNightOwlFlight and creates animated overlay elements gracefully', async () => {
+            const { triggerNightOwlFlight } = await import('../js/modules/easterEggs.js');
+            expect(() => triggerNightOwlFlight()).not.toThrow();
+        });
+
+        it('executes triggerMaestroRain gracefully without throwing', async () => {
+            const { triggerMaestroRain } = await import('../js/modules/easterEggs.js');
+            expect(() => triggerMaestroRain()).not.toThrow();
+        });
+    });
 });
+

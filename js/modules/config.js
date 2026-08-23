@@ -17,7 +17,17 @@ if (typeof document === 'undefined') {
         querySelector: () => null,
         querySelectorAll: () => [],
         getElementById: () => null,
-        createElement: () => ({ setAttribute: () => {}, appendChild: () => {}, classList: { add: () => {}, remove: () => {} } }),
+        createElement: () => ({
+            style: { setProperty: () => {}, transition: '', opacity: '', transform: '', animation: '', width: '', height: '', top: '', left: '' },
+            setAttribute: () => {},
+            appendChild: () => {},
+            removeChild: () => {},
+            classList: { add: () => {}, remove: () => {}, contains: () => false },
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            getBoundingClientRect: () => ({ top: 0, left: 0, width: 100, height: 100 })
+        }),
+        head: { appendChild: () => {}, removeChild: () => {} },
         body: { appendChild: () => {}, removeChild: () => {} }
     };
 }

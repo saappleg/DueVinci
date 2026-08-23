@@ -110,7 +110,7 @@ export function handleCmdKey(e) {
 }
 
 export function triggerMaestroRain() {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || !document.body) return;
     const existing = document.getElementById('maestroRainOverlay');
     if (existing) existing.remove();
 
@@ -146,7 +146,8 @@ export function triggerMaestroRain() {
                 transform: scale(1.4) rotate(15deg) !important;
             }
         `;
-        document.head.appendChild(style);
+        if (document.head) document.head.appendChild(style);
+        else document.body.appendChild(style);
     }
 
     const overlay = document.createElement('div');
@@ -247,27 +248,182 @@ export function triggerMaestroRain() {
 }
 
 export function triggerNightOwlFlight() {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || !document.body) return;
     const existing = document.getElementById('nightOwlFlightOverlay');
     if (existing) existing.remove();
+
+    if (!document.getElementById('nightOwlFlightStyle')) {
+        const style = document.createElement('style');
+        style.id = 'nightOwlFlightStyle';
+        style.innerHTML = `
+            @keyframes nightOwlFlyAcross {
+                0% {
+                    transform: translateX(-180px) translateY(var(--owl-start-y, 0px)) scale(var(--owl-scale, 1)) rotate(var(--owl-rot-start, -10deg));
+                    opacity: 0;
+                }
+                6% {
+                    opacity: 1;
+                }
+                50% {
+                    transform: translateX(50vw) translateY(var(--owl-mid-y, -35px)) scale(calc(var(--owl-scale, 1) * 1.08)) rotate(var(--owl-rot-mid, 4deg));
+                }
+                92% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateX(calc(100vw + 180px)) translateY(var(--owl-end-y, -60px)) scale(var(--owl-scale, 1)) rotate(var(--owl-rot-end, -6deg));
+                    opacity: 0;
+                }
+            }
+            @keyframes nightOwlFlyAcrossReverse {
+                0% {
+                    transform: translateX(calc(100vw + 180px)) translateY(var(--owl-start-y, 0px)) scaleX(-1) scale(var(--owl-scale, 1)) rotate(var(--owl-rot-start, 10deg));
+                    opacity: 0;
+                }
+                6% {
+                    opacity: 1;
+                }
+                50% {
+                    transform: translateX(50vw) translateY(var(--owl-mid-y, -35px)) scaleX(-1) scale(calc(var(--owl-scale, 1) * 1.08)) rotate(var(--owl-rot-mid, -4deg));
+                }
+                92% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateX(-180px) translateY(var(--owl-end-y, -60px)) scaleX(-1) scale(var(--owl-scale, 1)) rotate(var(--owl-rot-end, 6deg));
+                    opacity: 0;
+                }
+            }
+            @keyframes nightOwlFlapGlide {
+                0%, 100% { transform: translateY(0px) rotate(0deg); }
+                30% { transform: translateY(-10px) rotate(-3deg); }
+                65% { transform: translateY(8px) rotate(3deg); }
+            }
+            @keyframes nightOwlBadgePop {
+                0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+                50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            .night-owl-flyer {
+                position: absolute;
+                top: 0;
+                left: 0;
+                user-select: none;
+                cursor: pointer;
+                filter: drop-shadow(0 8px 18px rgba(0, 32, 91, 0.45)) drop-shadow(0 2px 6px rgba(99, 102, 241, 0.5));
+                will-change: transform, opacity;
+            }
+            .night-owl-inner {
+                width: 100%;
+                height: 100%;
+                animation: nightOwlFlapGlide var(--flap-dur, 1.6s) ease-in-out infinite;
+                transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .night-owl-flyer:hover .night-owl-inner {
+                transform: scale(1.25) rotate(12deg);
+                filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.85));
+            }
+        `;
+        if (document.head) document.head.appendChild(style);
+        else document.body.appendChild(style);
+    }
 
     const overlay = document.createElement('div');
     overlay.id = 'nightOwlFlightOverlay';
     overlay.className = 'fixed inset-0 pointer-events-none z-[9999] overflow-hidden';
     document.body.appendChild(overlay);
 
+    const basePath = getBasePath();
+    const owlImgSrc = `${basePath}assets/images/wgu-owl.png`;
+
     const badge = document.createElement('div');
-    badge.className = 'fixed top-14 left-1/2 -translate-x-1/2 z-[10000] bg-zinc-900/90 dark:bg-black/90 text-white px-5 py-3 rounded-2xl shadow-2xl border border-zinc-700 flex items-center gap-3 backdrop-blur-md transition-all pointer-events-none';
+    badge.className = 'fixed top-14 left-1/2 -translate-x-1/2 z-[10000] bg-zinc-900/90 dark:bg-black/90 text-white px-5 py-3 rounded-2xl shadow-2xl border border-indigo-500/40 flex items-center gap-3 backdrop-blur-md transition-all pointer-events-none';
+    badge.style.animation = 'nightOwlBadgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
     badge.innerHTML = `
-        <div class="text-2xl">🦉</div>
+        <div class="w-10 h-10 rounded-xl bg-[#00205b] p-1 flex items-center justify-center shadow-inner border border-indigo-400/30">
+            <img src="${owlImgSrc}" alt="WGU Owl" class="w-full h-full object-contain">
+        </div>
         <div>
-            <div class="text-xs font-black tracking-wider uppercase text-indigo-400">Night Owls Ascend!</div>
-            <div class="text-xs text-zinc-300 font-medium">Late Night Study Power Active. 🌙✨</div>
+            <div class="text-xs font-black tracking-wider uppercase text-indigo-400 flex items-center gap-1.5">
+                <span>WGU Night Owls Flyover!</span>
+                <span class="text-amber-400">🦉✨</span>
+            </div>
+            <div class="text-xs text-zinc-300 font-medium">Night Owls Ascend! Late Night Study Power Active. 🌙⚡</div>
         </div>
     `;
     overlay.appendChild(badge);
 
-    fireConfetti();
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 55,
+            spread: 85,
+            origin: { y: 0.14 },
+            colors: ['#00205b', '#e8a100', '#6366f1', '#38bdf8', '#ffffff']
+        });
+    }
+
+    // Spawn flight squad of Night Owls across varying altitudes and flight trajectories
+    const squad = [
+        // Lead Hero Owl
+        { top: 22, size: 100, delay: 0, duration: 4.2, startY: 0, midY: -45, endY: 30, rotStart: -8, rotMid: 5, rotEnd: -5, reverse: false, flapDur: 1.3 },
+        // Wingmen & Squadron
+        { top: 12, size: 68, delay: 0.35, duration: 3.8, startY: 20, midY: -25, endY: -40, rotStart: -12, rotMid: 2, rotEnd: -8, reverse: false, flapDur: 1.1 },
+        { top: 36, size: 75, delay: 0.6, duration: 4.5, startY: -20, midY: 35, endY: -10, rotStart: -5, rotMid: 8, rotEnd: -3, reverse: false, flapDur: 1.5 },
+        { top: 52, size: 85, delay: 1.0, duration: 4.0, startY: 40, midY: -50, endY: 20, rotStart: -10, rotMid: 6, rotEnd: -6, reverse: false, flapDur: 1.2 },
+        { top: 68, size: 72, delay: 1.3, duration: 4.6, startY: -10, midY: 30, endY: -35, rotStart: -6, rotMid: 4, rotEnd: -4, reverse: false, flapDur: 1.4 },
+        { top: 28, size: 60, delay: 1.6, duration: 3.9, startY: 30, midY: -20, endY: 15, rotStart: -14, rotMid: 3, rotEnd: -10, reverse: false, flapDur: 1.0 },
+        { top: 45, size: 90, delay: 2.0, duration: 4.3, startY: -30, midY: 40, endY: -20, rotStart: -7, rotMid: 7, rotEnd: -5, reverse: false, flapDur: 1.35 },
+        // Reverse cross-flyers for dynamic depth
+        { top: 18, size: 65, delay: 0.8, duration: 4.8, startY: -15, midY: 35, endY: -30, rotStart: 10, rotMid: -4, rotEnd: 8, reverse: true, flapDur: 1.25 },
+        { top: 60, size: 78, delay: 1.7, duration: 4.4, startY: 25, midY: -35, endY: 20, rotStart: 8, rotMid: -6, rotEnd: 6, reverse: true, flapDur: 1.45 }
+    ];
+
+    squad.forEach((owlData) => {
+        const el = document.createElement('div');
+        el.className = 'night-owl-flyer pointer-events-auto';
+        el.style.top = `${owlData.top}%`;
+        el.style.width = `${owlData.size}px`;
+        el.style.height = `${owlData.size}px`;
+        el.style.setProperty('--owl-start-y', `${owlData.startY}px`);
+        el.style.setProperty('--owl-mid-y', `${owlData.midY}px`);
+        el.style.setProperty('--owl-end-y', `${owlData.endY}px`);
+        el.style.setProperty('--owl-rot-start', `${owlData.rotStart}deg`);
+        el.style.setProperty('--owl-rot-mid', `${owlData.rotMid}deg`);
+        el.style.setProperty('--owl-rot-end', `${owlData.rotEnd}deg`);
+        el.style.setProperty('--owl-scale', '1');
+        el.style.setProperty('--flap-dur', `${owlData.flapDur}s`);
+
+        const animName = owlData.reverse ? 'nightOwlFlyAcrossReverse' : 'nightOwlFlyAcross';
+        el.style.animation = `${animName} ${owlData.duration}s cubic-bezier(0.25, 0.1, 0.25, 1) ${owlData.delay}s forwards`;
+
+        el.innerHTML = `
+            <div class="night-owl-inner">
+                <img src="${owlImgSrc}" alt="WGU Night Owl" class="w-full h-full object-contain pointer-events-none select-none">
+            </div>
+        `;
+
+        el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            el.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+            el.style.transform = 'scale(1.7) rotate(360deg)';
+            el.style.opacity = '0';
+            if (typeof confetti === 'function') {
+                const rect = el.getBoundingClientRect();
+                confetti({
+                    particleCount: 20,
+                    spread: 55,
+                    origin: {
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                    colors: ['#00205b', '#e8a100', '#6366f1', '#38bdf8', '#ffffff']
+                });
+            }
+            setTimeout(() => el.remove(), 320);
+        });
+
+        overlay.appendChild(el);
+    });
 
     setTimeout(() => {
         if (overlay) {
@@ -275,7 +431,7 @@ export function triggerNightOwlFlight() {
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 600);
         }
-    }, 5000);
+    }, 7200);
 }
 
 // Bind to window
