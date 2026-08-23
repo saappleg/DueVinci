@@ -46,6 +46,16 @@ function withTimeout(promise, message, timeoutMs = 15000) {
     ]);
 }
 
+async function functionErrorMessage(error, fallback) {
+    try {
+        const body = await error?.context?.json?.();
+        if (body?.error) return body.error;
+    } catch (_) {
+        // Use the SDK error when the response body is unavailable.
+    }
+    return error?.message || fallback;
+}
+
 function isActiveTrial(profile) {
     return profile?.subscription_status === 'trialing'
         && Boolean(profile.trial_end)
@@ -239,7 +249,7 @@ export async function handleCanvasCheckout(interval) {
         if (!data?.url) throw new Error(data?.error || 'Unable to create a checkout session.');
         window.location.assign(data.url);
     } catch (err) {
-        if (message) message.textContent = err.message || 'Unable to open checkout. Please try again.';
+        if (message) message.textContent = await functionErrorMessage(err, 'Unable to open checkout. Please try again.');
         buttons.forEach(button => { button.disabled = false; });
     }
 }
@@ -255,7 +265,7 @@ export async function handleCanvasBillingPortal() {
         if (!data?.url) throw new Error(data?.error || 'Unable to open billing portal.');
         window.location.assign(data.url);
     } catch (err) {
-        if (message) message.textContent = err.message || 'Unable to open billing portal.';
+        if (message) message.textContent = await functionErrorMessage(err, 'Unable to open billing portal.');
         if (btn) { btn.disabled = false; btn.textContent = 'Manage Canvas Sync billing'; }
     }
 }
