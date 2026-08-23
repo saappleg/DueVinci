@@ -180,15 +180,30 @@
 
                     <div class="flex flex-col h-full">
                         <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
-                        <form id="addAssignmentForm" class="space-y-2 mb-4 bg-zinc-50 dark:bg-brand-900 p-3 rounded-xl border border-zinc-200 dark:border-brand-700">
+                        <form id="addAssignmentForm" onsubmit="submitAddAssignment(event)" class="space-y-2.5 mb-4 bg-zinc-50 dark:bg-brand-900 p-3.5 rounded-xl border border-zinc-200 dark:border-brand-700">
                             <div class="flex gap-2">
-                                <input type="text" id="assignTitle" placeholder="e.g. Unit 1: How the web works" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 min-w-0">
-                                <input type="number" id="assignUnit" placeholder="Unit #" class="w-20 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
+                                <input type="text" id="assignTitle" placeholder="e.g. Unit 1: Foundations or Midterm Exam" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 min-w-0 font-medium">
+                                <input type="number" id="assignUnit" placeholder="Unit #" class="w-16 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-xs text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
                             </div>
-                            <div class="flex gap-2">
-                                <input type="text" id="assignDate" placeholder="YYYY-MM-DD" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 font-mono">
-                                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-500 transition shadow-sm">Add Unit</button>
+                            <div class="grid grid-cols-3 gap-2">
+                                <select id="assignType" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer" title="Lesson / Task Type">
+                                    <option value="lesson">📖 Lesson</option>
+                                    <option value="review">📝 Review</option>
+                                    <option value="exam">🎯 Exam</option>
+                                    <option value="assignment">💻 Assignment</option>
+                                    <option value="reading">📚 Reading</option>
+                                    <option value="lab">🔬 Lab</option>
+                                </select>
+                                <select id="assignPriority" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer" title="Priority Level">
+                                    <option value="medium">⚡ Normal</option>
+                                    <option value="high">🔥 Urgent</option>
+                                    <option value="low">🌱 Low</option>
+                                </select>
+                                <input type="date" id="assignDate" required class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
                             </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5">
+                                <span>+ Add Lesson / Coursework</span>
+                            </button>
                         </form>
                         <div id="assignmentList" class="space-y-2 flex-1 overflow-y-auto"></div>
                     </div>

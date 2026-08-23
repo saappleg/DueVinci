@@ -72,8 +72,17 @@ export function getLessonNumber(item) {
 export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7) {
     if (!courses || !assignments || !Array.isArray(courses) || !Array.isArray(assignments)) return [];
 
-    const baseDate = new Date(startDate);
-    baseDate.setHours(0, 0, 0, 0);
+    let baseDate;
+    if (typeof startDate === 'string') {
+        const datePart = startDate.split('T')[0];
+        baseDate = new Date(datePart + 'T00:00:00');
+    } else if (startDate instanceof Date) {
+        const datePart = startDate.toISOString().split('T')[0];
+        baseDate = new Date(datePart + 'T00:00:00');
+    } else {
+        baseDate = new Date();
+        baseDate.setHours(0, 0, 0, 0);
+    }
 
     const pendingAssignments = assignments.filter(a => !a.is_completed && a.due_date);
     if (pendingAssignments.length === 0) {
@@ -120,9 +129,31 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     // Helper to generate rich block
     function createStudyBlock(task, course, currentDate, customTitle = null, customMinutes = null, customRec = null) {
-        const isExam = /exam|final|midterm|test/i.test(task.title);
+        let taskType = task.task_type || task.type || 'lesson';
+        if (/exam|final|midterm|test/i.test(task.title)) taskType = 'exam';
+        else if (/review|recap|summary|synthesis/i.test(task.title)) taskType = 'review';
+        else if (/lab|project|code/i.test(task.title)) taskType = 'lab';
+        else if (/reading|chapter|book/i.test(task.title)) taskType = 'reading';
+
+        const isExam = taskType === 'exam';
+        const isReview = taskType === 'review';
         const durationMin = customMinutes !== null ? customMinutes : (isExam ? 50 : 25);
         const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
+
+        let priority = task.priority || 'medium';
+        if (priority === 'urgent') priority = 'high';
+        if (priority === 'normal') priority = 'medium';
+
+        let priorityBadgeText = '⚡ Normal';
+        if (priority === 'high') priorityBadgeText = '🔥 Urgent';
+        else if (priority === 'low') priorityBadgeText = '🌱 Low';
+
+        let typeBadgeText = '📖 Lesson';
+        if (taskType === 'exam') typeBadgeText = '🎯 Exam';
+        else if (taskType === 'review') typeBadgeText = '📝 Review';
+        else if (taskType === 'lab') typeBadgeText = '🔬 Lab';
+        else if (taskType === 'reading') typeBadgeText = '📚 Reading';
+        else if (taskType === 'assignment') typeBadgeText = '💻 Assign';
 
         const unitNum = getUnitNumber(task);
         const lessonNum = getLessonNumber(task);
@@ -141,15 +172,17 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         if (!recommendation) {
             if (isExam) {
                 recommendation = 'Active recall with flashcards, practice exam problems, and formula review.';
+            } else if (isReview) {
+                recommendation = 'Unit synthesis & review: connect core concepts across lessons, complete active problem sets, and review study deck.';
             } else if (hasExplicitLesson && lessonNum === 1) {
                 recommendation = `Foundational concepts for Unit ${unitNum || 1} • Lesson 1: Master core definitions, review syllabus objectives, and build foundational notes.`;
             } else if (hasExplicitLesson && lessonNum > 1 && lessonNum < 4) {
                 recommendation = `Sequential mastery for Lesson ${lessonNum}: Connect to prior lesson topics, complete active practice problems, and reinforce core mechanisms.`;
             } else if (hasExplicitLesson && lessonNum >= 4) {
                 recommendation = `Advanced unit synthesis for Lesson ${lessonNum}: Consolidate earlier lessons, complete problem sets, and review cumulative unit flashcards.`;
-            } else if (/reading|chapter|read|textbook/i.test(task.title)) {
+            } else if (/reading|chapter|read|textbook/i.test(task.title) || taskType === 'reading') {
                 recommendation = 'Synthesize key definitions, generate summary bullet points, and review diagrams.';
-            } else if (/lab|project|code|program/i.test(task.title)) {
+            } else if (/lab|project|code|program/i.test(task.title) || taskType === 'lab') {
                 recommendation = 'Work on core logic implementation, execute test cases, and document edge conditions.';
             } else {
                 recommendation = 'Break task into active work sprints. Review core assignment rubrics.';
@@ -172,8 +205,13 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             unitBadgeText,
             lessonBadgeText,
             isSubLesson: isSub,
+            taskType,
+            typeBadgeText,
+            priority,
+            priorityBadgeText,
             durationMinutes: durationMin,
             isExam,
+            isReview,
             dueDate: task.due_date,
             daysUntilDue: daysLeft,
             dueText,
@@ -182,8 +220,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         };
     }
 
-    // Helper to sort a list of tasks deterministically
-    function sortTasks(taskList, refDate) {
+    // Helper to sort tasks in strict pedagogical curriculum order
+    function sortTasks(taskList, refDate, isDailyHeaderFirst = false) {
         return [...taskList].sort((a, b) => {
             const daysLeftA = calculateDaysRemaining(a.due_date, refDate);
             const daysLeftB = calculateDaysRemaining(b.due_date, refDate);
@@ -203,11 +241,17 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             const unitB = getUnitNumber(b);
             if (unitA !== unitB) return unitA - unitB;
 
-            // 4. Parent unit overview before sub-lessons
+            // 4. If same unit: Parent unit header first when displaying daily list,
+            // but sub-lessons first when progressing through curriculum queue
             const isSubA = (a.title || '').startsWith('↳');
             const isSubB = (b.title || '').startsWith('↳');
-            if (!isSubA && isSubB) return -1;
-            if (isSubA && !isSubB) return 1;
+            if (isDailyHeaderFirst) {
+                if (!isSubA && isSubB) return -1;
+                if (isSubA && !isSubB) return 1;
+            } else {
+                if (isSubA && !isSubB) return -1;
+                if (!isSubA && isSubB) return 1;
+            }
 
             // 5. Strict Lesson sequential order (Lesson 1 -> 2 -> 3 -> 4)
             const lessonA = getLessonNumber(a);
@@ -218,104 +262,55 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         });
     }
 
-    // Group pending assignments by course, unit, and deadline
-    const unitGroups = new Map();
-    pendingAssignments.forEach(task => {
-        const key = `${task.course_id}_u${getUnitNumber(task)}_${task.due_date}`;
-        if (!unitGroups.has(key)) unitGroups.set(key, []);
-        unitGroups.get(key).push(task);
-    });
-
-    // Allocate tasks across the days
-    unitGroups.forEach((groupTasks) => {
-        const firstTask = groupTasks[0];
-        const daysUntilDue = calculateDaysRemaining(firstTask.due_date, baseDate);
-        const sortedGroup = sortTasks(groupTasks, baseDate);
-
-        // Immediate deadlines (overdue, due today, or due in <= 2 days):
-        // Schedule in sequential order on Day 0 (and Day 1 if multi-day)
-        if (daysUntilDue <= 2) {
-            sortedGroup.forEach(t => {
-                days[0].assignedTasks.push({ task: t });
-            });
-            if (daysUntilDue >= 1 && daysAhead > 1) {
-                const targetDay = Math.min(daysUntilDue, daysAhead - 1);
-                sortedGroup.forEach(t => {
-                    days[targetDay].assignedTasks.push({ task: t });
-                });
-            }
-            return;
-        }
-
-        // Multi-day Workload Balancing for deadlines in 3+ days:
-        // Distribute lessons progressively across the days leading to the deadline!
-        const availableDayCount = Math.min(daysUntilDue + 1, daysAhead);
-        const subLessons = sortedGroup.filter(t => (t.title || '').startsWith('↳'));
-        const parentUnit = sortedGroup.find(t => !(t.title || '').startsWith('↳'));
-
-        if (subLessons.length > 0) {
-            // Distribute sub-lessons across days 0, 1, 2, 3...
-            subLessons.forEach((subTask, idx) => {
-                const targetDayIdx = Math.min(idx, availableDayCount - 1);
-                days[targetDayIdx].assignedTasks.push({ task: subTask });
-            });
-
-            // Put Parent Unit on deadline day
-            if (parentUnit) {
-                const finalDayIdx = Math.min(daysUntilDue, daysAhead - 1);
-                days[finalDayIdx].assignedTasks.push({
-                    task: parentUnit,
-                    customTitle: `Unit Synthesis: ${parentUnit.title.replace('↳', '').trim()}`,
-                    customRec: 'Synthesize all unit lessons, complete end-of-unit checklist, and submit deliverable.'
-                });
-            }
-        } else {
-            // Exam or single deliverables
-            const singleTask = sortedGroup[0];
-            const isExam = /exam|final|midterm|test/i.test(singleTask.title);
-
-            if (isExam && availableDayCount >= 3) {
-                const stage1Day = Math.max(0, daysUntilDue - 2);
-                if (stage1Day < daysAhead) {
-                    days[stage1Day].assignedTasks.push({
-                        task: singleTask,
-                        customTitle: `Exam Prep: Active Recall & Flashcards (${singleTask.title})`,
-                        customMinutes: 50,
-                        customRec: 'Active recall with flashcards, key definition reviews, and core formula practice.'
-                    });
-                }
-
-                const stage2Day = Math.max(0, daysUntilDue - 1);
-                if (stage2Day < daysAhead && stage2Day !== stage1Day) {
-                    days[stage2Day].assignedTasks.push({
-                        task: singleTask,
-                        customTitle: `Exam Prep: Mock Practice & Problem Sets (${singleTask.title})`,
-                        customMinutes: 50,
-                        customRec: 'Timed practice exams, problem set synthesis, and weak area reinforcement.'
-                    });
-                }
-
-                const examDay = Math.min(daysUntilDue, daysAhead - 1);
-                days[examDay].assignedTasks.push({
-                    task: singleTask,
-                    customTitle: `Final Exam Day: ${singleTask.title}`,
-                    customMinutes: 50,
-                    customRec: 'Final pre-test formula check, test taking strategy, and exam execution.'
-                });
-            } else {
-                // Schedule on target day
-                let targetDay = Math.min(daysUntilDue, daysAhead - 1);
-                days[targetDay].assignedTasks.push({ task: singleTask });
-            }
+    // Group pending assignments by Course (Subject) and sort in strict pedagogical curriculum order
+    const courseQueues = new Map();
+    courses.forEach(c => {
+        const cTasks = pendingAssignments.filter(a => a.course_id === c.id);
+        if (cTasks.length > 0) {
+            courseQueues.set(c.id, sortTasks(cTasks, baseDate, false));
         }
     });
+
+    // Handle any orphaned assignments with missing course_id
+    const orphanedTasks = pendingAssignments.filter(a => !courses.some(c => c.id === a.course_id));
+    if (orphanedTasks.length > 0) {
+        courseQueues.set('orphaned', sortTasks(orphanedTasks, baseDate, false));
+    }
+
+    // Allocate lessons day-by-day across active subjects
+    // Each day advances 1 lesson per subject (interleaving different subjects on the same day)
+    for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
+        const day = days[dayOffset];
+
+        courseQueues.forEach((queue, courseId) => {
+            if (queue.length === 0) return;
+
+            const nextTask = queue.shift();
+            day.assignedTasks.push({ task: nextTask });
+        });
+    }
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {
+        // Collect tasks for this day:
+        // 1. Assigned sequential focus tasks for this day
+        // 2. On Day 0 (Today), also include any urgent tasks due within 2 days or overdue
+        const combinedTasks = [...day.assignedTasks];
+        if (day.isToday) {
+            pendingAssignments.forEach(task => {
+                const daysLeft = calculateDaysRemaining(task.due_date, day.currentDate);
+                if (daysLeft <= 2) {
+                    if (!combinedTasks.some(ct => ct.task.id === task.id)) {
+                        combinedTasks.push({ task });
+                    }
+                }
+            });
+        }
+
         // Deduplicate assigned tasks by task id + custom title
         const seen = new Set();
         const uniqueTaskData = [];
-        day.assignedTasks.forEach(td => {
+        combinedTasks.forEach(td => {
             const key = `${td.task.id}_${td.customTitle || td.task.title}`;
             if (!seen.has(key)) {
                 seen.add(key);
@@ -323,49 +318,16 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             }
         });
 
-        // Sort unique tasks for this day
-        uniqueTaskData.sort((a, b) => {
-            const taskA = a.task;
-            const taskB = b.task;
-
-            const daysLeftA = calculateDaysRemaining(taskA.due_date, day.currentDate);
-            const daysLeftB = calculateDaysRemaining(taskB.due_date, day.currentDate);
-
-            // 1. Overdue first
-            const isOverdueA = daysLeftA < 0;
-            const isOverdueB = daysLeftB < 0;
-            if (isOverdueA && !isOverdueB) return -1;
-            if (!isOverdueA && isOverdueB) return 1;
-
-            // 2. Due date order
-            const dateDiff = new Date(taskA.due_date) - new Date(taskB.due_date);
-            if (dateDiff !== 0) return dateDiff;
-
-            // 3. Unit number
-            const unitA = getUnitNumber(taskA);
-            const unitB = getUnitNumber(taskB);
-            if (unitA !== unitB) return unitA - unitB;
-
-            // 4. Parent unit before sub-lesson
-            const isSubA = (taskA.title || '').startsWith('↳');
-            const isSubB = (taskB.title || '').startsWith('↳');
-            if (!isSubA && isSubB) return -1;
-            if (isSubA && !isSubB) return 1;
-
-            // 5. Lesson sequential order
-            const lessonA = getLessonNumber(taskA);
-            const lessonB = getLessonNumber(taskB);
-            if (lessonA !== lessonB) return lessonA - lessonB;
-
-            return (taskA.title || '').localeCompare(b.title || '');
-        });
+        // Sort unique tasks for this day strictly by curriculum order (Parent header first for day display)
+        const sortedDayTasks = sortTasks(uniqueTaskData.map(td => td.task), day.currentDate, true);
 
         let totalMins = 0;
         const blocks = [];
 
-        uniqueTaskData.forEach(td => {
-            const course = courses.find(c => c.id === td.task.course_id);
-            const block = createStudyBlock(td.task, course, day.currentDate, td.customTitle, td.customMinutes, td.customRec);
+        sortedDayTasks.forEach(task => {
+            const td = uniqueTaskData.find(u => u.task.id === task.id) || { task };
+            const course = courses.find(c => c.id === task.course_id);
+            const block = createStudyBlock(task, course, day.currentDate, td.customTitle, td.customMinutes, td.customRec);
             blocks.push(block);
             totalMins += block.durationMinutes;
         });
@@ -489,18 +451,19 @@ export async function openStudyPlanDayModal(dateStr) {
                     <div class="flex items-center gap-3 min-w-0">
                         <span class="text-2xl shrink-0 p-2 bg-white dark:bg-brand-800 rounded-xl shadow-xs border border-zinc-200 dark:border-brand-700">${block.courseEmoji}</span>
                         <div class="min-w-0">
-                            <div class="flex items-center gap-2 flex-wrap">
+                            <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="font-bold text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-brand-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-brand-700">${block.courseCode}</span>
                                 ${block.unitBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/70 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-brand-600">${block.unitBadgeText}</span>` : ''}
-                                ${block.lessonBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/30">📖 ${block.lessonBadgeText}</span>` : ''}
-                                <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">${block.dueText}</span>
+                                <span class="font-bold text-[11px] px-2 py-0.5 rounded-md ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : (block.isReview ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/30')}">${block.typeBadgeText || '📖 Lesson'}</span>
+                                ${block.priority === 'high' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">🔥 Urgent</span>' : (block.priority === 'low' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌱 Low</span>' : '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/60 dark:bg-brand-700 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-brand-600">⚡ Normal</span>')}
+                                <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">• ${block.dueText}</span>
                             </div>
                             <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${block.title}</h4>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <span class="px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30'}">
-                            ${block.isExam ? '🔥 50m Exam Prep' : '⏱️ 25m Focus Block'}
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : (block.isReview ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30')}">
+                            ${block.isExam ? '🎯 50m Exam Prep' : (block.isReview ? '📝 25m Review Block' : '⏱️ 25m Focus Block')}
                         </span>
                     </div>
                 </div>

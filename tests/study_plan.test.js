@@ -190,11 +190,94 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(plan[2].allBlocks.map(b => b.title)).toContain('Lesson 3: Loops');
             // Day 3 (Aug 23) should have Lesson 4
             expect(plan[3].allBlocks.map(b => b.title)).toContain('Lesson 4: OOP');
-            // Day 4 (Aug 24, deadline day) should have Unit Synthesis
-            expect(plan[4].allBlocks.some(b => b.title.includes('Unit Synthesis'))).toBe(true);
+            // Day 4 (Aug 24, deadline day) should have Unit 1 deliverable
+            expect(plan[4].allBlocks.some(b => b.title.includes('Unit 1: Fundamentals'))).toBe(true);
 
             // Day 0 should NOT be overloaded with all 5 items
             expect(plan[0].allBlocks.length).toBe(1);
+        });
+
+        it('progresses strictly lesson by lesson through Unit 1 before starting Unit 2, and pairs different subjects together on each day', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [
+                { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' },
+                { id: 'math', code: 'MATH 101', name: 'Calculus', emoji: '📐', color: '#10b981' }
+            ];
+
+            const assignments = [
+                // CS 101: Unit 1 (2 lessons), Unit 2 (2 lessons)
+                { id: 'cs_u1_l1', course_id: 'cs', unit_number: 1, title: '↳ CS Lesson 1: Syntax', due_date: '2026-08-26', is_completed: false },
+                { id: 'cs_u1_l2', course_id: 'cs', unit_number: 1, title: '↳ CS Lesson 2: Logic', due_date: '2026-08-26', is_completed: false },
+                { id: 'cs_u2_l1', course_id: 'cs', unit_number: 2, title: '↳ CS Lesson 1: Functions', due_date: '2026-08-26', is_completed: false },
+                { id: 'cs_u2_l2', course_id: 'cs', unit_number: 2, title: '↳ CS Lesson 2: Recursion', due_date: '2026-08-26', is_completed: false },
+
+                // MATH 101: Unit 1 (2 lessons), Unit 2 (2 lessons)
+                { id: 'm_u1_l1', course_id: 'math', unit_number: 1, title: '↳ Math Lesson 1: Limits', due_date: '2026-08-26', is_completed: false },
+                { id: 'm_u1_l2', course_id: 'math', unit_number: 1, title: '↳ Math Lesson 2: Continuity', due_date: '2026-08-26', is_completed: false },
+                { id: 'm_u2_l1', course_id: 'math', unit_number: 2, title: '↳ Math Lesson 1: Derivatives', due_date: '2026-08-26', is_completed: false },
+                { id: 'm_u2_l2', course_id: 'math', unit_number: 2, title: '↳ Math Lesson 2: Chain Rule', due_date: '2026-08-26', is_completed: false }
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 5);
+
+            // Day 0: CS Unit 1 Lesson 1 + Math Unit 1 Lesson 1 (different subjects combined, Unit 1 only!)
+            const day0Titles = plan[0].allBlocks.map(b => b.title);
+            expect(day0Titles).toContain('CS Lesson 1: Syntax');
+            expect(day0Titles).toContain('Math Lesson 1: Limits');
+            expect(day0Titles).not.toContain('CS Lesson 1: Functions'); // Unit 2 must NOT be in Day 0
+
+            // Day 1: CS Unit 1 Lesson 2 + Math Unit 1 Lesson 2
+            const day1Titles = plan[1].allBlocks.map(b => b.title);
+            expect(day1Titles).toContain('CS Lesson 2: Logic');
+            expect(day1Titles).toContain('Math Lesson 2: Continuity');
+
+            // Day 2: ONLY after finishing Unit 1 does Unit 2 start: CS Unit 2 Lesson 1 + Math Unit 2 Lesson 1
+            const day2Titles = plan[2].allBlocks.map(b => b.title);
+            expect(day2Titles).toContain('CS Lesson 1: Functions');
+            expect(day2Titles).toContain('Math Lesson 1: Derivatives');
+
+            // Day 3: CS Unit 2 Lesson 2 + Math Unit 2 Lesson 2
+            const day3Titles = plan[3].allBlocks.map(b => b.title);
+            expect(day3Titles).toContain('CS Lesson 2: Recursion');
+            expect(day3Titles).toContain('Math Lesson 2: Chain Rule');
+        });
+
+        it('correctly tags assignments with priority (Urgent, Normal, Low) and type (Exam, Review, Lesson)', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [
+                { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
+            ];
+
+            const assignments = [
+                { id: 'a1', course_id: 'cs', title: 'Midterm Exam Practice', task_type: 'exam', priority: 'high', due_date: '2026-08-21', is_completed: false },
+                { id: 'a2', course_id: 'cs', title: 'Unit 1 Comprehensive Review', task_type: 'review', priority: 'medium', due_date: '2026-08-21', is_completed: false },
+                { id: 'a3', course_id: 'cs', title: 'Optional Enrichment Reading', task_type: 'reading', priority: 'low', due_date: '2026-08-21', is_completed: false }
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 3);
+            const blocks = plan[0].allBlocks;
+
+            const examBlock = blocks.find(b => b.taskId === 'a1');
+            expect(examBlock).toBeDefined();
+            expect(examBlock.isExam).toBe(true);
+            expect(examBlock.typeBadgeText).toBe('🎯 Exam');
+            expect(examBlock.priority).toBe('high');
+            expect(examBlock.priorityBadgeText).toBe('🔥 Urgent');
+            expect(examBlock.durationMinutes).toBe(50);
+
+            const reviewBlock = blocks.find(b => b.taskId === 'a2');
+            expect(reviewBlock).toBeDefined();
+            expect(reviewBlock.isReview).toBe(true);
+            expect(reviewBlock.typeBadgeText).toBe('📝 Review');
+            expect(reviewBlock.priority).toBe('medium');
+            expect(reviewBlock.priorityBadgeText).toBe('⚡ Normal');
+            expect(reviewBlock.recommendation).toContain('Unit synthesis & review');
+
+            const readingBlock = blocks.find(b => b.taskId === 'a3');
+            expect(readingBlock).toBeDefined();
+            expect(readingBlock.typeBadgeText).toBe('📚 Reading');
+            expect(readingBlock.priority).toBe('low');
+            expect(readingBlock.priorityBadgeText).toBe('🌱 Low');
         });
     });
 

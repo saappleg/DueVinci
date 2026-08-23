@@ -5,7 +5,7 @@ import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recor
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, initPasskeyUI, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, setTimerDuration, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
-import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
@@ -85,6 +85,13 @@ export {
     closeTermModal,
     loadAssignments,
     toggleAssignment,
+    updateAssignmentDate,
+    updateAssignmentPriority,
+    updateAssignmentType,
+    deleteAssignment,
+    submitAddAssignment,
+    addSubItem,
+    changeAssignmentPage,
     updateScratchpadPreview,
     downloadCourseNotesAsMarkdown,
     filterDashboardUpNext,
@@ -233,6 +240,13 @@ _rootScope.openTermModal = openTermModal;
 _rootScope.closeTermModal = closeTermModal;
 _rootScope.loadAssignments = loadAssignments;
 _rootScope.toggleAssignment = toggleAssignment;
+_rootScope.updateAssignmentDate = updateAssignmentDate;
+_rootScope.updateAssignmentPriority = updateAssignmentPriority;
+_rootScope.updateAssignmentType = updateAssignmentType;
+_rootScope.deleteAssignment = deleteAssignment;
+_rootScope.submitAddAssignment = submitAddAssignment;
+_rootScope.addSubItem = addSubItem;
+_rootScope.changeAssignmentPage = changeAssignmentPage;
 _rootScope.updateScratchpadPreview = updateScratchpadPreview;
 _rootScope.downloadCourseNotesAsMarkdown = downloadCourseNotesAsMarkdown;
 _rootScope.filterDashboardUpNext = filterDashboardUpNext;

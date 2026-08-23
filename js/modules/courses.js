@@ -779,22 +779,117 @@ export async function updateAssignmentDate(assignId, newDate, courseId) {
     const parsedDate = parseInputDate(newDate);
     await supabaseClient.from('assignments').update({ due_date: parsedDate }).eq('id', assignId);
     loadAssignments(courseId, currentAssignmentPage);
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export async function updateAssignmentPriority(assignId, priority, courseId) {
+    if (!assignId || !priority) return;
+    await supabaseClient.from('assignments').update({ priority }).eq('id', assignId);
+    loadAssignments(courseId, currentAssignmentPage);
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export async function updateAssignmentType(assignId, taskType, courseId) {
+    if (!assignId || !taskType) return;
+    await supabaseClient.from('assignments').update({ task_type: taskType, type: taskType }).eq('id', assignId);
+    loadAssignments(courseId, currentAssignmentPage);
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export async function deleteAssignment(assignId, courseId) {
+    if (!confirm('Are you sure you want to delete this coursework item?')) return;
+    await supabaseClient.from('assignments').delete().eq('id', assignId);
+    loadAssignments(courseId, currentAssignmentPage);
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export async function submitAddAssignment(event) {
+    if (event) event.preventDefault();
+    const courseId = document.getElementById('editCourseId')?.value;
+    const titleInput = document.getElementById('assignTitle');
+    const unitInput = document.getElementById('assignUnit');
+    const typeInput = document.getElementById('assignType');
+    const priorityInput = document.getElementById('assignPriority');
+    const dateInput = document.getElementById('assignDate');
+
+    const title = titleInput?.value.trim();
+    const unitNum = unitInput?.value ? parseInt(unitInput.value, 10) : null;
+    const taskType = typeInput?.value || 'lesson';
+    const priority = priorityInput?.value || 'medium';
+    const dueDate = dateInput?.value ? parseInputDate(dateInput.value) : new Date().toISOString().split('T')[0];
+
+    if (!courseId || !title) {
+        alert('Please provide a title for the unit or lesson.');
+        return;
+    }
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
+    await supabaseClient.from('assignments').insert([{
+        course_id: courseId,
+        user_id: user.id,
+        title: title,
+        unit_number: unitNum,
+        task_type: taskType,
+        type: taskType,
+        priority: priority,
+        due_date: dueDate,
+        is_completed: false
+    }]);
+
+    if (titleInput) titleInput.value = '';
+    loadAssignments(courseId, currentAssignmentPage);
+    loadDashboardStats();
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
 }
 
 export async function addSubItem(parentId, courseId) {
     const inputEl = document.getElementById(`subInput-${parentId}`);
+    const typeEl = document.getElementById(`subType-${parentId}`);
+    const priorityEl = document.getElementById(`subPriority-${parentId}`);
+
     const title = inputEl ? inputEl.value.trim() : "";
+    const taskType = typeEl ? typeEl.value : "lesson";
+    const priority = priorityEl ? priorityEl.value : "medium";
+
     if (!title) return;
 
     const { data: parentAssign } = await supabaseClient.from('assignments').select('unit_number, due_date').eq('id', parentId).single();
     const unitNum = parentAssign ? parentAssign.unit_number : null;
     const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
 
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+
     await supabaseClient.from('assignments').insert([{
-        course_id: courseId, user_id: currentUser.id,
-        title: `↳ ${title}`, unit_number: unitNum, due_date: dueDate
+        course_id: courseId,
+        user_id: user.id,
+        title: `↳ ${title}`,
+        unit_number: unitNum,
+        task_type: taskType,
+        type: taskType,
+        priority: priority,
+        due_date: dueDate,
+        is_completed: false
     }]);
+
+    if (inputEl) inputEl.value = '';
     loadAssignments(courseId, currentAssignmentPage);
+    loadDashboardStats();
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
 }
 
 export function changeAssignmentPage(courseId, page) {
@@ -809,7 +904,7 @@ export async function loadAssignments(courseId, page = 1) {
     listEl.innerHTML = '';
 
     if (!assignments || !assignments.length) {
-        listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet.</p></div>';
+        listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet. Use the form above to add weekly units and lessons.</p></div>';
         return;
     }
 
@@ -857,8 +952,19 @@ export async function loadAssignments(courseId, page = 1) {
 
     paginatedAssignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
-        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
-        const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
+        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
+
+        // Determine current type
+        let currentType = assign.task_type || assign.type || 'lesson';
+        if (/exam|final|midterm|test/i.test(assign.title)) currentType = 'exam';
+        else if (/review|recap|summary|synthesis/i.test(assign.title)) currentType = 'review';
+        else if (/lab|project|code/i.test(assign.title)) currentType = 'lab';
+        else if (/reading|chapter|book/i.test(assign.title)) currentType = 'reading';
+
+        // Determine current priority
+        let currentPriority = assign.priority || 'medium';
+        if (currentPriority === 'urgent') currentPriority = 'high';
+        if (currentPriority === 'normal') currentPriority = 'medium';
 
         let checkboxHtml = '';
         if (isSubItem) {
@@ -876,26 +982,52 @@ export async function loadAssignments(courseId, page = 1) {
             }
         }
 
-        const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200";
+        const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200 font-bold";
 
         let subItemForm = '';
         if (!isSubItem && assign.unit_number) {
             subItemForm = `
-                <div class="mt-2 flex items-center gap-2">
-                    <input type="text" id="subInput-${assign.id}" placeholder="+ Add lesson..." class="flex-1 border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-xs">
-                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">+ Add</button>
+                <div class="mt-2 pt-2 border-t border-zinc-200/60 dark:border-brand-700/60 flex flex-wrap items-center gap-1.5">
+                    <input type="text" id="subInput-${assign.id}" placeholder="+ Add lesson (e.g. ↳ Lesson 1: Concept)..." class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-xs min-w-[140px]">
+                    <select id="subType-${assign.id}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Lesson Type">
+                        <option value="lesson">📖 Lesson</option>
+                        <option value="review">📝 Review</option>
+                        <option value="exam">🎯 Exam</option>
+                        <option value="lab">🔬 Lab</option>
+                        <option value="assignment">💻 Assign</option>
+                    </select>
+                    <select id="subPriority-${assign.id}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Priority">
+                        <option value="medium">⚡ Normal</option>
+                        <option value="high">🔥 Urgent</option>
+                        <option value="low">🌱 Low</option>
+                    </select>
+                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-sm">+ Add</button>
                 </div>`;
         }
 
         listEl.innerHTML += `
-            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5 flex-1 min-w-0">
+            <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 text-xs hover:border-indigo-500/30 transition">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2.5 flex-1 min-w-[180px]">
                         ${checkboxHtml}
-                        <span class="font-bold truncate ${tClass}">${unitBadge}${assign.title}</span>
+                        <span class="truncate ${tClass}">${unitBadge}${assign.title}</span>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <input type="date" value="${assign.due_date || ''}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-xs">
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <select onchange="updateAssignmentType('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer" title="Change Type">
+                            <option value="lesson" ${currentType === 'lesson' ? 'selected' : ''}>📖 Lesson</option>
+                            <option value="review" ${currentType === 'review' ? 'selected' : ''}>📝 Review</option>
+                            <option value="exam" ${currentType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
+                            <option value="assignment" ${currentType === 'assignment' ? 'selected' : ''}>💻 Assign</option>
+                            <option value="reading" ${currentType === 'reading' ? 'selected' : ''}>📚 Reading</option>
+                            <option value="lab" ${currentType === 'lab' ? 'selected' : ''}>🔬 Lab</option>
+                        </select>
+                        <select onchange="updateAssignmentPriority('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer ${currentPriority === 'high' ? 'text-rose-500 font-bold' : ''}" title="Change Priority">
+                            <option value="high" ${currentPriority === 'high' ? 'selected' : ''}>🔥 Urgent</option>
+                            <option value="medium" ${currentPriority === 'medium' ? 'selected' : ''}>⚡ Normal</option>
+                            <option value="low" ${currentPriority === 'low' ? 'selected' : ''}>🌱 Low</option>
+                        </select>
+                        <input type="date" value="${assign.due_date ? String(assign.due_date).split('T')[0] : ''}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-mono cursor-pointer">
+                        <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-rose-500 p-1 transition" title="Delete Coursework Item">✕</button>
                     </div>
                 </div>
                 ${subItemForm}
@@ -970,10 +1102,17 @@ export async function openQuickAddModal() {
                         <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Assignment or Exam Title</label>
                         <input type="text" id="quickAddTitle" required placeholder="e.g. Unit 3 Quiz or Practice Exam" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-3 gap-2">
                         <div>
-                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Due Date</label>
-                            <input type="date" id="quickAddDueDate" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500">
+                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
+                            <select id="quickAddType" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+                                <option value="lesson">📖 Lesson</option>
+                                <option value="review">📝 Review</option>
+                                <option value="exam">🎯 Exam</option>
+                                <option value="assignment">💻 Assign</option>
+                                <option value="reading">📚 Reading</option>
+                                <option value="lab">🔬 Lab</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Priority</label>
@@ -982,6 +1121,10 @@ export async function openQuickAddModal() {
                                 <option value="high">🔥 Urgent</option>
                                 <option value="low">🌱 Low</option>
                             </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Due Date</label>
+                            <input type="date" id="quickAddDueDate" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
                     <div class="pt-2">
@@ -1016,6 +1159,7 @@ export async function submitQuickAddTask(event) {
     const title = document.getElementById('quickAddTitle')?.value.trim();
     const dueDate = document.getElementById('quickAddDueDate')?.value;
     const priority = document.getElementById('quickAddPriority')?.value || 'medium';
+    const taskType = document.getElementById('quickAddType')?.value || 'lesson';
 
     if (!courseId || !title || !dueDate) {
         alert('Please fill out all required fields.');
@@ -1030,6 +1174,8 @@ export async function submitQuickAddTask(event) {
         user_id: user.id,
         title: title.startsWith('↳') ? title : `↳ ${title}`,
         due_date: dueDate,
+        task_type: taskType,
+        type: taskType,
         priority: priority,
         is_completed: false
     };
@@ -1077,6 +1223,10 @@ if (typeof window !== 'undefined') {
     window.toggleCourseComplete = toggleCourseComplete;
     window.toggleAssignment = toggleAssignment;
     window.updateAssignmentDate = updateAssignmentDate;
+    window.updateAssignmentPriority = updateAssignmentPriority;
+    window.updateAssignmentType = updateAssignmentType;
+    window.deleteAssignment = deleteAssignment;
+    window.submitAddAssignment = submitAddAssignment;
     window.addSubItem = addSubItem;
     window.changeAssignmentPage = changeAssignmentPage;
     window.loadAssignments = loadAssignments;
