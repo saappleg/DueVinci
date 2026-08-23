@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v4.4';
+const CACHE_NAME = 'duevinci-v4.5';
 const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
@@ -41,7 +41,16 @@ const ASSETS_TO_CACHE = [
   './js/modules/preferences.js',
   './js/modules/errorReporting.js',
   './js/modules/ui.js',
-  './js/modules/canvas.js'
+  './js/modules/canvas.js',
+  // These libraries are loaded by the static HTML pages. Pre-cache them so a
+  // fresh offline page can initialize auth and render, not just an already
+  // open tab that happened to have them in memory.
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdn.tailwindcss.com',
+  'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js',
+  'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css',
+  'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js',
+  'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js'
 ];
 
 self.addEventListener('install', (event) => {
