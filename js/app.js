@@ -13,7 +13,7 @@ import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
 import { getUnitNumber, getLessonNumber, getRestDays, setRestDays, toggleRestDay, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
-import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
+import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
@@ -153,6 +153,7 @@ export {
     validateBackupPayload,
     exportUserDataJSON,
     importUserDataJSON,
+    syncDataWithSupabase,
     startWalkthrough,
     updateTourButtonVisibility,
     replayTourFromSettings,
@@ -309,6 +310,7 @@ _rootScope.buildBackupPayload = buildBackupPayload;
 _rootScope.validateBackupPayload = validateBackupPayload;
 _rootScope.exportUserDataJSON = exportUserDataJSON;
 _rootScope.importUserDataJSON = importUserDataJSON;
+_rootScope.syncDataWithSupabase = syncDataWithSupabase;
 _rootScope.getTourCookie = getTourCookie;
 _rootScope.setTourCookie = setTourCookie;
 _rootScope.startWalkthrough = startWalkthrough;

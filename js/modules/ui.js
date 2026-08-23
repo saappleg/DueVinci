@@ -130,6 +130,7 @@ export function ensureSettingsModalExists() {
                         <nav class="space-y-1">
                             <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
                             <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                            <button type="button" onclick="switchSettingsTab('backup')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
                             <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
                         </nav>
                     </div>
@@ -209,6 +210,53 @@ export function ensureSettingsModalExists() {
                                 <option value="light">☀️ Light Mode</option>
                                 <option value="dark">🌙 Dark Mode</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Backup & Cloud Sync -->
+                    <div id="content-backup" class="hidden space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Supabase Cloud Sync & Data Backup</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Export local snapshots, restore course history, and sync with Supabase PostgreSQL.</p>
+                        </div>
+
+                        <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div>
+                                <div class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                    <span class="text-emerald-500">🟢</span> Supabase Cloud Database Sync
+                                </div>
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Real-time PostgreSQL synchronization for your courses, assignments, and study sessions.</div>
+                            </div>
+                            <button type="button" onclick="syncDataWithSupabase()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 flex items-center gap-1.5">
+                                <span>🔄</span> Sync to Cloud Now
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                                <div>
+                                    <h4 class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <span>📥</span> Export JSON Backup
+                                    </h4>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Download a portable JSON archive of all your courses, assignments, custom events, timers, and preferences.</p>
+                                </div>
+                                <button type="button" onclick="exportUserDataJSON()" class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-brand-700 dark:hover:bg-brand-600 text-white rounded-lg text-xs font-bold transition">
+                                    Download Backup (.json)
+                                </button>
+                            </div>
+
+                            <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                                <div>
+                                    <h4 class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <span>📤</span> Restore from Backup
+                                    </h4>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Select a previously exported DueVinci JSON file to restore and sync courses and assignments back into Supabase.</p>
+                                </div>
+                                <label class="w-full py-2 px-3 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-bold transition cursor-pointer text-center block">
+                                    Choose JSON File to Restore
+                                    <input type="file" accept=".json,application/json" onchange="importUserDataJSON(this)" class="hidden">
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -326,7 +374,7 @@ export function closeSettingsModal() {
 }
 
 export function switchSettingsTab(tabName) {
-    const tabs = ['profile', 'appearance', 'privacy'];
+    const tabs = ['profile', 'appearance', 'backup', 'privacy'];
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);

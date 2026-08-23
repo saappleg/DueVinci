@@ -59,6 +59,46 @@ export async function exportUserDataJSON() {
     }
 }
 
+export async function syncDataWithSupabase() {
+    try {
+        if (!supabaseClient) {
+            alert('Supabase client is not initialized.');
+            return;
+        }
+        let user = currentUser;
+        if (!user && supabaseClient.auth) {
+            const { data } = await supabaseClient.auth.getUser();
+            user = data?.user;
+        }
+        if (!user) {
+            alert('Please sign in to sync with your Supabase cloud database.');
+            return;
+        }
+
+        // Fetch latest cloud state
+        const { data: courses, error: cErr } = await supabaseClient.from('courses').select('*');
+        if (cErr) throw cErr;
+
+        const { data: assignments, error: aErr } = await supabaseClient.from('assignments').select('*');
+        if (aErr) throw aErr;
+
+        if (typeof window !== 'undefined') {
+            window.localCourses = courses || [];
+            if (typeof window.renderStudyPlanDashboardWidget === 'function') {
+                window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+            }
+            if (typeof window.renderAcademicsDashboardWidget === 'function') {
+                window.renderAcademicsDashboardWidget('dashboardGrid');
+            }
+        }
+
+        alert(`✅ Supabase Cloud Sync Successful!\nAccount: ${user.email}\n• ${courses?.length || 0} Courses Synchronized\n• ${assignments?.length || 0} Assignments Synchronized`);
+    } catch (err) {
+        console.error('Error syncing with Supabase:', err);
+        alert('Supabase cloud sync failed. Please check network connection.');
+    }
+}
+
 export async function importUserDataJSON(fileInput) {
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
     const file = fileInput.files[0];
@@ -84,9 +124,33 @@ export async function importUserDataJSON(fileInput) {
             if (json.data.preferences && typeof localStorage !== 'undefined') {
                 if (json.data.preferences.theme) localStorage.setItem('theme', json.data.preferences.theme);
                 if (json.data.preferences.gpaScale) localStorage.setItem('duevinci_gpa_scale', json.data.preferences.gpaScale);
+                if (json.data.preferences.dateFormat) localStorage.setItem('duevinci_date_format', json.data.preferences.dateFormat);
+                if (json.data.preferences.activityDates) localStorage.setItem('duevinci_activity_dates', JSON.stringify(json.data.preferences.activityDates));
             }
 
-            alert('Backup data restored successfully! Refreshing page...');
+            // Sync restored courses and assignments to Supabase
+            let user = currentUser;
+            if (!user && supabaseClient && supabaseClient.auth) {
+                const sessionRes = await supabaseClient.auth.getUser();
+                user = sessionRes.data?.user;
+            }
+
+            if (supabaseClient && user) {
+                if (Array.isArray(json.data.courses) && json.data.courses.length > 0) {
+                    const coursesToUpsert = json.data.courses.map(c => ({ ...c, user_id: user.id }));
+                    await supabaseClient.from('courses').upsert(coursesToUpsert);
+                }
+                if (Array.isArray(json.data.assignments) && json.data.assignments.length > 0) {
+                    const assignmentsToUpsert = json.data.assignments.map(a => ({ ...a, user_id: user.id }));
+                    await supabaseClient.from('assignments').upsert(assignmentsToUpsert);
+                }
+                if (Array.isArray(json.data.customEvents) && json.data.customEvents.length > 0) {
+                    const eventsToUpsert = json.data.customEvents.map(ev => ({ ...ev, user_id: user.id }));
+                    await supabaseClient.from('custom_events').upsert(eventsToUpsert);
+                }
+            }
+
+            alert('Backup data and Supabase cloud sync restored successfully! Refreshing page...');
             if (typeof window !== 'undefined') window.location.reload();
         } catch (err) {
             console.error('Failed to parse backup JSON:', err);
@@ -103,3 +167,4 @@ _scope.buildBackupPayload = buildBackupPayload;
 _scope.validateBackupPayload = validateBackupPayload;
 _scope.exportUserDataJSON = exportUserDataJSON;
 _scope.importUserDataJSON = importUserDataJSON;
+_scope.syncDataWithSupabase = syncDataWithSupabase;

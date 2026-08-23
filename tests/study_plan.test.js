@@ -53,13 +53,13 @@ describe('AI Study Schedule & Workload Balancer', () => {
                 { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
 
-            // Provide assignments in jumbled / out-of-order sequence with same due date
+            // Provide assignments in jumbled / out-of-order sequence with same due date (due today)
             const jumbledAssignments = [
-                { id: 'a4', course_id: 'c1', unit_number: 1, title: '↳ Lesson 4: Object-Oriented Design', due_date: '2026-08-21', is_completed: false },
-                { id: 'a2', course_id: 'c1', unit_number: 1, title: '↳ Lesson 2: Control Flow', due_date: '2026-08-21', is_completed: false },
-                { id: 'a1', course_id: 'c1', unit_number: 1, title: '↳ Lesson 1: Syntax & Variables', due_date: '2026-08-21', is_completed: false },
-                { id: 'a3', course_id: 'c1', unit_number: 1, title: '↳ Lesson 3: Functions & Modules', due_date: '2026-08-21', is_completed: false },
-                { id: 'u1', course_id: 'c1', unit_number: 1, title: 'Unit 1: Programming Fundamentals', due_date: '2026-08-21', is_completed: false }
+                { id: 'a4', course_id: 'c1', unit_number: 1, title: '↳ Lesson 4: Object-Oriented Design', due_date: '2026-08-20', is_completed: false },
+                { id: 'a2', course_id: 'c1', unit_number: 1, title: '↳ Lesson 2: Control Flow', due_date: '2026-08-20', is_completed: false },
+                { id: 'a1', course_id: 'c1', unit_number: 1, title: '↳ Lesson 1: Syntax & Variables', due_date: '2026-08-20', is_completed: false },
+                { id: 'a3', course_id: 'c1', unit_number: 1, title: '↳ Lesson 3: Functions & Modules', due_date: '2026-08-20', is_completed: false },
+                { id: 'u1', course_id: 'c1', unit_number: 1, title: 'Unit 1: Programming Fundamentals', due_date: '2026-08-20', is_completed: false }
             ];
 
             const plan = generateBalancedStudyPlan(courses, jumbledAssignments, baseDate, 3);
@@ -98,9 +98,9 @@ describe('AI Study Schedule & Workload Balancer', () => {
             ];
 
             const multiUnitAssignments = [
-                { id: 'u2l1', course_id: 'c1', unit_number: 2, title: '↳ Lesson 1: Derivatives', due_date: '2026-08-21', is_completed: false },
-                { id: 'u1l2', course_id: 'c1', unit_number: 1, title: '↳ Lesson 2: Limit Laws', due_date: '2026-08-21', is_completed: false },
-                { id: 'u1l1', course_id: 'c1', unit_number: 1, title: '↳ Lesson 1: Introduction to Limits', due_date: '2026-08-21', is_completed: false }
+                { id: 'u2l1', course_id: 'c1', unit_number: 2, title: '↳ Lesson 1: Derivatives', due_date: '2026-08-20', is_completed: false },
+                { id: 'u1l2', course_id: 'c1', unit_number: 1, title: '↳ Lesson 2: Limit Laws', due_date: '2026-08-20', is_completed: false },
+                { id: 'u1l1', course_id: 'c1', unit_number: 1, title: '↳ Lesson 1: Introduction to Limits', due_date: '2026-08-20', is_completed: false }
             ];
 
             const plan = generateBalancedStudyPlan(courses, multiUnitAssignments, baseDate, 3);
@@ -249,9 +249,9 @@ describe('AI Study Schedule & Workload Balancer', () => {
             ];
 
             const assignments = [
-                { id: 'a1', course_id: 'cs', title: 'Midterm Exam Practice', task_type: 'exam', priority: 'high', due_date: '2026-08-21', is_completed: false },
-                { id: 'a2', course_id: 'cs', title: 'Unit 1 Comprehensive Review', task_type: 'review', priority: 'medium', due_date: '2026-08-21', is_completed: false },
-                { id: 'a3', course_id: 'cs', title: 'Optional Enrichment Reading', task_type: 'reading', priority: 'low', due_date: '2026-08-21', is_completed: false }
+                { id: 'a1', course_id: 'cs', title: 'Midterm Exam Practice', task_type: 'exam', priority: 'high', due_date: '2026-08-20', is_completed: false },
+                { id: 'a2', course_id: 'cs', title: 'Unit 1 Comprehensive Review', task_type: 'review', priority: 'medium', due_date: '2026-08-20', is_completed: false },
+                { id: 'a3', course_id: 'cs', title: 'Optional Enrichment Reading', task_type: 'reading', priority: 'low', due_date: '2026-08-20', is_completed: false }
             ];
 
             const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 3);

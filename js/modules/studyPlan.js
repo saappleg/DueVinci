@@ -336,62 +336,103 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         });
     }
 
-    // Group pending assignments by Course (Subject) and sort in strict pedagogical curriculum order
-    const courseQueues = new Map();
-    courses.forEach(c => {
-        const cTasks = pendingAssignments.filter(a => a.course_id === c.id);
-        if (cTasks.length > 0) {
-            courseQueues.set(c.id, sortTasks(cTasks, baseDate, false));
-        }
+    // Group pending assignments by Course
+    const courseMap = new Map();
+    courses.forEach(c => courseMap.set(c.id, []));
+    courseMap.set('orphaned', []);
+
+    pendingAssignments.forEach(task => {
+        const cId = courses.some(c => c.id === task.course_id) ? task.course_id : 'orphaned';
+        courseMap.get(cId).push(task);
     });
 
-    // Handle any orphaned assignments with missing course_id
-    const orphanedTasks = pendingAssignments.filter(a => !courses.some(c => c.id === a.course_id));
-    if (orphanedTasks.length > 0) {
-        courseQueues.set('orphaned', sortTasks(orphanedTasks, baseDate, false));
-    }
+    // Allocate lessons unit-by-unit and lesson-by-lesson, spaced across available study days leading to due dates
+    courseMap.forEach((cTasks, courseId) => {
+        if (cTasks.length === 0) return;
 
-    // Allocate lessons day-by-day with Deadline-Driven Pacing and Rest Day exclusion
-    for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
-        const day = days[dayOffset];
-
-        // If today is marked as a rest day, skip assigning standard study lessons
-        if (day.isRestDay) continue;
-
-        courseQueues.forEach((queue, courseId) => {
-            if (queue.length === 0) return;
-
-            // Calculate required pace based on earliest deadline in queue
-            const nextTask = queue[0];
-            const daysUntilDue = calculateDaysRemaining(nextTask.due_date, baseDate);
-            
-            // Count remaining ACTIVE (non-rest) study days between current dayOffset and deadline
-            const activeDaysRemaining = days
-                .slice(dayOffset, Math.min(daysAhead, Math.max(dayOffset + 1, daysUntilDue + 1)))
-                .filter(d => !d.isRestDay).length;
-
-            const tasksInWindow = queue.filter(t => calculateDaysRemaining(t.due_date, baseDate) <= daysUntilDue).length;
-            const requiredLessonsToday = Math.max(1, Math.ceil(tasksInWindow / Math.max(1, activeDaysRemaining)));
-
-            let allocated = 0;
-            while (queue.length > 0 && allocated < requiredLessonsToday) {
-                const task = queue.shift();
-                day.assignedTasks.push({ task });
-                allocated++;
-            }
+        // Group tasks by unit number
+        const unitGroups = new Map();
+        cTasks.forEach(t => {
+            const uNum = getUnitNumber(t);
+            if (!unitGroups.has(uNum)) unitGroups.set(uNum, []);
+            unitGroups.get(uNum).push(t);
         });
-    }
+
+        // Sort unit keys sequentially: 0 (General/Intro), 1 (Unit 1), 2 (Unit 2), 3 (Unit 3)...
+        const sortedUnitKeys = Array.from(unitGroups.keys()).sort((a, b) => a - b);
+
+        let currentDayPointer = 0;
+
+        sortedUnitKeys.forEach(uKey => {
+            const unitTaskList = sortTasks(unitGroups.get(uKey), baseDate, false);
+            if (unitTaskList.length === 0) return;
+
+            // Find unit deadline (in days from baseDate)
+            const deadlines = unitTaskList.map(t => calculateDaysRemaining(t.due_date, baseDate));
+            const minDeadline = Math.min(...deadlines);
+
+            // If unit is overdue (minDeadline < 0) or due today (minDeadline === 0)
+            if (minDeadline <= 0) {
+                unitTaskList.forEach(task => {
+                    days[0].assignedTasks.push({ task });
+                });
+                currentDayPointer = Math.max(currentDayPointer, 1);
+                return;
+            }
+
+            // Find target end day for this unit (capped at daysAhead - 1)
+            const targetEndDay = Math.min(daysAhead - 1, Math.max(currentDayPointer, minDeadline));
+
+            // Collect active (non-rest) study days available for this unit
+            let activeDayIndices = [];
+            for (let d = currentDayPointer; d <= targetEndDay; d++) {
+                if (!days[d].isRestDay) {
+                    activeDayIndices.push(d);
+                }
+            }
+
+            // If all days in window are rest days, use the next available active day or current day
+            if (activeDayIndices.length === 0) {
+                for (let d = currentDayPointer; d < daysAhead; d++) {
+                    if (!days[d].isRestDay) {
+                        activeDayIndices.push(d);
+                        break;
+                    }
+                }
+                if (activeDayIndices.length === 0) activeDayIndices = [Math.min(currentDayPointer, daysAhead - 1)];
+            }
+
+            // Distribute unit tasks evenly across active days available
+            const tasksPerActiveDay = Math.max(1, Math.ceil(unitTaskList.length / activeDayIndices.length));
+            let activeIdx = 0;
+            let countOnCurrentDay = 0;
+            let lastDayAssigned = activeDayIndices[0];
+
+            unitTaskList.forEach(task => {
+                const daySlot = activeDayIndices[activeIdx];
+                days[daySlot].assignedTasks.push({ task });
+                lastDayAssigned = daySlot;
+                countOnCurrentDay++;
+
+                if (countOnCurrentDay >= tasksPerActiveDay && activeIdx < activeDayIndices.length - 1) {
+                    activeIdx++;
+                    countOnCurrentDay = 0;
+                }
+            });
+
+            // Advance pointer to the day after this unit completes
+            currentDayPointer = Math.min(daysAhead - 1, lastDayAssigned + 1);
+        });
+    });
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {
-        // Collect tasks for this day:
-        // 1. Assigned sequential focus tasks for this day
-        // 2. On Day 0 (Today), also include any urgent tasks due within 2 days or overdue
+        // Collect assigned tasks for this day (and ensure overdue tasks are surfaced on Day 0)
         const combinedTasks = [...day.assignedTasks];
         if (day.isToday) {
             pendingAssignments.forEach(task => {
                 const daysLeft = calculateDaysRemaining(task.due_date, day.currentDate);
-                if (daysLeft <= 2) {
+                if (daysLeft < 0) {
                     if (!combinedTasks.some(ct => ct.task.id === task.id)) {
                         combinedTasks.push({ task });
                     }

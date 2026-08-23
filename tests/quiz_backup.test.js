@@ -96,6 +96,16 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(validateBackupPayload({ invalid: true }).valid).toBe(false);
             expect(validateBackupPayload({ data: { courses: 'not-an-array', assignments: [] } }).valid).toBe(false);
         });
+
+        it('exports backup and cloud sync functions safely', async () => {
+            const mod = await import('../js/modules/backup.js');
+            expect(typeof mod.exportUserDataJSON).toBe('function');
+            expect(typeof mod.importUserDataJSON).toBe('function');
+            expect(typeof mod.syncDataWithSupabase).toBe('function');
+
+            // Running without DOM file input shouldn't crash
+            expect(() => mod.importUserDataJSON(null)).not.toThrow();
+        });
     });
 
     describe('generateICSString', () => {
