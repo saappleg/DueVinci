@@ -43,16 +43,15 @@ export async function handleAuth(session) {
         if (currentUser?.id && typeof localStorage !== 'undefined') {
             localStorage.setItem('duevinci_offline_user', JSON.stringify({ id: currentUser.id, email: currentUser.email || '' }));
         }
-        // Preference sync is an enhancement, never a prerequisite for opening
-        // the cached planner. A network failure here must not leave an offline
-        // page hidden behind the auth screen.
-        try {
-            await initializePreferenceSync(currentUser);
-        } catch (error) {
-            console.warn('Preference sync deferred until reconnect:', error.message || error);
-        }
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
+
+        // Never block cached-page rendering on a cloud preference request.
+        // Chrome's DevTools offline mode can still report navigator.onLine,
+        // so this must be deliberately background-only.
+        initializePreferenceSync(currentUser).catch((error) => {
+            console.warn('Preference sync deferred until reconnect:', error.message || error);
+        });
 
         const page = getCurrentPageName();
         if ((page === 'index' || page === 'index.html' || page === '') && document.getElementById('dashboardGrid')) {
