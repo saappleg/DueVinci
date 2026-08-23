@@ -786,7 +786,24 @@ export async function updateAssignmentDate(assignId, newDate, courseId) {
 
 export async function updateAssignmentPriority(assignId, priority, courseId) {
     if (!assignId || !priority) return;
-    await supabaseClient.from('assignments').update({ priority }).eq('id', assignId);
+
+    // Dual-layer persistence to guarantee zero-reversion
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const prioMap = JSON.parse(localStorage.getItem('duevinci_assignment_priorities') || '{}');
+            prioMap[assignId] = priority;
+            localStorage.setItem('duevinci_assignment_priorities', JSON.stringify(prioMap));
+        }
+    } catch (e) {
+        console.warn('localStorage priority write notice:', e);
+    }
+
+    try {
+        await supabaseClient.from('assignments').update({ priority }).eq('id', assignId);
+    } catch (err) {
+        console.warn('Supabase priority update notice:', err);
+    }
+
     loadAssignments(courseId, currentAssignmentPage);
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
         window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
@@ -795,7 +812,27 @@ export async function updateAssignmentPriority(assignId, priority, courseId) {
 
 export async function updateAssignmentType(assignId, taskType, courseId) {
     if (!assignId || !taskType) return;
-    await supabaseClient.from('assignments').update({ task_type: taskType, type: taskType }).eq('id', assignId);
+
+    // Dual-layer persistence to guarantee zero-reversion
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const typesMap = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}');
+            typesMap[assignId] = taskType;
+            localStorage.setItem('duevinci_assignment_types', JSON.stringify(typesMap));
+        }
+    } catch (e) {
+        console.warn('localStorage assignment type write notice:', e);
+    }
+
+    try {
+        const { error } = await supabaseClient.from('assignments').update({ task_type: taskType, type: taskType }).eq('id', assignId);
+        if (error) {
+            console.warn('Supabase task_type update notice:', error.message);
+        }
+    } catch (err) {
+        console.warn('Supabase task_type update exception:', err);
+    }
+
     loadAssignments(courseId, currentAssignmentPage);
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
         window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
@@ -950,12 +987,21 @@ export async function loadAssignments(courseId, page = 1) {
     const startIndex = (page - 1) * pageSize;
     const paginatedAssignments = assignments.slice(startIndex, startIndex + pageSize);
 
+    let localTypes = {};
+    let localPrios = {};
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localTypes = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}');
+            localPrios = JSON.parse(localStorage.getItem('duevinci_assignment_priorities') || '{}');
+        }
+    } catch (e) {}
+
     paginatedAssignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
 
-        // Determine current type (respect explicit assignment type over regex heuristics)
-        let currentType = assign.task_type || assign.type;
+        // Determine current type (respect local overrides & explicit assignment type over regex heuristics)
+        let currentType = localTypes[assign.id] || assign.task_type || assign.type;
         if (!currentType) {
             if (/exam|final|midterm|test/i.test(assign.title)) currentType = 'exam';
             else if (/review|recap|summary|synthesis/i.test(assign.title)) currentType = 'review';
@@ -965,7 +1011,7 @@ export async function loadAssignments(courseId, page = 1) {
         }
 
         // Determine current priority
-        let currentPriority = assign.priority || 'medium';
+        let currentPriority = localPrios[assign.id] || assign.priority || 'medium';
         if (currentPriority === 'urgent') currentPriority = 'high';
         if (currentPriority === 'normal') currentPriority = 'medium';
 

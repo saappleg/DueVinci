@@ -129,7 +129,16 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     // Helper to generate rich block
     function createStudyBlock(task, course, currentDate, customTitle = null, customMinutes = null, customRec = null) {
-        let taskType = task.task_type || task.type;
+        let localTypes = {};
+        let localPrios = {};
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localTypes = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}');
+                localPrios = JSON.parse(localStorage.getItem('duevinci_assignment_priorities') || '{}');
+            }
+        } catch (e) {}
+
+        let taskType = localTypes[task.id] || task.task_type || task.type;
         if (!taskType) {
             if (/exam|final|midterm|test/i.test(task.title)) taskType = 'exam';
             else if (/review|recap|summary|synthesis/i.test(task.title)) taskType = 'review';
@@ -143,7 +152,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         const durationMin = customMinutes !== null ? customMinutes : (isExam ? 50 : 25);
         const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
-        let priority = task.priority || 'medium';
+        let priority = localPrios[task.id] || task.priority || 'medium';
         if (priority === 'urgent') priority = 'high';
         if (priority === 'normal') priority = 'medium';
 
