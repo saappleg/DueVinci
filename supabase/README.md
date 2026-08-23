@@ -13,6 +13,7 @@ supabase db push --project-ref kinsxkeerxguqkyzrjfm
 ```sh
 supabase functions deploy start-trial --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy create-portal-session canvas-connect canvas-courses canvas-sync canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
 ```
 
@@ -21,4 +22,4 @@ supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
 `STRIPE_YEARLY_PRICE_ID`, and `APP_URL`. Keep each environment's Test or Live Stripe
 credentials and price IDs separate.
 
-Canvas Sync currently calls Canvas directly from the browser, so the target Canvas instance must permit requests from the Dev origin. The `20260823112000_canvas_subscription_foundation.sql` migration creates the profile fields, RLS policies, signup trigger, and LMS course identity required by the active vanilla-JS UI. The `20260823114000_canvas_billing.sql` migration adds Stripe customer/subscription identities and the one-time trial marker.
+Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.

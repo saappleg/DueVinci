@@ -317,7 +317,7 @@ export function ensureSettingsModalExists() {
                             <button id="canvasStartTrialBtn" type="button" onclick="handleCanvasStartTrial()" class="hidden w-full py-2 px-4 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2">
                                 Start 30-Day Free Trial — No Card Required
                             </button>
-                            <div id="canvasCheckoutOptions" class="hidden space-y-2">
+                        <div id="canvasCheckoutOptions" class="hidden space-y-2">
                                 <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Canvas Sync is available as a separate add-on. Cancel anytime.</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
@@ -325,6 +325,7 @@ export function ensureSettingsModalExists() {
                                 </div>
                             </div>
                         </div>
+                        <button id="canvasManageBillingBtn" type="button" onclick="handleCanvasBillingPortal()" class="hidden w-full py-2 px-4 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl transition">Manage Canvas Sync billing</button>
 
                         <!-- Canvas Connector Form -->
                         <div id="canvasConnectorArea" class="hidden p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-4">

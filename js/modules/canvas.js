@@ -62,7 +62,7 @@ async function requireCanvasAccess() {
 
     const { data: profile, error } = await supabaseClient
         .from('profiles')
-        .select('subscription_status, trial_end, canvas_domain, canvas_token')
+        .select('subscription_status, trial_end, canvas_domain')
         .eq('user_id', user.id)
         .maybeSingle();
     if (error) throw error;
@@ -100,6 +100,7 @@ export async function initCanvasSettingsTab() {
     const msg     = document.getElementById('canvasSubMsg');
     const trialBtn = document.getElementById('canvasStartTrialBtn');
     const checkoutArea = document.getElementById('canvasCheckoutOptions');
+    const manageBillingBtn = document.getElementById('canvasManageBillingBtn');
     const connectorArea = document.getElementById('canvasConnectorArea');
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
 
@@ -108,7 +109,7 @@ export async function initCanvasSettingsTab() {
     // Reset UI
     badge.textContent = 'Loading…';
     msg.textContent   = 'Checking your plan…';
-    [trialBtn, checkoutArea, connectorArea, syncTriggerArea].forEach(el => el?.classList.add('hidden'));
+    [trialBtn, checkoutArea, manageBillingBtn, connectorArea, syncTriggerArea].forEach(el => el?.classList.add('hidden'));
 
     try {
         const { data: { user } } = await supabaseClient.auth.getUser();
@@ -116,7 +117,7 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, canvas_domain, canvas_token')
+            .select('subscription_status, trial_end, trial_started_at, canvas_domain')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -151,6 +152,7 @@ export async function initCanvasSettingsTab() {
             _showConnectorOrSync(profile);
         } else if (status === 'active') {
             msg.textContent = 'DueVinci Pro is active. Canvas Sync is enabled.';
+            manageBillingBtn?.classList.remove('hidden');
             _showConnectorOrSync(profile);
         } else {
             msg.textContent = 'Your Canvas Sync subscription is not active. Choose a plan to continue.';
@@ -167,15 +169,15 @@ function _showConnectorOrSync(profile) {
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
     const domainDisplay = document.getElementById('canvasConnectedDomain');
 
-    if (profile?.canvas_domain && profile?.canvas_token) {
+    if (profile?.canvas_domain) {
         // Already connected — show sync trigger
         syncTriggerArea?.classList.remove('hidden');
         if (domainDisplay) domainDisplay.textContent = profile.canvas_domain;
-        // Pre-fill connector inputs in case user wants to update
+        // Pre-fill only the non-secret domain. The Canvas token stays server-side.
         const domainInput = document.getElementById('canvasDomainInput');
         const tokenInput  = document.getElementById('canvasTokenInput');
         if (domainInput) domainInput.value = profile.canvas_domain;
-        if (tokenInput)  tokenInput.value  = profile.canvas_token;
+        if (tokenInput) tokenInput.value = '';
     } else {
         // Not connected yet — show connector form
         connectorArea?.classList.remove('hidden');
@@ -238,6 +240,22 @@ export async function handleCanvasCheckout(interval) {
     }
 }
 
+export async function handleCanvasBillingPortal() {
+    const btn = document.getElementById('canvasManageBillingBtn');
+    const message = document.getElementById('canvasSubMsg');
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening billing portal…'; }
+    try {
+        const returnUrl = `${window.location.origin}${window.location.pathname}`;
+        const { data, error } = await withTimeout(supabaseClient.functions.invoke('create-portal-session', { body: { returnUrl } }), 'Opening billing portal took too long. Please try again.');
+        if (error) throw error;
+        if (!data?.url) throw new Error(data?.error || 'Unable to open billing portal.');
+        window.location.assign(data.url);
+    } catch (err) {
+        if (message) message.textContent = err.message || 'Unable to open billing portal.';
+        if (btn) { btn.disabled = false; btn.textContent = 'Manage Canvas Sync billing'; }
+    }
+}
+
 // ─── Connector Handler ─────────────────────────────────────────────────────────
 
 export async function handleCanvasConnect() {
@@ -259,31 +277,10 @@ export async function handleCanvasConnect() {
     if (connectBtn) { connectBtn.textContent = 'Verifying…'; connectBtn.disabled = true; }
 
     try {
-        await requireCanvasAccess();
-        // 1. Verify token against Canvas API
-        const res = await fetch(`${domain}/api/v1/users/self/profile`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
-        });
-
-        if (!res.ok) {
-            if (res.status === 401) throw new Error('Authentication failed. Your Canvas token is invalid or expired.');
-            throw new Error(`Canvas returned HTTP ${res.status}. Check your instance URL.`);
-        }
-
-        const canvasUser = await res.json();
-
-        // 2. Save credentials to Supabase profiles row
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) throw new Error('Not signed in.');
-
-        const { error: updateErr } = await supabaseClient
-            .from('profiles')
-            .update({ canvas_domain: domain, canvas_token: token, updated_at: new Date().toISOString() })
-            .eq('user_id', user.id);
-
-        if (updateErr) throw updateErr;
-
-        const name = canvasUser.name || canvasUser.sortable_name || 'Canvas Student';
+        const { data, error } = await withTimeout(supabaseClient.functions.invoke('canvas-connect', { body: { canvasUrl: domain, canvasToken: token } }), 'Connecting to Canvas took too long. Please try again.');
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Unable to connect Canvas.');
+        const name = data.name || 'Canvas Student';
         showConnectorMsg(`Connected as ${name}! Refreshing…`, 'success');
 
         setTimeout(() => initCanvasSettingsTab(), 800);
@@ -300,13 +297,8 @@ export async function handleCanvasDisconnect() {
     if (!confirm('Disconnect your Canvas account? Your imported courses will remain, but syncing will be disabled.')) return;
 
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) return;
-
-        await supabaseClient
-            .from('profiles')
-            .update({ canvas_domain: null, canvas_token: null, updated_at: new Date().toISOString() })
-            .eq('user_id', user.id);
+        const { error } = await supabaseClient.functions.invoke('canvas-disconnect');
+        if (error) throw error;
 
         await initCanvasSettingsTab();
     } catch (err) {
@@ -342,20 +334,10 @@ export async function openCanvasSyncModal() {
     }
 
     try {
-        const { profile } = await requireCanvasAccess();
-        if (!profile?.canvas_domain || !profile?.canvas_token) {
-            throw new Error('Canvas credentials not found. Please connect Canvas first.');
-        }
-
-        const res = await fetch(
-            `${profile.canvas_domain}/api/v1/courses?enrollment_state=active&include[]=term`,
-            { headers: { Authorization: `Bearer ${profile.canvas_token}`, Accept: 'application/json' } }
-        );
-
-        if (!res.ok) throw new Error(`Canvas returned HTTP ${res.status}.`);
-
-        const raw = await res.json();
-        _canvasCourses = raw.filter(c => c.name && c.name.trim().length > 0);
+        const { data, error } = await withTimeout(supabaseClient.functions.invoke('canvas-courses'), 'Loading Canvas courses took too long. Please try again.');
+        if (error) throw error;
+        if (!data?.courses) throw new Error(data?.error || 'Unable to load Canvas courses.');
+        _canvasCourses = data.courses;
         _canvasSelectedIds = new Set(_canvasCourses.map(c => c.id));
 
         _renderCourseList();
@@ -429,22 +411,10 @@ export async function handleCanvasSyncConfirm() {
     if (confirmBtn) { confirmBtn.textContent = 'Syncing…'; confirmBtn.disabled = true; }
 
     try {
-        const { user } = await requireCanvasAccess();
-
-        const coursesToSync = _canvasCourses.filter(c => _canvasSelectedIds.has(c.id));
-
-        // Keep Canvas imports compatible with the course fields used throughout the
-        // current application, while retaining the LMS identity for future re-syncs.
-        const syncedAt = new Date().toISOString();
-        const payload = coursesToSync.map(c => buildCanvasCoursePayload(c, user.id, syncedAt));
-
-        const { error } = await supabaseClient
-            .from('courses')
-            .upsert(payload, { onConflict: 'user_id,lms_source_id' });
-
+        const { data, error } = await withTimeout(supabaseClient.functions.invoke('canvas-sync', { body: { selectedIds: [..._canvasSelectedIds] } }), 'Syncing Canvas courses took too long. Please try again.');
         if (error) throw error;
-
-        showSyncModalMsg(`✓ Synced ${coursesToSync.length} course${coursesToSync.length === 1 ? '' : 's'} successfully!`, 'success');
+        if (!data?.success) throw new Error(data?.error || 'Unable to sync Canvas courses.');
+        showSyncModalMsg(`✓ Synced ${data.synced} course${data.synced === 1 ? '' : 's'} successfully!`, 'success');
         setTimeout(() => closeCanvasSyncModal(), 1500);
     } catch (err) {
         showSyncModalMsg(err.message || 'Failed to sync courses.');
@@ -459,6 +429,7 @@ if (typeof window !== 'undefined') {
     window.initCanvasSettingsTab  = initCanvasSettingsTab;
     window.handleCanvasStartTrial = handleCanvasStartTrial;
     window.handleCanvasCheckout = handleCanvasCheckout;
+    window.handleCanvasBillingPortal = handleCanvasBillingPortal;
     window.handleCanvasConnect    = handleCanvasConnect;
     window.handleCanvasDisconnect = handleCanvasDisconnect;
     window.openCanvasSyncModal    = openCanvasSyncModal;
