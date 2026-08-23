@@ -98,38 +98,38 @@ export function ensureWhatsNewModalExists() {
                     <span class="text-3xl">✨</span>
                     <div>
                         <h3 class="font-black text-lg text-zinc-900 dark:text-white">What's New in DueVinci</h3>
-                        <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version 2.2 Feature Drop</p>
+                        <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version 1.3 Feature Drop</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
             </div>
             <div class="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto text-xs">
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">🎯</span>
+                    <span class="text-2xl shrink-0">📅</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">"What-If" Grade Simulator</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Experiment with hypothetical scores on upcoming exams on the Grades page to see exactly what score you need to keep your target GPA.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Unit Milestone Planner & Rest Days</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Unit-by-unit milestone spacing planner with customizable Rest Days scheduling, deadline-first sorting, and timestamp-aware workload balancing.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">🛡️</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Dual-Persistence & Task Schema Hardening</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Persist custom task types (assignments, lessons, quizzes, pages), editable coursework titles, and priority tags across IndexedDB and cloud sync.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">⚡</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Canvas LMS Direct Sync</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Optional one-click import of active term courses and modules directly from your university's Canvas instance.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
                     <span class="text-2xl shrink-0">📊</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">7-Day Workload & Stress Radar</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Visualize your upcoming academic load across the next 7 days right on your Dashboard to avoid crunch weeks.</p>
-                    </div>
-                </div>
-                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">🎴</span>
-                    <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">AI Flashcards & Practice Quizzes</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Generate interactive study flashcard decks and 5-minute practice checks directly inside your course drawer.</p>
-                    </div>
-                </div>
-                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">📱</span>
-                    <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Installable App & Offline Mode</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Install DueVinci on your laptop or phone as a standalone PWA with offline caching.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">7-Day Workload Radar & GPA Simulator</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Visualize daily cognitive load to prevent crunch weeks and test "What-If" hypothetical scores on upcoming exams.</p>
                     </div>
                 </div>
             </div>
@@ -150,13 +150,13 @@ export function openWhatsNewModal() {
 }
 
 export function closeWhatsNewModal() {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_whats_new_seen', 'v2.2');
+    if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_whats_new_seen', 'v1.3');
     const m = document.getElementById('whatsNewModal');
     if (m) m.classList.add('hidden');
 }
 
 export function checkWhatsNewOnLaunch() {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_whats_new_seen') !== 'v2.2') {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_whats_new_seen') !== 'v1.3') {
         setTimeout(openWhatsNewModal, 900);
     }
 }

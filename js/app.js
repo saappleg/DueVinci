@@ -18,6 +18,7 @@ import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, o
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
 import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
+import './modules/canvas.js'; // Canvas LMS Sync — optional add-on, zero impact on free core
 
 // Re-export for external and test suite imports
 export {

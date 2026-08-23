@@ -132,6 +132,7 @@ export function ensureSettingsModalExists() {
                             <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                             <button type="button" onclick="switchSettingsTab('backup')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
                             <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
+                            <button type="button" onclick="switchSettingsTab('canvas')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">⚡ Canvas Sync</button>
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
@@ -298,6 +299,88 @@ export function ensureSettingsModalExists() {
                                 </div>
                             </div>
                         </div>
+
+                    <!-- Tab: Canvas LMS Sync -->
+                    <div id="content-canvas" class="hidden space-y-5">
+                        <div>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Canvas LMS Sync</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Optionally connect your university Canvas account to auto-import courses and assignments. All free core features remain available without this.</p>
+                        </div>
+
+                        <!-- Subscription Status Banner -->
+                        <div id="canvasSubscriptionArea" class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">🎟️ Subscription Status</div>
+                                <span id="canvasSubBadge" class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-zinc-200 dark:bg-brand-700 text-zinc-500 dark:text-zinc-400">Loading…</span>
+                            </div>
+                            <p id="canvasSubMsg" class="text-xs text-zinc-500 dark:text-zinc-400">Checking your plan…</p>
+                            <button id="canvasStartTrialBtn" type="button" onclick="handleCanvasStartTrial()" class="hidden w-full py-2 px-4 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2">
+                                Start 30-Day Free Trial — No Card Required
+                            </button>
+                        </div>
+
+                        <!-- Canvas Connector Form -->
+                        <div id="canvasConnectorArea" class="hidden p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-4">
+                            <div class="font-bold text-sm text-zinc-900 dark:text-white">🔗 Connect Your Canvas Instance</div>
+                            <div id="canvasConnectorMsg" class="hidden text-xs rounded-lg px-3 py-2 border"></div>
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Canvas Instance URL</label>
+                                <input type="text" id="canvasDomainInput" placeholder="https://canvas.myschool.edu" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
+                                <input type="password" id="canvasTokenInput" placeholder="Canvas → Account → Settings → + New Access Token" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
+                                <p class="text-[11px] text-zinc-400 mt-1.5">Canvas: Account → Settings → Approved Integrations → + New Access Token.</p>
+                            </div>
+                            <button type="button" id="canvasConnectBtn" onclick="handleCanvasConnect()" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+                                Connect Canvas LMS
+                            </button>
+                        </div>
+
+                        <!-- Connected State + Sync Trigger -->
+                        <div id="canvasSyncTriggerArea" class="hidden p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Canvas Connected
+                                    </div>
+                                    <div id="canvasConnectedDomain" class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono"></div>
+                                </div>
+                                <button type="button" onclick="handleCanvasDisconnect()" class="text-[11px] text-zinc-400 hover:text-red-500 transition font-medium">Disconnect</button>
+                            </div>
+                            <button type="button" onclick="openCanvasSyncModal()" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                                Sync Canvas Courses…
+                            </button>
+                        </div>
+
+                        <!-- Canvas Sync Modal -->
+                        <div id="canvasSyncModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                            <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                                <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
+                                    <div>
+                                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas Courses</h3>
+                                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Select active courses to import into DueVinci.</p>
+                                    </div>
+                                    <button type="button" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
+                                </div>
+                                <div id="canvasSyncModalMsg" class="hidden mx-5 mt-4 p-3 rounded-xl text-xs border"></div>
+                                <div class="flex-1 overflow-y-auto p-5" id="canvasCourseList">
+                                    <div class="flex flex-col items-center justify-center py-10 text-zinc-400 gap-3">
+                                        <svg class="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                                        <span class="text-xs">Loading courses from Canvas…</span>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-t border-zinc-200 dark:border-brand-700 flex justify-between items-center gap-3">
+                                    <span id="canvasSyncCount" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
+                                    <div class="flex gap-2">
+                                        <button type="button" onclick="closeCanvasSyncModal()" class="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-brand-700 hover:bg-zinc-200 dark:hover:bg-brand-600 rounded-lg transition">Cancel</button>
+                                        <button type="button" id="canvasSyncConfirmBtn" onclick="handleCanvasSyncConfirm()" class="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition disabled:opacity-50">Sync Selected</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -374,7 +457,7 @@ export function closeSettingsModal() {
 }
 
 export function switchSettingsTab(tabName) {
-    const tabs = ['profile', 'appearance', 'backup', 'privacy'];
+    const tabs = ['profile', 'appearance', 'backup', 'privacy', 'canvas'];
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);
@@ -390,6 +473,10 @@ export function switchSettingsTab(tabName) {
             }
         }
     });
+    // When switching to Canvas tab, refresh its state
+    if (tabName === 'canvas') {
+        if (typeof window.initCanvasSettingsTab === 'function') window.initCanvasSettingsTab();
+    }
 }
 
 export function ensureSupportModalExists() {
