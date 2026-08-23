@@ -132,7 +132,7 @@ export function ensureSettingsModalExists() {
                             <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                             <button type="button" onclick="switchSettingsTab('backup')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
                             <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
-                            <button type="button" onclick="switchSettingsTab('canvas')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">⚡ Canvas Sync</button>
+                            <button type="button" onclick="switchSettingsTab('canvas')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">💳 Subscription</button>
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
@@ -300,11 +300,11 @@ export function ensureSettingsModalExists() {
                             </div>
                         </div>
 
-                    <!-- Tab: Canvas LMS Sync -->
+                    <!-- Tab: Subscription -->
                     <div id="content-canvas" class="hidden space-y-5">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Canvas LMS Sync</h2>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Optionally connect your university Canvas account to auto-import courses and assignments. All free core features remain available without this.</p>
+                            <h2 class="text-xl font-bold dark:text-white mb-1">Subscription</h2>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Canvas LMS Sync is the first subscription benefit. All existing DueVinci planning features remain free forever.</p>
                         </div>
 
                         <!-- Subscription Status Banner -->
@@ -318,14 +318,14 @@ export function ensureSettingsModalExists() {
                                 Start 30-Day Free Trial — No Card Required
                             </button>
                         <div id="canvasCheckoutOptions" class="hidden space-y-2">
-                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Canvas Sync is available as a separate add-on. Cancel anytime.</p>
+                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Canvas LMS Sync enabled. Cancel anytime.</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
                                     <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('yearly')" class="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$45 / year</button>
                                 </div>
                             </div>
                         </div>
-                        <button id="canvasManageBillingBtn" type="button" onclick="handleCanvasBillingPortal()" class="hidden w-full py-2 px-4 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl transition">Manage Canvas Sync billing</button>
+                        <button id="canvasManageBillingBtn" type="button" onclick="handleCanvasBillingPortal()" class="hidden w-full py-2 px-4 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl transition">Manage subscription</button>
 
                         <!-- Canvas Connector Form -->
                         <div id="canvasConnectorArea" class="hidden p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-4">

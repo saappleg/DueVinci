@@ -47,7 +47,7 @@ serve(async (req) => {
 
     if (existing?.trial_started_at) {
       return new Response(
-        JSON.stringify({ success: false, code: 'trial_used', error: 'Your free trial has already been used. Please choose a Canvas Sync plan.' }),
+        JSON.stringify({ success: false, code: 'trial_used', error: 'Your free trial has already been used. Please choose a subscription.' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

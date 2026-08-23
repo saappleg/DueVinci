@@ -47,7 +47,7 @@ serve(async (req) => {
     const priceId = interval === 'monthly'
       ? Deno.env.get('STRIPE_MONTHLY_PRICE_ID')
       : Deno.env.get('STRIPE_YEARLY_PRICE_ID')
-    if (!priceId) throw new Error('Canvas Sync price is not configured')
+    if (!priceId) throw new Error('Subscription pricing is not configured')
 
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
@@ -55,11 +55,11 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .maybeSingle()
     if (profileErr) throw profileErr
-    if (profile?.subscription_status === 'active') throw new Error('Canvas Sync is already active')
+    if (profile?.subscription_status === 'active') throw new Error('Your subscription is already active')
     if (profile?.stripe_subscription_id) {
       try {
         await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
-        throw new Error('A Canvas Sync subscription is already scheduled. Manage it in the billing portal.')
+        throw new Error('A subscription is already scheduled. Manage it in the billing portal.')
       } catch (error) {
         if (!isMissingStripeResource(error)) throw error
         const { error: clearSubscriptionErr } = await supabaseAdmin

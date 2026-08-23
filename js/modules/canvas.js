@@ -147,7 +147,7 @@ export async function initCanvasSettingsTab() {
 
         if (status === 'inactive') {
             if (profile?.trial_started_at) {
-                msg.textContent = 'Your free trial has ended. Choose a plan to continue using Canvas LMS Sync.';
+                msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Canvas LMS Sync.';
                 checkoutArea?.classList.remove('hidden');
             } else {
                 msg.textContent = 'Start a free trial to unlock Canvas LMS course syncing. No credit card required.';
@@ -165,11 +165,11 @@ export async function initCanvasSettingsTab() {
             // Show connector or sync trigger depending on credentials
             _showConnectorOrSync(profile);
         } else if (status === 'active') {
-            msg.textContent = 'DueVinci Pro is active. Canvas Sync is enabled.';
+            msg.textContent = 'Your subscription is active. Canvas LMS Sync is enabled.';
             manageBillingBtn?.classList.remove('hidden');
             _showConnectorOrSync(profile);
         } else {
-            msg.textContent = 'Your Canvas Sync subscription is not active. Choose a plan to continue.';
+            msg.textContent = 'Your subscription is not active. Choose a plan to continue.';
             checkoutArea?.classList.remove('hidden');
         }
     } catch (err) {
@@ -266,7 +266,7 @@ export async function handleCanvasBillingPortal() {
         window.location.assign(data.url);
     } catch (err) {
         if (message) message.textContent = await functionErrorMessage(err, 'Unable to open billing portal.');
-        if (btn) { btn.disabled = false; btn.textContent = 'Manage Canvas Sync billing'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Manage subscription'; }
     }
 }
 
