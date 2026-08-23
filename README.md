@@ -26,7 +26,7 @@
 - **Smart Study Plan & Workload Balancer** — Sequences lessons within units, spreads work over available study days, respects chosen rest days where possible, and keeps deadlines as hard constraints.
 - **7-Day Workload & Stress Radar** — Highlights upcoming task volume and exam days so students can spot pressure before it becomes cramming.
 - **Grades, GPA, calendar, timers, and backups** — Track academic progress, export `.ics` calendars, run focus sessions, and export/import JSON data.
-- **PWA and accessibility-minded UI** — Installable static web app with cached application assets, dark mode, and responsive layouts.
+- **PWA and accessibility-minded UI** — Installable offline-first web app: planner data is cached locally and free-core changes sync after reconnecting, with dark mode and responsive layouts.
 
 ### Optional integrations
 

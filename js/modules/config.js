@@ -1,4 +1,5 @@
 // --- DYNAMIC SUPABASE ENVIRONMENT ROUTING & CLIENT ---
+import { createOfflineFirstClient } from './offlineDb.js';
 
 // Environment safeguards for browser/Node compatibility
 if (typeof window === 'undefined') {
@@ -64,7 +65,7 @@ if (IS_DEVELOPMENT) {
     if (typeof console !== 'undefined') console.log('🚀 Running in Production Mode (DueVinci-Prod)');
 }
 
-export const supabaseClient = (typeof window !== 'undefined' && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const rawSupabaseClient = (typeof window !== 'undefined' && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         experimental: { passkey: true }
     }
@@ -86,6 +87,10 @@ export const supabaseClient = (typeof window !== 'undefined' && window.supabase)
         order: () => ({ data: [], error: null })
     })
 };
+
+// Free planner tables are offline-first. Canvas, billing, profiles, support,
+// and every Edge Function retain their normal online-only Supabase behavior.
+export const supabaseClient = createOfflineFirstClient(rawSupabaseClient);
 
 // Bind to window for global access
 if (typeof window !== 'undefined') {

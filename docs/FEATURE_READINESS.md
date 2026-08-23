@@ -38,8 +38,12 @@ also used for protected billing state.
   no longer stop installation.
 - Authenticated Supabase/API responses are never cached by the worker.
 - The installed app can open its cached shell offline after a successful online
-  load. Saving, syncing, and account changes still require a connection;
-  DueVinci does **not** currently queue offline mutations.
+  load. Courses, assignments, grades, completion changes, and calendar events
+  are cached per signed-in user and changes made offline are queued in
+  IndexedDB for replay after reconnecting.
+- Canvas, billing, AI import, account deletion, support requests, and other
+  server-side operations remain online-only. Do not assume an offline write is
+  fully synced until the reconnection notice clears.
 
 Before a release, manually verify installation and an offline reload in Chrome
 or on a phone after visiting the dashboard, Courses, Grades, and Calendar once
