@@ -48,12 +48,13 @@ export const PROD_SUPABASE_URL = 'https://lzmsguzlmjmedlaybckc.supabase.co';
 export const PROD_SUPABASE_ANON_KEY = 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
 
 export const currentHost = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
+export const IS_DEVELOPMENT = currentHost.includes('localhost') || currentHost.includes('127.0.0.1') || currentHost.startsWith('file');
 
 export let SUPABASE_URL = '';
 export let SUPABASE_ANON_KEY = '';
 
 // Determine environment based on hostname. Any non-local host is treated as production (GitHub Pages, custom domains, etc.).
-if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1') || currentHost.startsWith('file')) {
+if (IS_DEVELOPMENT) {
     SUPABASE_URL = DEV_SUPABASE_URL;
     SUPABASE_ANON_KEY = DEV_SUPABASE_ANON_KEY;
     if (typeof console !== 'undefined') console.log('🔧 Running in Development Mode (DueVinci-Dev)');

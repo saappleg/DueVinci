@@ -27,3 +27,9 @@ key to its enabled features. Add future paid features by creating a plan key and
 feature mapping, then use the shared Edge Function entitlement check.
 
 Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.
+
+## Dev Canvas mock
+
+Set `ENABLE_CANVAS_MOCK=true` only in the Dev project to show the local-only sample
+Canvas account. It exercises connection, course selection, and import with three
+fixture courses. Do not set this variable in Production.

@@ -4,7 +4,7 @@
 // This is a fully isolated, optional add-on.
 // The free core (local courses, planner, SM-2, timers) is NEVER gated.
 
-import { supabaseClient } from './config.js';
+import { IS_DEVELOPMENT, supabaseClient } from './config.js';
 
 let _canvasSelectedIds = new Set();
 let _canvasCourses = [];
@@ -195,6 +195,8 @@ function _showConnectorOrSync(profile) {
     } else {
         // Not connected yet — show connector form
         connectorArea?.classList.remove('hidden');
+        document.getElementById('canvasMockConnectBtn')?.classList.toggle('hidden', !IS_DEVELOPMENT);
+        document.getElementById('canvasMockConnectHint')?.classList.toggle('hidden', !IS_DEVELOPMENT);
     }
 }
 
@@ -302,6 +304,27 @@ export async function handleCanvasConnect() {
         showConnectorMsg(err.message || 'Unable to connect to Canvas.');
     } finally {
         if (connectBtn) { connectBtn.textContent = 'Connect Canvas LMS'; connectBtn.disabled = false; }
+    }
+}
+
+// This uses the Dev Supabase project's server-side fixture. It is never shown
+// outside a loopback development host and the fixture is disabled in Production.
+export async function handleCanvasConnectMock() {
+    const connectBtn = document.getElementById('canvasMockConnectBtn');
+    if (connectBtn) { connectBtn.textContent = 'Connecting sample account…'; connectBtn.disabled = true; }
+    try {
+        const { data, error } = await withTimeout(
+            supabaseClient.functions.invoke('canvas-connect', { body: { useMock: true } }),
+            'Connecting the sample Canvas account took too long. Please try again.'
+        );
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Unable to connect the sample Canvas account.');
+        showConnectorMsg('Sample Canvas account connected! Refreshing…', 'success');
+        setTimeout(() => initCanvasSettingsTab(), 800);
+    } catch (err) {
+        showConnectorMsg(err.message || 'Unable to connect the sample Canvas account.');
+    } finally {
+        if (connectBtn) { connectBtn.textContent = 'Use sample Canvas account (Dev only)'; connectBtn.disabled = false; }
     }
 }
 
@@ -445,6 +468,7 @@ if (typeof window !== 'undefined') {
     window.handleCanvasCheckout = handleCanvasCheckout;
     window.handleCanvasBillingPortal = handleCanvasBillingPortal;
     window.handleCanvasConnect    = handleCanvasConnect;
+    window.handleCanvasConnectMock = handleCanvasConnectMock;
     window.handleCanvasDisconnect = handleCanvasDisconnect;
     window.openCanvasSyncModal    = openCanvasSyncModal;
     window.closeCanvasSyncModal   = closeCanvasSyncModal;
