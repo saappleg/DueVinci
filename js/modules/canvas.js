@@ -9,6 +9,8 @@ import { supabaseClient } from './config.js';
 let _canvasSelectedIds = new Set();
 let _canvasCourses = [];
 
+const CANVAS_COURSE_COLORS = ['#4f46e5', '#0f766e', '#c2410c', '#be123c', '#7c3aed', '#0369a1'];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function normalizeDomain(raw) {
@@ -46,6 +48,27 @@ function withTimeout(promise, message, timeoutMs = 15000) {
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error(message)), timeoutMs))
     ]);
+}
+
+function getCanvasCourseColor(canvasCourseId) {
+    const value = String(canvasCourseId).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return CANVAS_COURSE_COLORS[value % CANVAS_COURSE_COLORS.length];
+}
+
+export function buildCanvasCoursePayload(canvasCourse, userId, updatedAt = new Date().toISOString()) {
+    const name = String(canvasCourse.name || '').trim();
+    const code = String(canvasCourse.course_code || name).trim() || name;
+
+    return {
+        user_id: userId,
+        name,
+        code,
+        emoji: '📚',
+        color: getCanvasCourseColor(canvasCourse.id),
+        lms_source_id: String(canvasCourse.id),
+        lms_provider: 'canvas',
+        updated_at: updatedAt
+    };
 }
 
 // ─── Subscription State ────────────────────────────────────────────────────────
@@ -364,14 +387,10 @@ export async function handleCanvasSyncConfirm() {
 
         const coursesToSync = _canvasCourses.filter(c => _canvasSelectedIds.has(c.id));
 
-        // Match schema: public.courses (user_id, name, lms_source_id, lms_provider, updated_at)
-        const payload = coursesToSync.map(c => ({
-            user_id: user.id,
-            name: c.name,
-            lms_source_id: String(c.id),
-            lms_provider: 'canvas',
-            updated_at: new Date().toISOString()
-        }));
+        // Keep Canvas imports compatible with the course fields used throughout the
+        // current application, while retaining the LMS identity for future re-syncs.
+        const syncedAt = new Date().toISOString();
+        const payload = coursesToSync.map(c => buildCanvasCoursePayload(c, user.id, syncedAt));
 
         const { error } = await supabaseClient
             .from('courses')
