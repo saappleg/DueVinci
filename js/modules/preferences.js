@@ -46,7 +46,14 @@ export async function initializePreferenceSync(user) {
     if (!user?.id || typeof localStorage === 'undefined') return;
     activeUserId = user.id;
     const localUpdatedAt = localStorage.getItem(UPDATED_AT_KEY) || '';
-    const { data, error } = await supabaseClient.from('user_preferences').select('preferences, updated_at').eq('user_id', user.id).maybeSingle();
+    let data;
+    let error;
+    try {
+        ({ data, error } = await supabaseClient.from('user_preferences').select('preferences, updated_at').eq('user_id', user.id).maybeSingle());
+    } catch (networkError) {
+        console.warn('Preference sync deferred until reconnect:', networkError.message || networkError);
+        return;
+    }
     if (error) {
         console.warn('Preference sync unavailable:', error.message);
         return;
