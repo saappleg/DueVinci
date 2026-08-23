@@ -5,6 +5,7 @@ describe('Academic Utilities', () => {
     let calculateCumulativeGpa;
     let getWorkloadIntensity;
     let calculateDaysRemaining;
+    let getSevenDayWorkload;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/academics.js');
@@ -12,6 +13,7 @@ describe('Academic Utilities', () => {
         calculateCumulativeGpa = mod.calculateCumulativeGpa || globalThis.calculateCumulativeGpa;
         getWorkloadIntensity = mod.getWorkloadIntensity || globalThis.getWorkloadIntensity;
         calculateDaysRemaining = mod.calculateDaysRemaining || globalThis.calculateDaysRemaining;
+        getSevenDayWorkload = mod.getSevenDayWorkload || globalThis.getSevenDayWorkload;
     });
 
     describe('calculateStudyStreak', () => {
@@ -85,6 +87,20 @@ describe('Academic Utilities', () => {
             const res = getWorkloadIntensity(0, false);
             expect(res.statusLabel).toBe('Chill');
             expect(res.intensityClass).toContain('text-emerald-700');
+        });
+    });
+
+    describe('getSevenDayWorkload', () => {
+        it('counts date-only and ISO-timestamp deadlines on the same calendar day', () => {
+            const workload = getSevenDayWorkload([
+                { id: 'a', title: 'Essay', due_date: '2026-08-21', is_completed: false },
+                { id: 'b', title: 'Midterm', due_date: '2026-08-21T18:00:00Z', is_completed: false },
+                { id: 'c', title: 'Done task', due_date: '2026-08-21', is_completed: true }
+            ], new Date('2026-08-20T12:00:00'), 2, task => /midterm/i.test(task.title));
+
+            expect(workload[1].dayTasks).toBe(2);
+            expect(workload[1].hasExam).toBe(true);
+            expect(workload[1].intensity.statusLabel).toBe('🔥 Exam');
         });
     });
 

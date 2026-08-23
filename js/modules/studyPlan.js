@@ -1,7 +1,7 @@
 // --- AI STUDY SCHEDULE & WORKLOAD BALANCER MODULE ---
-import { calculateDaysRemaining } from './academics.js';
+import { calculateDaysRemaining, getLocalDateKey } from './academics.js';
 import { supabaseClient } from './config.js';
-import { fireConfetti } from './utils.js';
+import { escapeHtml, escapeInlineJs, fireConfetti } from './utils.js';
 
 let cachedStudyPlan = [];
 
@@ -133,6 +133,9 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         const datePart = startDate.split('T')[0];
         baseDate = new Date(datePart + 'T00:00:00');
     } else if (startDate instanceof Date) {
+        // Preserve the calendar date supplied by callers that use an ISO Date.
+        // The resulting local-midnight Date prevents daylight-saving drift while
+        // retaining the module's existing Date-input contract.
         const datePart = startDate.toISOString().split('T')[0];
         baseDate = new Date(datePart + 'T00:00:00');
     } else {
@@ -146,7 +149,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
             const currentDate = new Date(baseDate);
             currentDate.setDate(baseDate.getDate() + dayOffset);
-            const dateStr = currentDate.toISOString().split('T')[0];
+            const dateStr = getLocalDateKey(currentDate);
             const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
             const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
             emptyPlan.push({
@@ -172,7 +175,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
         const currentDate = new Date(baseDate);
         currentDate.setDate(baseDate.getDate() + dayOffset);
-        const dateStr = currentDate.toISOString().split('T')[0];
+        const dateStr = getLocalDateKey(currentDate);
         const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
         const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
         days.push({
@@ -359,7 +362,13 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         });
 
         // Sort unit keys sequentially: 0 (General/Intro), 1 (Unit 1), 2 (Unit 2), 3 (Unit 3)...
-        const sortedUnitKeys = Array.from(unitGroups.keys()).sort((a, b) => a - b);
+        // A hard deadline takes precedence over curriculum order. Units with the
+        // same deadline retain their normal numerical sequence.
+        const sortedUnitKeys = Array.from(unitGroups.keys()).sort((a, b) => {
+            const deadlineA = Math.min(...unitGroups.get(a).map(t => calculateDaysRemaining(t.due_date, baseDate)));
+            const deadlineB = Math.min(...unitGroups.get(b).map(t => calculateDaysRemaining(t.due_date, baseDate)));
+            return deadlineA - deadlineB || a - b;
+        });
 
         let currentDayPointer = 0;
 
@@ -391,15 +400,10 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
                 }
             }
 
-            // If all days in window are rest days, use the next available active day or current day
+            // If every available day is a rest day, the deadline remains a hard
+            // constraint: schedule on its date rather than silently moving work late.
             if (activeDayIndices.length === 0) {
-                for (let d = currentDayPointer; d < daysAhead; d++) {
-                    if (!days[d].isRestDay) {
-                        activeDayIndices.push(d);
-                        break;
-                    }
-                }
-                if (activeDayIndices.length === 0) activeDayIndices = [Math.min(currentDayPointer, daysAhead - 1)];
+                activeDayIndices = [targetEndDay];
             }
 
             // Distribute unit tasks evenly across active days available
@@ -603,7 +607,7 @@ export async function openStudyPlanDayModal(dateStr) {
                                 ${block.priority === 'high' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">🔥 Urgent</span>' : (block.priority === 'low' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌱 Low</span>' : '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/60 dark:bg-brand-700 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-brand-600">⚡ Normal</span>')}
                                 <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">• ${block.dueText}</span>
                             </div>
-                            <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${block.title}</h4>
+                            <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${escapeHtml(block.title)}</h4>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
@@ -623,11 +627,11 @@ export async function openStudyPlanDayModal(dateStr) {
 
                 <!-- Interactive Actions -->
                 <div class="flex items-center justify-between pt-1 text-xs">
-                    <button type="button" onclick="startStudyPlanTimer(${block.durationMinutes}, '${block.title.replace(/'/g, "\\'")}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
+                    <button type="button" onclick="startStudyPlanTimer(${block.durationMinutes}, '${escapeInlineJs(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
                         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         Start ${block.durationMinutes}m Timer
                     </button>
-                    <button type="button" onclick="toggleStudyPlanAssignment('${block.taskId}', ${block.isCompleted}, '${block.courseId}', '${dateStr}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition">
+                    <button type="button" onclick="toggleStudyPlanAssignment('${escapeInlineJs(block.taskId)}', ${block.isCompleted}, '${escapeInlineJs(block.courseId)}', '${dateStr}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
                         Mark Done
                     </button>
@@ -853,12 +857,12 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                 blocksHtml += `
                     <div class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
                         <div class="flex items-center gap-2 min-w-0">
-                            <span class="text-sm shrink-0">${b.courseEmoji}</span>
+                            <span class="text-sm shrink-0">${escapeHtml(b.courseEmoji)}</span>
                             <div class="truncate flex items-center gap-1">
-                                <span class="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">${b.courseCode}</span>
+                                <span class="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">${escapeHtml(b.courseCode)}</span>
                                 ${b.unitBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-brand-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-brand-700 shrink-0">${b.unitBadgeText}</span>` : ''}
                                 ${b.lessonBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">${b.lessonBadgeText}</span>` : ''}
-                                <span class="text-zinc-500 dark:text-zinc-400 font-medium truncate ml-0.5">${b.title}</span>
+                                <span class="text-zinc-500 dark:text-zinc-400 font-medium truncate ml-0.5">${escapeHtml(b.title)}</span>
                             </div>
                         </div>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${b.isExam ? 'bg-rose-500/10 text-rose-500 font-extrabold animate-pulse' : 'bg-indigo-500/10 text-indigo-500'}">
@@ -941,5 +945,3 @@ _studyScope.openStudyPlanDayModal = openStudyPlanDayModal;
 _studyScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
 _studyScope.startStudyPlanTimer = startStudyPlanTimer;
 _studyScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
-
-

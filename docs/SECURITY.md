@@ -26,8 +26,6 @@ To provide a personalized academic planning experience, we collect:
 ---
 ## Data Security & Storage <a id="data-security--storage"></a>
 
-![Dashboard Mockup](/Users/steven/.gemini/antigravity-ide/brain/29d18c0a-f76e-42fe-b6ce-d90a85104c9e/dashboard_mockup_1787202939693.jpg)
-
 We employ industry‑standard security measures:
 
 - **Secure Infrastructure** – All traffic is encrypted via HTTPS; data at rest is encrypted in Supabase.

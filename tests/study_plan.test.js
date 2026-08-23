@@ -357,6 +357,28 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(activeScheduledIds).toContain('b3');
         });
 
+        it('never moves a deadline-day task past its due date just because it is a rest day', () => {
+            const courses = [{ id: 'bio', code: 'BIO 101', name: 'Biology' }];
+            const assignments = [{ id: 'due', course_id: 'bio', title: 'Lesson 1: Cells', due_date: '2026-08-22', is_completed: false }];
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date('2026-08-22T12:00:00'), 3, ['Sat']);
+
+            expect(plan[0].isRestDay).toBe(true);
+            expect(plan[0].assignedTasks.map(item => item.task.id)).toContain('due');
+            expect(plan[1].assignedTasks).toHaveLength(0);
+        });
+
+        it('prioritizes an earlier unit deadline over unit number so no work is scheduled late', () => {
+            const courses = [{ id: 'cs', code: 'CS 101', name: 'Computer Science' }];
+            const assignments = [
+                { id: 'unit1', course_id: 'cs', unit_number: 1, title: 'Lesson 1: Foundations', due_date: '2026-08-25', is_completed: false },
+                { id: 'unit2', course_id: 'cs', unit_number: 2, title: 'Lesson 1: Urgent topic', due_date: '2026-08-21', is_completed: false }
+            ];
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date('2026-08-20T12:00:00'), 6);
+            const unit2Day = plan.findIndex(day => day.assignedTasks.some(item => item.task.id === 'unit2'));
+
+            expect(unit2Day).toBeLessThanOrEqual(1);
+        });
+
         it('manages rest days state via getRestDays, setRestDays, and toggleRestDay', () => {
             expect(typeof getRestDays).toBe('function');
             expect(typeof setRestDays).toBe('function');
@@ -382,5 +404,4 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
     });
 });
-
 

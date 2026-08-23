@@ -4,6 +4,37 @@ let ambientAudioCtx = null;
 let ambientNoiseNode = null;
 let ambientGainNode = null;
 
+/** Escapes untrusted text before interpolating it into HTML. */
+export function escapeHtml(value = '') {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** Escapes text for a single-quoted inline event-handler argument. */
+export function escapeInlineJs(value = '') {
+    return String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/[\r\n]/g, ' ')
+        .replace(/</g, '\\x3C')
+        .replace(/>/g, '\\x3E')
+        .replace(/&/g, '\\x26');
+}
+
+/** Allows only absolute HTTP(S) URLs for externally opened user links. */
+export function getSafeExternalUrl(value = '') {
+    try {
+        const url = new URL(String(value).trim());
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch {
+        return '';
+    }
+}
+
 export function getTourCookie(name = 'duevinci_tour_done') {
     if (typeof document === 'undefined') return false;
 
@@ -330,4 +361,5 @@ if (typeof window !== 'undefined') {
     window.parseInputDate = parseInputDate;
     window.fireConfetti = fireConfetti;
     window.recordStudyActivity = recordStudyActivity;
+    window.escapeHtml = escapeHtml;
 }

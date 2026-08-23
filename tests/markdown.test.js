@@ -3,11 +3,14 @@ import { describe, it, expect, beforeAll } from 'vitest';
 describe('Markdown & LaTeX Math Formatter', () => {
     let renderMarkdownToHtml;
     let formatMathFormula;
+    let getSafeExternalUrl;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/markdown.js');
         renderMarkdownToHtml = mod.renderMarkdownToHtml || globalThis.renderMarkdownToHtml;
         formatMathFormula = mod.formatMathFormula || globalThis.formatMathFormula;
+        const utils = await import('../js/modules/utils.js');
+        getSafeExternalUrl = utils.getSafeExternalUrl;
     });
 
     describe('formatMathFormula', () => {
@@ -35,6 +38,19 @@ describe('Markdown & LaTeX Math Formatter', () => {
             const html = renderMarkdownToHtml(md);
             expect(html).toContain('<sup>2</sup>');
             expect(html).toContain('∫');
+        });
+
+        it('escapes HTML supplied in notes while retaining generated formatting', () => {
+            const html = renderMarkdownToHtml('# Notes\n<img src=x onerror=alert(1)> **safe**');
+            expect(html).toContain('&lt;img');
+            expect(html).not.toContain('<img');
+            expect(html).toContain('<strong');
+        });
+
+        it('accepts only http(s) external resource links', () => {
+            expect(getSafeExternalUrl('https://example.com/notes')).toBe('https://example.com/notes');
+            expect(getSafeExternalUrl('javascript:alert(1)')).toBe('');
+            expect(getSafeExternalUrl('data:text/html,test')).toBe('');
         });
     });
 });

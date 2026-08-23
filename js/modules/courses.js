@@ -1,7 +1,7 @@
 // --- COURSES, UNITS, ASSIGNMENTS & SYLLABUS AI PARSER MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
-import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName } from './utils.js';
+import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl } from './utils.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
@@ -83,8 +83,8 @@ export async function loadDashboardStats() {
                         <div class="flex items-center gap-3 min-w-0">
                             <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                             <div class="truncate">
-                                <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${course.emoji} ${unitBadge}${assign.title}</p>
-                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${course.code} • Target: ${formattedDate}</p>
+                                <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${escapeHtml(course.emoji)} ${unitBadge}${escapeHtml(assign.title)}</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(course.code)} • Target: ${escapeHtml(formattedDate)}</p>
                             </div>
                         </div>
                         <div class="shrink-0 ml-2">
@@ -397,7 +397,7 @@ export function openCourseModal(courseId) {
     if (!course) return;
 
     const completionBadge = course.is_completed ? `<span class="ml-2 text-xs bg-green-500/10 text-green-500 border border-green-500/30 px-2 py-0.5 rounded-full font-bold">Completed</span>` : '';
-    document.getElementById('modalCourseTitle').innerHTML = `<span>${course.emoji || '📚'}</span> ${course.code} ${completionBadge}`;
+    document.getElementById('modalCourseTitle').innerHTML = `<span>${escapeHtml(course.emoji || '📚')}</span> ${escapeHtml(course.code)} ${completionBadge}`;
 
     document.getElementById('editCourseId').value = course.id;
     document.getElementById('editCourseEmoji').value = course.emoji || '📚';
@@ -412,8 +412,8 @@ export function openCourseModal(courseId) {
     const metaBox = document.getElementById('courseMetadataBox');
     if (metaBox) {
         let metaHtml = '';
-        if (course.description) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400 mb-1.5"><strong>Description:</strong> ${course.description}</p>`;
-        if (course.objectives) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400"><strong>Objectives:</strong> ${course.objectives}</p>`;
+        if (course.description) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400 mb-1.5"><strong>Description:</strong> ${escapeHtml(course.description)}</p>`;
+        if (course.objectives) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400"><strong>Objectives:</strong> ${escapeHtml(course.objectives)}</p>`;
         metaBox.innerHTML = metaHtml ? `<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700">${metaHtml}</div>` : '<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs text-zinc-500">No course description or objectives provided yet. Upload a syllabus or edit below.</div>';
     }
 
@@ -466,12 +466,15 @@ export function renderStaticCoursePanels(course) {
         resPanel.innerHTML = `
             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">🔗 Resource & Note Links</h3>
             <div id="linksList_${course.id}" class="space-y-2 mt-2">
-                ${links.map((l, idx) => `
+                ${links.map((l, idx) => {
+                    const safeUrl = getSafeExternalUrl(l.url);
+                    return `
                     <div class="flex items-center justify-between p-2.5 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
-                        <a href="${l.url}" target="_blank" class="font-bold text-indigo-500 hover:underline truncate">${l.title}</a>
-                        <button onclick="removeResourceLink('${course.id}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-2">✕</button>
+                        ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-indigo-500 hover:underline truncate">${escapeHtml(l.title)}</a>` : `<span class="text-zinc-500 truncate">${escapeHtml(l.title)} <em>(invalid link)</em></span>`}
+                        <button onclick="removeResourceLink('${escapeInlineJs(course.id)}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-2">✕</button>
                     </div>
-                `).join('')}
+                `;
+                }).join('')}
             </div>
             <div class="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
                 <input type="text" id="resTitle_${course.id}" placeholder="Resource Title" class="w-1/3 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
@@ -517,13 +520,17 @@ export async function addCourseResourceLink(courseId) {
     const urlInput = document.getElementById(`resUrl_${courseId}`);
     const title = titleInput ? titleInput.value.trim() : '';
     const url = urlInput ? urlInput.value.trim() : '';
-    if (!title || !url) return;
+    const safeUrl = getSafeExternalUrl(url);
+    if (!title || !safeUrl) {
+        alert('Please enter a valid http:// or https:// resource link.');
+        return;
+    }
 
     const course = localCourses.find(c => c.id === courseId);
     if (!course) return;
 
     let links = course.resources || [];
-    links.push({ title, url });
+    links.push({ title, url: safeUrl });
     course.resources = links;
 
     await supabaseClient.from('courses').update({ resources: links }).eq('id', courseId);
@@ -1094,8 +1101,8 @@ export async function loadAssignments(courseId, page = 1) {
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                     <div class="flex items-center gap-2 flex-1 min-w-[180px] group/title">
                         ${checkboxHtml}
-                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${assign.id}', '${assign.title.replace(/'/g, "\\'")}', '${courseId}')">${unitBadge}${assign.title}</span>
-                        <button type="button" onclick="editAssignmentTitlePrompt('${assign.id}', '${assign.title.replace(/'/g, "\\'")}', '${courseId}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
+                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(assign.title)}</span>
+                        <button type="button" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
                         <select onchange="updateAssignmentType('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer" title="Change Type">

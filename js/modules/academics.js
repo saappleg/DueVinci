@@ -1,5 +1,23 @@
 // --- DYNAMIC ACADEMICS, STUDY STREAK, GPA & WORKLOAD RADAR ---
 import { supabaseClient } from './config.js';
+import { escapeHtml, escapeInlineJs, getSafeExternalUrl } from './utils.js';
+
+/** Returns a stable YYYY-MM-DD key using the viewer's local calendar day. */
+export function getLocalDateKey(value = new Date()) {
+    const date = value instanceof Date ? new Date(value) : new Date(value);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/** Normalizes database due dates, including ISO timestamps, to their calendar-date key. */
+export function getDueDateKey(dueDate) {
+    if (dueDate === null || dueDate === undefined) return '';
+    const key = String(dueDate).split('T')[0].trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : '';
+}
 
 /**
  * Calculates consecutive study days from an array of ISO date strings (YYYY-MM-DD).
@@ -74,6 +92,27 @@ export function getWorkloadIntensity(dayTasks = 0, hasExam = false) {
 }
 
 /**
+ * Builds the data behind the seven-day workload radar.
+ * Due-date timestamps are treated as the same calendar date as date-only values.
+ */
+export function getSevenDayWorkload(assignments = [], startDate = new Date(), daysAhead = 7, isExamTask = () => false) {
+    if (!Array.isArray(assignments) || !Number.isInteger(daysAhead) || daysAhead < 1) return [];
+
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) return [];
+    start.setHours(0, 0, 0, 0);
+
+    return Array.from({ length: daysAhead }, (_, index) => {
+        const date = new Date(start);
+        date.setDate(start.getDate() + index);
+        const dateKey = getLocalDateKey(date);
+        const tasks = assignments.filter(a => !a.is_completed && getDueDateKey(a.due_date) === dateKey);
+        const hasExam = tasks.some(isExamTask);
+        return { date: dateKey, dayTasks: tasks.length, hasExam, intensity: getWorkloadIntensity(tasks.length, hasExam) };
+    });
+}
+
+/**
  * Calculates cumulative GPA across courses given percentage averages and a scale (4.0 or 5.0).
  */
 export function calculateCumulativeGpa(courseAverages = [], scale = 4.0) {
@@ -142,7 +181,10 @@ export async function renderAcademicsDashboardWidget(containerId) {
     };
 
     if (assignmentsData.length > 0) {
-        const validItems = assignmentsData.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
+        const validItems = assignmentsData.filter(a => {
+            const title = String(a.title || '');
+            return title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(title);
+        });
         totalCount = validItems.length;
         completedCount = validItems.filter(a => a.is_completed).length;
 
@@ -193,31 +235,22 @@ export async function renderAcademicsDashboardWidget(containerId) {
 
     let workloadHtml = '';
     try {
-        const days = [];
         const now = new Date();
-        for (let i = 0; i < 7; i++) {
+        const radarDays = getSevenDayWorkload(assignmentsData, now, 7, isExamTask);
+        const days = radarDays.map((radarDay, i) => {
             const d = new Date(now);
             d.setDate(now.getDate() + i);
-            const dateStr = d.toISOString().split('T')[0];
             const dayName = i === 0 ? 'Today' : (i === 1 ? 'Tmrw' : d.toLocaleDateString('en-US', { weekday: 'short' }));
             const displayDate = `${d.getMonth() + 1}/${d.getDate()}`;
-
-            let dayTasks = 0;
-            let hasExam = false;
-            if (assignmentsData && assignmentsData.length > 0) {
-                dayTasks = assignmentsData.filter(a => !a.is_completed && a.due_date === dateStr).length;
-                hasExam = assignmentsData.some(a => !a.is_completed && a.due_date === dateStr && isExamTask(a));
-            }
-
-            const intensity = getWorkloadIntensity(dayTasks, hasExam);
-            days.push(`
+            const intensity = radarDay.intensity;
+            return `
                 <div class="flex-1 min-w-[70px] p-2 rounded-lg border text-center ${intensity.intensityClass} transition hover:scale-105">
                     <div class="text-[10px] font-bold uppercase tracking-wider opacity-75">${dayName}</div>
                     <div class="text-xs font-black my-0.5">${displayDate}</div>
                     <div class="text-[10px] font-bold truncate">${intensity.statusLabel}</div>
                 </div>
-            `);
-        }
+            `;
+        });
         workloadHtml = `
             <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
                 <div class="flex items-center justify-between mb-2">
@@ -322,7 +355,12 @@ export function renderResourceLinksSection(courseId, containerId) {
 
     let html = `<div class="space-y-3 mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700"><h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">🔗 Resource & Note Links</h3><div class="space-y-2">`;
     savedLinks.forEach((link, idx) => {
-        html += `<div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs"><a href="${link.url}" target="_blank" class="font-bold text-indigo-500 hover:underline truncate">${link.title}</a><button onclick="removeResourceLink('${courseId}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button></div>`;
+        const safeUrl = getSafeExternalUrl(link.url);
+        const label = escapeHtml(link.title);
+        const linkHtml = safeUrl
+            ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-indigo-500 hover:underline truncate">${label}</a>`
+            : `<span class="text-zinc-500 truncate">${label} <em>(invalid link)</em></span>`;
+        html += `<div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs">${linkHtml}<button onclick="removeResourceLink('${escapeInlineJs(courseId)}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button></div>`;
     });
     html += `</div><div class="flex gap-2 mt-2"><input type="text" id="resTitle_${courseId}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><input type="url" id="resUrl_${courseId}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><button onclick="addResourceLink('${courseId}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button></div></div>`;
     container.innerHTML = html;
@@ -333,8 +371,11 @@ export function addResourceLink(courseId) {
     const titleInput = document.getElementById(`resTitle_${courseId}`);
     const urlInput = document.getElementById(`resUrl_${courseId}`);
     const title = titleInput ? titleInput.value.trim() : '';
-    const url = urlInput ? urlInput.value.trim() : '';
-    if (!title || !url) return;
+    const url = getSafeExternalUrl(urlInput ? urlInput.value : '');
+    if (!title || !url) {
+        alert('Please enter a valid http:// or https:// resource link.');
+        return;
+    }
 
     let savedLinks = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem(`resources_${courseId}`))) || [];
     savedLinks.push({ title, url });

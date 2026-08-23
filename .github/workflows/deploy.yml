@@ -24,6 +24,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Deployment must be gated by the same checks developers run locally.
+      # The CI workflow runs independently, so it cannot protect this job.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Verify release
+        run: |
+          npm ci
+          npm run check:syntax
+          npm test
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

@@ -20,8 +20,6 @@
 
 > **Note:** All features are live in the modern dark‑mode UI shown below.
 
-![Dashboard Mockup](/Users/steven/.gemini/antigravity-ide/brain/29d18c0a-f76e-42fe-b6ce-d90a85104c9e/dashboard_mockup_1787202939693.jpg)
-
 - **AI‑Powered Syllabus & Schedule Import** – Upload a PDF syllabus or a screenshot. DueVinci uses Google Gemini via a secure Supabase Edge Function to extract course descriptions, objectives, and automatically map out weekly units and due dates.
 - **Smart Course Management** – Organize classes into custom term folders with intuitive drag‑and‑drop. Track assignments, exams, and reviews.
 - **Real‑Time Academic Grade Tracker** – Input grades to see live course averages and cumulative GPA on a customizable 4.0 or 5.0 scale.

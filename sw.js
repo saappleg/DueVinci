@@ -1,5 +1,7 @@
 // DueVinci Service Worker - Offline Caching
-const CACHE_NAME = 'duevinci-v3.1';
+// Bump this whenever the precached application shell changes so installed PWAs
+// receive the current planner and workload logic after activation.
+const CACHE_NAME = 'duevinci-v3.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
