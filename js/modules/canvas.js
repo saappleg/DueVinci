@@ -39,15 +39,37 @@ function showSyncModalMsg(text, type = 'error') {
     el.classList.remove('hidden');
 }
 
-function getCurrentUserId() {
-    return supabaseClient?.auth?.getUser ? supabaseClient.auth.getUser().then(r => r?.data?.user?.id) : Promise.resolve(null);
-}
-
 function withTimeout(promise, message, timeoutMs = 15000) {
     return Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error(message)), timeoutMs))
     ]);
+}
+
+function isActiveTrial(profile) {
+    return profile?.subscription_status === 'trialing'
+        && Boolean(profile.trial_end)
+        && new Date(profile.trial_end).getTime() > Date.now();
+}
+
+function hasCanvasAccess(profile) {
+    return profile?.subscription_status === 'active' || isActiveTrial(profile);
+}
+
+async function requireCanvasAccess() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) throw new Error('Not signed in.');
+
+    const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('subscription_status, trial_end, canvas_domain, canvas_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (error) throw error;
+    if (!hasCanvasAccess(profile)) {
+        throw new Error('Canvas LMS Sync requires an active plan or an unexpired free trial.');
+    }
+    return { user, profile };
 }
 
 function getCanvasCourseColor(canvasCourseId) {
@@ -77,6 +99,7 @@ export async function initCanvasSettingsTab() {
     const badge   = document.getElementById('canvasSubBadge');
     const msg     = document.getElementById('canvasSubMsg');
     const trialBtn = document.getElementById('canvasStartTrialBtn');
+    const checkoutArea = document.getElementById('canvasCheckoutOptions');
     const connectorArea = document.getElementById('canvasConnectorArea');
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
 
@@ -85,7 +108,7 @@ export async function initCanvasSettingsTab() {
     // Reset UI
     badge.textContent = 'Loading…';
     msg.textContent   = 'Checking your plan…';
-    [trialBtn, connectorArea, syncTriggerArea].forEach(el => el?.classList.add('hidden'));
+    [trialBtn, checkoutArea, connectorArea, syncTriggerArea].forEach(el => el?.classList.add('hidden'));
 
     try {
         const { data: { user } } = await supabaseClient.auth.getUser();
@@ -93,13 +116,14 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, canvas_domain, canvas_token')
+            .select('subscription_status, trial_end, trial_started_at, canvas_domain, canvas_token')
             .eq('user_id', user.id)
             .maybeSingle();
 
         if (error) throw error;
 
-        const status = profile?.subscription_status || 'inactive';
+        const storedStatus = profile?.subscription_status || 'inactive';
+        const status = storedStatus === 'trialing' && !isActiveTrial(profile) ? 'inactive' : storedStatus;
 
         // Update badge
         const badgeStyles = {
@@ -111,8 +135,13 @@ export async function initCanvasSettingsTab() {
         badge.className = `px-2 py-0.5 text-[11px] font-semibold rounded-full ${badgeStyles[status] || badgeStyles.inactive}`;
 
         if (status === 'inactive') {
-            msg.textContent = 'Start a free trial to unlock Canvas LMS course syncing. No credit card required.';
-            trialBtn?.classList.remove('hidden');
+            if (profile?.trial_started_at) {
+                msg.textContent = 'Your free trial has ended. Choose a plan to continue using Canvas LMS Sync.';
+                checkoutArea?.classList.remove('hidden');
+            } else {
+                msg.textContent = 'Start a free trial to unlock Canvas LMS course syncing. No credit card required.';
+                trialBtn?.classList.remove('hidden');
+            }
         } else if (status === 'trialing') {
             const daysLeft = profile.trial_end
                 ? Math.max(0, Math.ceil((new Date(profile.trial_end) - new Date()) / 86400000))
@@ -124,7 +153,8 @@ export async function initCanvasSettingsTab() {
             msg.textContent = 'DueVinci Pro is active. Canvas Sync is enabled.';
             _showConnectorOrSync(profile);
         } else {
-            msg.textContent = `Subscription status: ${status}. Contact support if this is unexpected.`;
+            msg.textContent = 'Your Canvas Sync subscription is not active. Choose a plan to continue.';
+            checkoutArea?.classList.remove('hidden');
         }
     } catch (err) {
         badge.textContent = 'Error';
@@ -183,6 +213,31 @@ export async function handleCanvasStartTrial() {
     }
 }
 
+export async function handleCanvasCheckout(interval) {
+    const buttons = [...document.querySelectorAll('[data-canvas-checkout]')];
+    const message = document.getElementById('canvasSubMsg');
+
+    buttons.forEach(button => { button.disabled = true; });
+    if (message) message.textContent = 'Opening secure checkout…';
+
+    try {
+        const returnUrl = `${window.location.origin}${window.location.pathname}`;
+        const { data, error } = await withTimeout(
+            supabaseClient.functions.invoke('create-checkout-session', {
+                body: { interval, returnUrl }
+            }),
+            'Opening checkout took too long. Please try again.'
+        );
+
+        if (error) throw error;
+        if (!data?.url) throw new Error(data?.error || 'Unable to create a checkout session.');
+        window.location.assign(data.url);
+    } catch (err) {
+        if (message) message.textContent = err.message || 'Unable to open checkout. Please try again.';
+        buttons.forEach(button => { button.disabled = false; });
+    }
+}
+
 // ─── Connector Handler ─────────────────────────────────────────────────────────
 
 export async function handleCanvasConnect() {
@@ -204,6 +259,7 @@ export async function handleCanvasConnect() {
     if (connectBtn) { connectBtn.textContent = 'Verifying…'; connectBtn.disabled = true; }
 
     try {
+        await requireCanvasAccess();
         // 1. Verify token against Canvas API
         const res = await fetch(`${domain}/api/v1/users/self/profile`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
@@ -286,16 +342,7 @@ export async function openCanvasSyncModal() {
     }
 
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) throw new Error('Not signed in.');
-
-        const { data: profile, error: profileErr } = await supabaseClient
-            .from('profiles')
-            .select('canvas_domain, canvas_token')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (profileErr) throw profileErr;
+        const { profile } = await requireCanvasAccess();
         if (!profile?.canvas_domain || !profile?.canvas_token) {
             throw new Error('Canvas credentials not found. Please connect Canvas first.');
         }
@@ -382,8 +429,7 @@ export async function handleCanvasSyncConfirm() {
     if (confirmBtn) { confirmBtn.textContent = 'Syncing…'; confirmBtn.disabled = true; }
 
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) throw new Error('Not signed in.');
+        const { user } = await requireCanvasAccess();
 
         const coursesToSync = _canvasCourses.filter(c => _canvasSelectedIds.has(c.id));
 
@@ -412,6 +458,7 @@ export async function handleCanvasSyncConfirm() {
 if (typeof window !== 'undefined') {
     window.initCanvasSettingsTab  = initCanvasSettingsTab;
     window.handleCanvasStartTrial = handleCanvasStartTrial;
+    window.handleCanvasCheckout = handleCanvasCheckout;
     window.handleCanvasConnect    = handleCanvasConnect;
     window.handleCanvasDisconnect = handleCanvasDisconnect;
     window.openCanvasSyncModal    = openCanvasSyncModal;

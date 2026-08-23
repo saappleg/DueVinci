@@ -7,15 +7,14 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
   httpClient: Stripe.createFetchHttpClient(),
 })
 
-// Maps Stripe events → DueVinci subscription_status values
-const EVENT_STATUS_MAP: Record<string, string> = {
-  'customer.subscription.created':      'trialing',
-  'customer.subscription.updated':      'active',
-  'customer.subscription.deleted':      'canceled',
-  'invoice.payment_succeeded':          'active',
-  'invoice.payment_failed':             'past_due',
-  'customer.subscription.trial_will_end': 'trialing', // still trialing, just a warning
-}
+const SUPPORTED_EVENTS = new Set([
+  'checkout.session.completed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.payment_succeeded',
+  'invoice.payment_failed',
+])
 
 serve(async (req) => {
   const body = await req.text()
@@ -36,8 +35,7 @@ serve(async (req) => {
 
   console.log(`Received Stripe event: ${event.type}`)
 
-  const newStatus = EVENT_STATUS_MAP[event.type]
-  if (!newStatus) {
+  if (!SUPPORTED_EVENTS.has(event.type)) {
     // Event not relevant to us — acknowledge and ignore
     return new Response(JSON.stringify({ received: true, action: 'ignored' }), {
       headers: { 'Content-Type': 'application/json' },
@@ -60,10 +58,18 @@ serve(async (req) => {
       })
     }
 
-    // For subscription events, extract useful subscription metadata
-    const updatePayload: Record<string, unknown> = {
-      subscription_status: newStatus,
-      updated_at: new Date().toISOString(),
+    const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+    if (event.type === 'checkout.session.completed') {
+      updatePayload.stripe_customer_id = customerId
+      if (dataObj.subscription) updatePayload.stripe_subscription_id = String(dataObj.subscription)
+    } else if (event.type.startsWith('customer.subscription.')) {
+      updatePayload.subscription_status = dataObj.status
+      updatePayload.stripe_subscription_id = dataObj.id
+    } else if (event.type === 'invoice.payment_succeeded') {
+      updatePayload.subscription_status = 'active'
+    } else if (event.type === 'invoice.payment_failed') {
+      updatePayload.subscription_status = 'past_due'
     }
 
     // Capture trial_end if present
@@ -71,17 +77,20 @@ serve(async (req) => {
       updatePayload.trial_end = new Date(dataObj.trial_end * 1000).toISOString()
     }
 
-    const { error, count } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .update(updatePayload)
       .eq('stripe_customer_id', customerId)
 
     if (error) throw error
 
-    console.log(`Updated profile for customer ${customerId} → status: ${newStatus} (${count} rows)`)
+    console.log(`Updated profile for customer ${customerId} from ${event.type}`)
   } catch (err) {
     console.error('DB update failed:', err.message)
-    // Still return 200 to Stripe so it doesn't retry indefinitely
+    return new Response(JSON.stringify({ error: 'Database update failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   return new Response(JSON.stringify({ received: true }), {

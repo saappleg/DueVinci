@@ -12,9 +12,13 @@ supabase db push --project-ref kinsxkeerxguqkyzrjfm
 
 ```sh
 supabase functions deploy start-trial --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
 ```
 
-`start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`. The Stripe webhook also requires `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`.
+`start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`. Stripe billing functions require
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MONTHLY_PRICE_ID`,
+`STRIPE_YEARLY_PRICE_ID`, and `APP_URL`. Keep each environment's Test or Live Stripe
+credentials and price IDs separate.
 
-Canvas Sync currently calls Canvas directly from the browser, so the target Canvas instance must permit requests from the Dev origin. The `20260823112000_canvas_subscription_foundation.sql` migration creates the profile fields, RLS policies, signup trigger, and LMS course identity required by the active vanilla-JS UI.
+Canvas Sync currently calls Canvas directly from the browser, so the target Canvas instance must permit requests from the Dev origin. The `20260823112000_canvas_subscription_foundation.sql` migration creates the profile fields, RLS policies, signup trigger, and LMS course identity required by the active vanilla-JS UI. The `20260823114000_canvas_billing.sql` migration adds Stripe customer/subscription identities and the one-time trial marker.

@@ -28,16 +28,27 @@ serve(async (req) => {
     // Check they don't already have an active/trialing subscription
     const { data: existing, error: profileLookupErr } = await supabaseAdmin
         .from('profiles')
-        .select('subscription_status')
+        .select('subscription_status, trial_started_at, trial_end')
         .eq('user_id', user.id)
         .maybeSingle()
 
     if (profileLookupErr) throw profileLookupErr
 
-    if (existing?.subscription_status === 'trialing' || existing?.subscription_status === 'active') {
+    const hasActiveTrial = existing?.subscription_status === 'trialing'
+      && existing.trial_end
+      && new Date(existing.trial_end).getTime() > Date.now()
+
+    if (hasActiveTrial || existing?.subscription_status === 'active') {
       return new Response(
         JSON.stringify({ success: true, message: 'Already on a plan', status: existing.subscription_status }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (existing?.trial_started_at) {
+      return new Response(
+        JSON.stringify({ success: false, code: 'trial_used', error: 'Your free trial has already been used. Please choose a Canvas Sync plan.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -52,6 +63,7 @@ serve(async (req) => {
         .upsert({
             user_id: user.id,
             subscription_status: 'trialing',
+            trial_started_at: new Date().toISOString(),
             trial_end: trialEnd.toISOString(),
             updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
