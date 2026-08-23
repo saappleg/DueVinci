@@ -34,7 +34,14 @@ export async function handleAuth(session) {
 
     if (session) {
         currentUser = session.user;
-        await initializePreferenceSync(currentUser);
+        // Preference sync is an enhancement, never a prerequisite for opening
+        // the cached planner. A network failure here must not leave an offline
+        // page hidden behind the auth screen.
+        try {
+            await initializePreferenceSync(currentUser);
+        } catch (error) {
+            console.warn('Preference sync deferred until reconnect:', error.message || error);
+        }
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
 
