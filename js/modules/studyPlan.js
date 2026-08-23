@@ -61,16 +61,72 @@ export function getLessonNumber(item) {
 }
 
 /**
+ * Retrieves the user's chosen rest days (days with no scheduled coursework).
+ * @returns {Array<string>} Array of day-of-week strings (e.g. ['Sun', 'Sat'])
+ */
+export function getRestDays() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const stored = localStorage.getItem('duevinci_rest_days');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        }
+    } catch (e) {
+        console.warn('Error reading rest days:', e);
+    }
+    return [];
+}
+
+/**
+ * Updates the user's rest days preference.
+ * @param {Array<string>} restDays Array of day names (e.g. ['Sun', 'Sat'])
+ */
+export function setRestDays(restDays = []) {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('duevinci_rest_days', JSON.stringify(restDays));
+        }
+    } catch (e) {
+        console.warn('Error saving rest days:', e);
+    }
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+/**
+ * Toggles a day of the week as a rest day.
+ * @param {string} dayName Day of week abbreviation (e.g. 'Sun', 'Sat')
+ * @returns {Array<string>} Updated rest days array
+ */
+export function toggleRestDay(dayName) {
+    const current = getRestDays();
+    let updated;
+    if (current.includes(dayName)) {
+        updated = current.filter(d => d !== dayName);
+    } else {
+        updated = [...current, dayName];
+    }
+    setRestDays(updated);
+    return updated;
+}
+
+/**
  * Calculates a balanced daily study schedule across multiple enrolled courses.
- * Enforces proper unit-lesson organization and strict sequential order (Lesson 1 -> Lesson 2 -> Lesson 3 -> Lesson 4).
+ * Enforces proper unit-lesson organization, strict sequential order, deadline-driven pacing, and rest day exclusion.
  * @param {Array} courses List of course objects
  * @param {Array} assignments List of assignment objects
  * @param {Date} startDate Starting calculation date
  * @param {number} daysAhead Number of days to project forward (default 7)
+ * @param {Array|null} customRestDays Optional rest days override (e.g. ['Sun', 'Sat'])
  * @returns {Array} List of daily study plan objects
  */
-export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7) {
+export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7, customRestDays = null) {
     if (!courses || !assignments || !Array.isArray(courses) || !Array.isArray(assignments)) return [];
+
+    const restDays = customRestDays !== null ? (Array.isArray(customRestDays) ? customRestDays : []) : getRestDays();
 
     let baseDate;
     if (typeof startDate === 'string') {
@@ -91,14 +147,17 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             const currentDate = new Date(baseDate);
             currentDate.setDate(baseDate.getDate() + dayOffset);
             const dateStr = currentDate.toISOString().split('T')[0];
+            const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+            const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
             emptyPlan.push({
                 date: dateStr,
                 currentDate,
                 dayOffset,
-                dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+                dayOfWeek,
                 displayDate: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 fullDate: currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
                 isToday: dayOffset === 0,
+                isRestDay,
                 totalMinutes: 0,
                 blocks: [],
                 allBlocks: []
@@ -114,14 +173,17 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         const currentDate = new Date(baseDate);
         currentDate.setDate(baseDate.getDate() + dayOffset);
         const dateStr = currentDate.toISOString().split('T')[0];
+        const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+        const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
         days.push({
             date: dateStr,
             currentDate,
             dayOffset,
-            dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+            dayOfWeek,
             displayDate: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             fullDate: currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
             isToday: dayOffset === 0,
+            isRestDay,
             totalMinutes: 0,
             assignedTasks: []
         });
@@ -289,9 +351,12 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         courseQueues.set('orphaned', sortTasks(orphanedTasks, baseDate, false));
     }
 
-    // Allocate lessons day-by-day with Deadline-Driven Pacing to ensure all coursework is finished on or before due date
+    // Allocate lessons day-by-day with Deadline-Driven Pacing and Rest Day exclusion
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
         const day = days[dayOffset];
+
+        // If today is marked as a rest day, skip assigning standard study lessons
+        if (day.isRestDay) continue;
 
         courseQueues.forEach((queue, courseId) => {
             if (queue.length === 0) return;
@@ -299,10 +364,14 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             // Calculate required pace based on earliest deadline in queue
             const nextTask = queue[0];
             const daysUntilDue = calculateDaysRemaining(nextTask.due_date, baseDate);
-            const daysRemainingUntilDeadline = Math.max(1, (daysUntilDue - dayOffset) + 1);
+            
+            // Count remaining ACTIVE (non-rest) study days between current dayOffset and deadline
+            const activeDaysRemaining = days
+                .slice(dayOffset, Math.min(daysAhead, Math.max(dayOffset + 1, daysUntilDue + 1)))
+                .filter(d => !d.isRestDay).length;
 
             const tasksInWindow = queue.filter(t => calculateDaysRemaining(t.due_date, baseDate) <= daysUntilDue).length;
-            const requiredLessonsToday = Math.max(1, Math.ceil(tasksInWindow / daysRemainingUntilDeadline));
+            const requiredLessonsToday = Math.max(1, Math.ceil(tasksInWindow / Math.max(1, activeDaysRemaining)));
 
             let allocated = 0;
             while (queue.length > 0 && allocated < requiredLessonsToday) {
@@ -458,15 +527,27 @@ export async function openStudyPlanDayModal(dateStr) {
 
     let tasksHtml = '';
     if (day.allBlocks.length === 0) {
-        tasksHtml = `
-            <div class="py-10 px-6 text-center space-y-3 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-dashed border-zinc-300 dark:border-brand-700">
-                <span class="text-4xl inline-block">🎉</span>
-                <h4 class="text-base font-black text-zinc-900 dark:text-white">No Urgent Deadlines Scheduled</h4>
-                <p class="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
-                    You have no pressing assignments due within this window. Enjoy some well-deserved rest, or use this time for self-paced reading and light flashcard review!
-                </p>
-            </div>
-        `;
+        if (day.isRestDay) {
+            tasksHtml = `
+                <div class="py-10 px-6 text-center space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-dashed border-emerald-300 dark:border-emerald-800/40">
+                    <span class="text-4xl inline-block">🌴</span>
+                    <h4 class="text-base font-black text-emerald-800 dark:text-emerald-300">Scheduled Rest & Recovery Day</h4>
+                    <p class="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
+                        No coursework is scheduled for today. Enjoy your break to recharge, or jump into light flashcard review when ready!
+                    </p>
+                </div>
+            `;
+        } else {
+            tasksHtml = `
+                <div class="py-10 px-6 text-center space-y-3 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-dashed border-zinc-300 dark:border-brand-700">
+                    <span class="text-4xl inline-block">🎉</span>
+                    <h4 class="text-base font-black text-zinc-900 dark:text-white">No Urgent Deadlines Scheduled</h4>
+                    <p class="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">
+                        You have no pressing assignments due within this window. Enjoy some well-deserved rest, or use this time for self-paced reading and light flashcard review!
+                    </p>
+                </div>
+            `;
+        }
     } else {
         tasksHtml = day.allBlocks.map((block, idx) => `
             <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-zinc-200 dark:border-brand-700 space-y-3 transition hover:border-indigo-400 dark:hover:border-indigo-500">
@@ -523,6 +604,7 @@ export async function openStudyPlanDayModal(dateStr) {
                         <span class="text-xl">🗓️</span>
                         <h3 class="font-black text-xl text-zinc-900 dark:text-white">${day.fullDate || `${day.dayOfWeek}, ${day.displayDate}`}</h3>
                         ${day.isToday ? '<span class="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">Today</span>' : ''}
+                        ${day.isRestDay ? '<span class="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">🌴 Rest Day</span>' : ''}
                     </div>
                     <div class="flex items-center gap-2 flex-wrap text-xs">
                         <span class="px-2.5 py-0.5 rounded-full border font-bold ${intensityBg}">
@@ -534,6 +616,16 @@ export async function openStudyPlanDayModal(dateStr) {
                     </div>
                 </div>
                 <button type="button" onclick="closeStudyPlanDayModal()" class="w-9 h-9 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 flex items-center justify-center font-bold text-sm transition">✕</button>
+            </div>
+
+            <!-- Rest Day Toggle Bar -->
+            <div class="px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
+                <span class="text-zinc-600 dark:text-zinc-400 font-medium">
+                    ${day.isRestDay ? '🌴 This day is marked as a <strong>Rest Day</strong> (no study blocks assigned).' : '📚 This day is an active <strong>Study Day</strong>.'}
+                </span>
+                <button type="button" onclick="toggleRestDay('${day.dayOfWeek}'); openStudyPlanDayModal('${day.date}')" class="px-3 py-1 bg-white dark:bg-brand-800 hover:bg-zinc-200 dark:hover:bg-brand-700 font-bold rounded-lg border border-zinc-300 dark:border-brand-600 text-zinc-700 dark:text-zinc-300 transition text-[11px]">
+                    ${day.isRestDay ? '✏️ Make Study Day' : '🌴 Set as Rest Day'}
+                </button>
             </div>
 
             <!-- Summary Stats Bar -->
@@ -570,7 +662,7 @@ export async function openStudyPlanDayModal(dateStr) {
                 <div class="p-4 bg-indigo-50/80 dark:bg-brand-900 rounded-2xl border border-indigo-200/80 dark:border-brand-700 flex items-start gap-3 text-xs text-zinc-800 dark:text-zinc-200 mt-4">
                     <span class="text-lg shrink-0">🧠</span>
                     <div class="leading-relaxed">
-                        <strong class="font-extrabold text-indigo-700 dark:text-indigo-400">Workload Balancer Pro-Tip:</strong> Distributing assignments across 3–4 days prior to deadlines prevents cognitive overload and improves exam performance by up to 35% compared to single-session cramming.
+                        <strong class="font-extrabold text-indigo-700 dark:text-indigo-400">Workload Balancer Pro-Tip:</strong> Distributing assignments across active study days while preserving scheduled rest days helps prevent cognitive fatigue and boosts retention.
                     </div>
                 </div>
             </div>
@@ -677,6 +769,8 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         });
     }
 
+    const restDays = getRestDays();
+
     if (courses.length === 0) {
         container.innerHTML = `
             <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm space-y-4">
@@ -708,7 +802,11 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
     plan.forEach(day => {
         let blocksHtml = '';
         if (day.blocks.length === 0) {
-            blocksHtml = `<p class="text-[11px] text-zinc-400 italic py-1">No urgent study blocks. Light review day! 🎉</p>`;
+            if (day.isRestDay) {
+                blocksHtml = `<p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold py-1">🌴 Rest & Recovery Day</p>`;
+            } else {
+                blocksHtml = `<p class="text-[11px] text-zinc-400 italic py-1">No urgent study blocks. Light review day! 🎉</p>`;
+            }
         } else {
             day.blocks.forEach(b => {
                 blocksHtml += `
@@ -738,10 +836,12 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         }
 
         daysHtml += `
-            <div onclick="openStudyPlanDayModal('${day.date}')" class="group cursor-pointer p-3.5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${day.isToday ? 'bg-indigo-50/50 dark:bg-brand-800 border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20' : 'bg-zinc-50/80 dark:bg-brand-800 border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500'} space-y-2.5">
+            <div onclick="openStudyPlanDayModal('${day.date}')" class="group cursor-pointer p-3.5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${day.isRestDay ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/70 dark:border-emerald-800/40' : (day.isToday ? 'bg-indigo-50/50 dark:bg-brand-800 border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20' : 'bg-zinc-50/80 dark:bg-brand-800 border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500')} space-y-2.5">
                 <div class="flex justify-between items-center text-xs">
-                    <span class="font-extrabold flex items-center gap-1.5 ${day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300'}">
-                        ${day.dayOfWeek}, ${day.displayDate} ${day.isToday ? '<span class="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-black tracking-wider uppercase">TODAY</span>' : ''}
+                    <span class="font-extrabold flex items-center gap-1.5 ${day.isRestDay ? 'text-emerald-700 dark:text-emerald-300' : (day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300')}">
+                        ${day.dayOfWeek}, ${day.displayDate}
+                        ${day.isToday ? '<span class="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-black tracking-wider uppercase">TODAY</span>' : ''}
+                        ${day.isRestDay ? '<span class="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider">REST</span>' : ''}
                     </span>
                     <span class="text-[11px] text-zinc-400 font-mono font-medium">${day.totalMinutes}m planned</span>
                 </div>
@@ -756,17 +856,28 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         `;
     });
 
+    const dayPillsHtml = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => {
+        const isRest = restDays.includes(d);
+        return `<button type="button" onclick="toggleRestDay('${d}')" class="px-2 py-0.5 rounded-lg text-[11px] font-bold transition ${isRest ? 'bg-emerald-500 text-white shadow-xs' : 'bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-600'}" title="Toggle ${d} as Rest Day">${d}${isRest ? ' 🌴' : ''}</button>`;
+    }).join('');
+
     container.innerHTML = `
         <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm space-y-4">
-            <div class="flex justify-between items-center pb-3 border-b border-zinc-200 dark:border-brand-700">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-brand-700">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">🗓️</div>
                     <div>
                         <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines. Click any day to open the full plan popup.</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines.</p>
                     </div>
                 </div>
-                <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline">↺ Refresh Plan</button>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-1 bg-zinc-50 dark:bg-brand-900 p-1 rounded-xl border border-zinc-200 dark:border-brand-700">
+                        <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 px-1.5">Rest:</span>
+                        ${dayPillsHtml}
+                    </div>
+                    <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh</button>
+                </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
@@ -779,6 +890,9 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
 const _studyScope = typeof window !== 'undefined' ? window : globalThis;
 _studyScope.getUnitNumber = getUnitNumber;
 _studyScope.getLessonNumber = getLessonNumber;
+_studyScope.getRestDays = getRestDays;
+_studyScope.setRestDays = setRestDays;
+_studyScope.toggleRestDay = toggleRestDay;
 _studyScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _studyScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
 _studyScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;

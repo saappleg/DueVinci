@@ -132,6 +132,9 @@ export async function loadDashboardStats() {
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
         window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
     }
+    if (typeof window !== 'undefined' && typeof window.renderAcademicsDashboardWidget === 'function') {
+        window.renderAcademicsDashboardWidget('dashboardGrid');
+    }
 }
 
 export function celebrateRunner(el, pct) {
@@ -810,6 +813,38 @@ export async function updateAssignmentPriority(assignId, priority, courseId) {
     }
 }
 
+export async function updateAssignmentTitle(assignId, newTitle, courseId) {
+    if (!assignId) return;
+    const cleanTitle = (newTitle || '').trim();
+    if (!cleanTitle) {
+        alert('Coursework title cannot be empty.');
+        loadAssignments(courseId, currentAssignmentPage);
+        return;
+    }
+
+    try {
+        await supabaseClient.from('assignments').update({ title: cleanTitle }).eq('id', assignId);
+    } catch (err) {
+        console.warn('Supabase title update error:', err);
+    }
+
+    loadAssignments(courseId, currentAssignmentPage);
+    loadDashboardStats();
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export function editAssignmentTitlePrompt(assignId, currentRawTitle, courseId) {
+    const isSub = currentRawTitle.startsWith('↳');
+    const displayTitle = currentRawTitle.replace(/^↳\s*/, '');
+    const newName = prompt('Edit coursework or lesson name:', displayTitle);
+    if (newName !== null && newName.trim() !== '') {
+        const finalTitle = isSub ? `↳ ${newName.trim()}` : newName.trim();
+        updateAssignmentTitle(assignId, finalTitle, courseId);
+    }
+}
+
 export async function updateAssignmentType(assignId, taskType, courseId) {
     if (!assignId || !taskType) return;
 
@@ -1057,9 +1092,10 @@ export async function loadAssignments(courseId, page = 1) {
         listEl.innerHTML += `
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 text-xs hover:border-indigo-500/30 transition">
                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <div class="flex items-center gap-2.5 flex-1 min-w-[180px]">
+                    <div class="flex items-center gap-2 flex-1 min-w-[180px] group/title">
                         ${checkboxHtml}
-                        <span class="truncate ${tClass}">${unitBadge}${assign.title}</span>
+                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${assign.id}', '${assign.title.replace(/'/g, "\\'")}', '${courseId}')">${unitBadge}${assign.title}</span>
+                        <button type="button" onclick="editAssignmentTitlePrompt('${assign.id}', '${assign.title.replace(/'/g, "\\'")}', '${courseId}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
                         <select onchange="updateAssignmentType('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer" title="Change Type">
@@ -1274,6 +1310,8 @@ if (typeof window !== 'undefined') {
     window.updateAssignmentDate = updateAssignmentDate;
     window.updateAssignmentPriority = updateAssignmentPriority;
     window.updateAssignmentType = updateAssignmentType;
+    window.updateAssignmentTitle = updateAssignmentTitle;
+    window.editAssignmentTitlePrompt = editAssignmentTitlePrompt;
     window.deleteAssignment = deleteAssignment;
     window.submitAddAssignment = submitAddAssignment;
     window.addSubItem = addSubItem;

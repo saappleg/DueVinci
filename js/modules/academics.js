@@ -105,29 +105,82 @@ export async function renderAcademicsDashboardWidget(containerId) {
     let examCountdownsHtml = '';
     let assignmentsData = [];
 
+    let localTypes = {};
     try {
-        const { data: assignments } = await supabaseClient.from('assignments').select('*, courses(code, emoji)');
-        assignmentsData = assignments || [];
+        if (typeof localStorage !== 'undefined') {
+            localTypes = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}');
+        }
+    } catch (e) {}
 
-        if (assignmentsData.length > 0) {
-            const validItems = assignmentsData.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
-            totalCount = validItems.length;
-            completedCount = validItems.filter(a => a.is_completed).length;
-
-            const uncompletedExams = assignmentsData.filter(a => !a.is_completed && /(exam|final|midterm|test)/i.test(a.title));
-            if (uncompletedExams.length > 0) {
-                examCountdownsHtml = uncompletedExams.map(exam => {
-                    const diffDays = calculateDaysRemaining(exam.due_date);
-                    const timeText = diffDays >= 0 ? `${diffDays} Day${diffDays === 1 ? '' : 's'}` : `Due today/past`;
-                    return `<div class="text-xs font-bold text-red-500 truncate" title="${exam.title}">• ${exam.title}: <span class="font-normal text-zinc-600 dark:text-zinc-300">${timeText}</span></div>`;
-                }).join('');
-            } else {
-                examCountdownsHtml = `<p class="text-xs text-zinc-400">No active exams or finals pending.</p>`;
+    try {
+        if (supabaseClient) {
+            const { data: assignments, error } = await supabaseClient.from('assignments').select('*');
+            if (assignments && !error) {
+                assignmentsData = assignments;
             }
         }
     } catch (e) {
-        console.error("Error fetching academic stats:", e);
-        examCountdownsHtml = `<p class="text-xs text-zinc-400">Unable to load exam countdowns.</p>`;
+        console.warn("Direct assignments query notice:", e);
+    }
+
+    // Fallback to local memory / localCourses
+    if (assignmentsData.length === 0 && typeof window !== 'undefined' && Array.isArray(window.localCourses)) {
+        window.localCourses.forEach(c => {
+            if (Array.isArray(c.assignments)) {
+                c.assignments.forEach(a => assignmentsData.push({ ...a, course_id: a.course_id || c.id }));
+            }
+        });
+    }
+
+    const isExamTask = (a) => {
+        const explicitType = localTypes[a.id] || a.task_type || a.type;
+        if (explicitType === 'exam') return true;
+        if (!explicitType) {
+            return /(exam|final|midterm|test|quiz)/i.test(a.title);
+        }
+        return false;
+    };
+
+    if (assignmentsData.length > 0) {
+        const validItems = assignmentsData.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
+        totalCount = validItems.length;
+        completedCount = validItems.filter(a => a.is_completed).length;
+
+        const uncompletedExams = assignmentsData
+            .filter(a => !a.is_completed && isExamTask(a) && a.due_date)
+            .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+        if (uncompletedExams.length > 0) {
+            examCountdownsHtml = uncompletedExams.map(exam => {
+                const cleanTitle = (exam.title || '').replace(/^↳\s*/, '').trim();
+                const diffDays = calculateDaysRemaining(exam.due_date);
+                let badgeColor = 'text-rose-500 font-bold';
+                let timeText = '';
+                if (diffDays < 0) {
+                    timeText = `Overdue (${Math.abs(diffDays)}d ago)`;
+                    badgeColor = 'text-red-600 font-extrabold';
+                } else if (diffDays === 0) {
+                    timeText = `🔥 Due Today!`;
+                    badgeColor = 'text-rose-600 font-extrabold animate-pulse';
+                } else if (diffDays === 1) {
+                    timeText = `⚡ Tomorrow (1d)`;
+                    badgeColor = 'text-amber-500 font-bold';
+                } else {
+                    timeText = `in ${diffDays} Days`;
+                    badgeColor = 'text-zinc-600 dark:text-zinc-300 font-medium';
+                }
+                return `
+                    <div class="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between gap-1 py-0.5 truncate" title="${cleanTitle}">
+                        <span class="truncate">🎯 ${cleanTitle}</span>
+                        <span class="shrink-0 text-[11px] ${badgeColor}">${timeText}</span>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            examCountdownsHtml = `<p class="text-xs text-zinc-400 py-1">No active exams or finals pending. 🎉</p>`;
+        }
+    } else {
+        examCountdownsHtml = `<p class="text-xs text-zinc-400 py-1">No active exams or finals pending. 🎉</p>`;
     }
 
     let streakDays = 0;
@@ -153,7 +206,7 @@ export async function renderAcademicsDashboardWidget(containerId) {
             let hasExam = false;
             if (assignmentsData && assignmentsData.length > 0) {
                 dayTasks = assignmentsData.filter(a => !a.is_completed && a.due_date === dateStr).length;
-                hasExam = assignmentsData.some(a => !a.is_completed && a.due_date === dateStr && /(exam|final|midterm|test)/i.test(a.title));
+                hasExam = assignmentsData.some(a => !a.is_completed && a.due_date === dateStr && isExamTask(a));
             }
 
             const intensity = getWorkloadIntensity(dayTasks, hasExam);
@@ -197,7 +250,7 @@ export async function renderAcademicsDashboardWidget(containerId) {
             </div>
             <div class="p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/80 dark:border-brand-700">
                 <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Exams & Finals Countdown</h4>
-                <div class="mt-1 space-y-1 max-h-16 overflow-y-auto pr-1">
+                <div class="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
                     ${examCountdownsHtml}
                 </div>
             </div>
@@ -205,7 +258,7 @@ export async function renderAcademicsDashboardWidget(containerId) {
         ${workloadHtml}
     `;
 
-    const headerTitle = container.querySelector('.flex.justify-between.items-end');
+    const headerTitle = container.querySelector('.flex.justify-between.items-end') || container.querySelector('.flex.flex-col') || container.firstElementChild;
     if (headerTitle && headerTitle.nextSibling) {
         container.insertBefore(analyticsDiv, headerTitle.nextSibling);
     } else {

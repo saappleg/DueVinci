@@ -5,12 +5,12 @@ import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recor
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, initPasskeyUI, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, setTimerDuration, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
-import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, updateAssignmentTitle, editAssignmentTitlePrompt, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
 import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
-import { getUnitNumber, getLessonNumber, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
+import { getUnitNumber, getLessonNumber, getRestDays, setRestDays, toggleRestDay, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON } from './modules/backup.js';
@@ -88,6 +88,8 @@ export {
     updateAssignmentDate,
     updateAssignmentPriority,
     updateAssignmentType,
+    updateAssignmentTitle,
+    editAssignmentTitlePrompt,
     deleteAssignment,
     submitAddAssignment,
     addSubItem,
@@ -131,6 +133,9 @@ export {
     renderMarkdownToHtml,
     getUnitNumber,
     getLessonNumber,
+    getRestDays,
+    setRestDays,
+    toggleRestDay,
     generateBalancedStudyPlan,
     renderStudyPlanDashboardWidget,
     ensureStudyPlanDayModalExists,
@@ -243,6 +248,8 @@ _rootScope.toggleAssignment = toggleAssignment;
 _rootScope.updateAssignmentDate = updateAssignmentDate;
 _rootScope.updateAssignmentPriority = updateAssignmentPriority;
 _rootScope.updateAssignmentType = updateAssignmentType;
+_rootScope.updateAssignmentTitle = updateAssignmentTitle;
+_rootScope.editAssignmentTitlePrompt = editAssignmentTitlePrompt;
 _rootScope.deleteAssignment = deleteAssignment;
 _rootScope.submitAddAssignment = submitAddAssignment;
 _rootScope.addSubItem = addSubItem;
@@ -283,6 +290,9 @@ _rootScope.formatMathFormula = formatMathFormula;
 _rootScope.renderMarkdownToHtml = renderMarkdownToHtml;
 _rootScope.getUnitNumber = getUnitNumber;
 _rootScope.getLessonNumber = getLessonNumber;
+_rootScope.getRestDays = getRestDays;
+_rootScope.setRestDays = setRestDays;
+_rootScope.toggleRestDay = toggleRestDay;
 _rootScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _rootScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
 _rootScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;

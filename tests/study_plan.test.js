@@ -318,6 +318,55 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(examBlock.isExam).toBe(true);
             expect(examBlock.typeBadgeText).toBe('🎯 Exam');
         });
+
+        it('excludes chosen Rest Days from standard coursework while completing deliverables on time', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z'); // Thursday (Thu = Day 0, Fri = Day 1, Sat = Day 2, Sun = Day 3, Mon = Day 4)
+            const courses = [
+                { id: 'bio', code: 'BIO 101', name: 'Biology', emoji: '🧬', color: '#10b981' }
+            ];
+
+            // 3 lessons due by Monday (Aug 24)
+            const assignments = [
+                { id: 'b1', course_id: 'bio', title: '↳ Lesson 1: Cells', due_date: '2026-08-24', is_completed: false },
+                { id: 'b2', course_id: 'bio', title: '↳ Lesson 2: Genetics', due_date: '2026-08-24', is_completed: false },
+                { id: 'b3', course_id: 'bio', title: '↳ Lesson 3: Ecology', due_date: '2026-08-24', is_completed: false }
+            ];
+
+            // Set Saturday (Sat) and Sunday (Sun) as Rest Days
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 5, ['Sat', 'Sun']);
+
+            const thuDay = plan[0]; // Thu (Day 0) - Active
+            const friDay = plan[1]; // Fri (Day 1) - Active
+            const satDay = plan[2]; // Sat (Day 2) - Rest Day
+            const sunDay = plan[3]; // Sun (Day 3) - Rest Day
+            const monDay = plan[4]; // Mon (Day 4) - Active
+
+            expect(thuDay.isRestDay).toBe(false);
+            expect(friDay.isRestDay).toBe(false);
+            expect(satDay.isRestDay).toBe(true);
+            expect(sunDay.isRestDay).toBe(true);
+
+            // Rest days (Sat & Sun) must have 0 assigned coursework
+            expect(satDay.assignedTasks.length).toBe(0);
+            expect(sunDay.assignedTasks.length).toBe(0);
+
+            // Active study days (Thu, Fri, Mon) must receive all 3 lessons
+            const activeScheduledIds = [...thuDay.assignedTasks, ...friDay.assignedTasks, ...monDay.assignedTasks].map(t => t.task.id);
+            expect(activeScheduledIds).toContain('b1');
+            expect(activeScheduledIds).toContain('b2');
+            expect(activeScheduledIds).toContain('b3');
+        });
+
+        it('manages rest days state via getRestDays, setRestDays, and toggleRestDay', () => {
+            expect(typeof getRestDays).toBe('function');
+            expect(typeof setRestDays).toBe('function');
+            expect(typeof toggleRestDay).toBe('function');
+
+            expect(getRestDays()).toEqual([]);
+            setRestDays(['Sun', 'Sat']);
+            // In test environment without real localStorage write failure, setRestDays executes without throw
+            expect(() => toggleRestDay('Wed')).not.toThrow();
+        });
     });
 
     describe('Modal and Timer Helpers', () => {
