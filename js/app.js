@@ -17,6 +17,7 @@ import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUs
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
+import { initializeErrorReporting } from './modules/errorReporting.js';
 import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
 
 // Re-export for external and test suite imports
@@ -354,6 +355,7 @@ if (typeof document !== 'undefined') {
         updateTimerDisplay();
         initMultiTimersUI();
         initNetworkStatusListeners(supabaseClient);
+        initializeErrorReporting();
         initPasskeyUI();
         initCourseForm();
 

@@ -9,6 +9,12 @@ export let hideUnassignedFolder = typeof localStorage !== 'undefined' && localSt
 export let currentAssignmentPage = 1;
 export let activeTermModalName = '';
 
+async function getPlannerUser() {
+    if (currentUser) return currentUser;
+    const { data } = await supabaseClient.auth.getSession();
+    return data?.session?.user || null;
+}
+
 export async function loadDashboardStats() {
     if (typeof document === 'undefined') return;
     const { data: courses } = await supabaseClient.from('courses').select('*');
@@ -163,8 +169,7 @@ export async function submitCourseForm(event) {
 
     if (!emoji || !code || !color) return;
 
-    const sessionResult = currentUser ? null : await supabaseClient.auth.getUser();
-    const user = currentUser || sessionResult?.data?.user;
+    const user = await getPlannerUser();
     if (!user) {
         if (message) message.textContent = 'Please sign in before adding a class.';
         return;
@@ -967,7 +972,7 @@ export async function submitAddAssignment(event) {
         return;
     }
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const user = await getPlannerUser();
     if (!user) return;
 
     await supabaseClient.from('assignments').insert([{
@@ -1005,7 +1010,7 @@ export async function addSubItem(parentId, courseId) {
     const unitNum = parentAssign ? parentAssign.unit_number : null;
     const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const user = await getPlannerUser();
     if (!user) return;
 
     await supabaseClient.from('assignments').insert([{
@@ -1315,7 +1320,7 @@ export async function submitQuickAddTask(event) {
         return;
     }
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const user = await getPlannerUser();
     if (!user) return;
 
     const newAssignment = {

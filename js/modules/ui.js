@@ -410,6 +410,7 @@ export function ensureSupportModalExists() {
                             <button type="button" onclick="switchSupportTab('contact')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="support-tab-contact">Contact Steven</button>
                             <button type="button" onclick="switchSupportTab('faq')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-faq">Quick FAQ</button>
                             <button type="button" onclick="switchSupportTab('github')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-github">GitHub & Bugs</button>
+                            <button type="button" onclick="switchSupportTab('inbox'); loadSupportInbox()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-inbox">Support Inbox</button>
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
@@ -520,6 +521,12 @@ export function ensureSupportModalExists() {
                             </a>
                         </div>
                     </div>
+
+                    <div id="support-content-inbox" class="hidden space-y-3">
+                        <div><h2 class="text-xl font-bold dark:text-white mb-1">Support Inbox</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Review and resolve incoming support tickets.</p></div>
+                        <p id="supportInboxFeedback" class="text-xs text-red-500"></p>
+                        <div id="supportInboxList" class="space-y-3 max-h-[50vh] overflow-y-auto"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -545,7 +552,7 @@ export function closeSupportModal() {
 }
 
 export function switchSupportTab(tabName) {
-    const tabs = ['contact', 'faq', 'github'];
+    const tabs = ['contact', 'faq', 'github', 'inbox'];
     tabs.forEach(t => {
         const content = document.getElementById(`support-content-${t}`);
         const tabBtn = document.getElementById(`support-tab-${t}`);
@@ -561,6 +568,32 @@ export function switchSupportTab(tabName) {
             }
         }
     });
+}
+
+function escapeSupportHtml(value) {
+    return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] || character));
+}
+
+export async function loadSupportInbox() {
+    const list = document.getElementById('supportInboxList');
+    const feedback = document.getElementById('supportInboxFeedback');
+    if (!list || !feedback) return;
+    list.innerHTML = '<p class="text-xs text-zinc-500">Loading tickets…</p>';
+    feedback.textContent = '';
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('manage-support-tickets', { body: { action: 'list' } });
+        if (error || !data?.tickets) throw new Error(data?.error || error?.message || 'Unable to load tickets.');
+        if (!data.tickets.length) { list.innerHTML = '<p class="text-xs text-zinc-500">No support tickets yet.</p>'; return; }
+        list.innerHTML = data.tickets.map((ticket) => `<article class="border border-zinc-200 dark:border-brand-700 rounded-lg p-3 space-y-2"><div class="flex justify-between gap-3"><strong class="text-xs dark:text-white">${escapeSupportHtml(ticket.subject)}</strong><span class="text-[10px] text-zinc-500">${new Date(ticket.created_at).toLocaleString()}</span></div><p class="text-[11px] text-zinc-500">${escapeSupportHtml(ticket.email)} · ${escapeSupportHtml(ticket.category)}</p><p class="text-xs whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">${escapeSupportHtml(ticket.message)}</p><select onchange="updateSupportTicketStatus('${ticket.id}', this.value)" class="text-xs border rounded px-2 py-1 dark:bg-brand-900 dark:border-brand-600">${['open', 'in_progress', 'resolved', 'closed', 'delivery_failed'].map((status) => `<option value="${status}" ${ticket.status === status ? 'selected' : ''}>${status.replace('_', ' ')}</option>`).join('')}</select></article>`).join('');
+    } catch (error) {
+        list.innerHTML = '';
+        feedback.textContent = error.message || 'Unable to load tickets.';
+    }
+}
+
+export async function updateSupportTicketStatus(id, status) {
+    const { data, error } = await supabaseClient.functions.invoke('manage-support-tickets', { body: { action: 'update', id, status } });
+    if (error || !data?.success) alert(data?.error || error?.message || 'Unable to update ticket.');
 }
 
 export async function submitSupportMessage(e) {
@@ -695,6 +728,8 @@ if (typeof window !== 'undefined') {
     window.closeSupportModal = closeSupportModal;
     window.switchSupportTab = switchSupportTab;
     window.submitSupportMessage = submitSupportMessage;
+    window.loadSupportInbox = loadSupportInbox;
+    window.updateSupportTicketStatus = updateSupportTicketStatus;
     window.sendDirectMailto = sendDirectMailto;
     window.confirmAccountDeletion = confirmAccountDeletion;
 }
