@@ -147,6 +147,63 @@ export function celebrateRunner(el, pct) {
     }
 }
 
+export async function submitCourseForm(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const emojiInput = document.getElementById('courseEmoji');
+    const codeInput = document.getElementById('courseCode');
+    const colorInput = document.getElementById('courseColor');
+    const submitButton = form?.querySelector('button[type="submit"]');
+    const message = document.getElementById('courseFormMessage');
+
+    const emoji = emojiInput?.value.trim();
+    const code = codeInput?.value.trim();
+    const color = colorInput?.value;
+
+    if (!emoji || !code || !color) return;
+
+    const sessionResult = currentUser ? null : await supabaseClient.auth.getUser();
+    const user = currentUser || sessionResult?.data?.user;
+    if (!user) {
+        if (message) message.textContent = 'Please sign in before adding a class.';
+        return;
+    }
+
+    if (submitButton) submitButton.disabled = true;
+    if (message) message.textContent = 'Adding class…';
+
+    try {
+        const { error } = await supabaseClient.from('courses').insert([{
+            user_id: user.id,
+            emoji,
+            code,
+            color
+        }]);
+
+        if (error) throw error;
+
+        form.reset();
+        if (colorInput) colorInput.value = '#4f46e5';
+        if (message) message.textContent = 'Class added.';
+        codeInput?.focus();
+        await loadCoursesPage();
+    } catch (error) {
+        console.error('Error adding course:', error);
+        if (message) message.textContent = `Could not add class: ${error.message || 'Please try again.'}`;
+    } finally {
+        if (submitButton) submitButton.disabled = false;
+    }
+}
+
+export function initCourseForm() {
+    const form = document.getElementById('courseForm');
+    if (!form || form.dataset.bound === 'true') return;
+
+    form.addEventListener('submit', submitCourseForm);
+    form.dataset.bound = 'true';
+}
+
 export async function loadCoursesPage() {
     const { data: courses } = await supabaseClient.from('courses').select('*').order('created_at', { ascending: false });
     localCourses = courses || [];
@@ -1286,6 +1343,8 @@ export async function submitQuickAddTask(event) {
 if (typeof window !== 'undefined') {
     window.loadDashboardStats = loadDashboardStats;
     window.celebrateRunner = celebrateRunner;
+    window.submitCourseForm = submitCourseForm;
+    window.initCourseForm = initCourseForm;
     window.loadCoursesPage = loadCoursesPage;
     window.renderTermFolders = renderTermFolders;
     window.renderAlphabeticals = renderAlphabeticals;

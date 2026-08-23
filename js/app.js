@@ -5,7 +5,7 @@ import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recor
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, initPasskeyUI, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, setTimerDuration, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
-import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, updateAssignmentTitle, editAssignmentTitlePrompt, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
+import { localCourses, loadDashboardStats, loadCoursesPage, initCourseForm, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, updateAssignmentTitle, editAssignmentTitlePrompt, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
@@ -77,6 +77,7 @@ export {
     localCourses,
     loadDashboardStats,
     loadCoursesPage,
+    initCourseForm,
     renderTermFolders,
     renderAlphabeticals,
     openCourseModal,
@@ -238,6 +239,7 @@ _rootScope.updateFloatingTimer = updateFloatingTimer;
 _rootScope.applyTimerCollapse = applyTimerCollapse;
 _rootScope.loadDashboardStats = loadDashboardStats;
 _rootScope.loadCoursesPage = loadCoursesPage;
+_rootScope.initCourseForm = initCourseForm;
 _rootScope.renderTermFolders = renderTermFolders;
 _rootScope.renderAlphabeticals = renderAlphabeticals;
 _rootScope.openCourseModal = openCourseModal;
@@ -353,6 +355,7 @@ if (typeof document !== 'undefined') {
         initMultiTimersUI();
         initNetworkStatusListeners();
         initPasskeyUI();
+        initCourseForm();
 
         // Restore ambient noise if active
         const savedAmbient = localStorage.getItem('duevinci_ambient_noise');
