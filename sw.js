@@ -1,7 +1,8 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v3.3';
+const CACHE_NAME = 'duevinci-v4.0';
+const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -37,13 +38,16 @@ const ASSETS_TO_CACHE = [
   './js/modules/tour.js',
   './js/modules/easterEggs.js',
   './js/modules/pwa.js',
-  './js/modules/ui.js'
+  './js/modules/ui.js',
+  './js/modules/canvas.js'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // An optional asset failing to cache must not prevent the PWA shell from
+      // installing. Cache as much of the shell as is available.
+      await Promise.allSettled(ASSETS_TO_CACHE.map((asset) => cache.add(asset)));
     }).then(() => self.skipWaiting())
   );
 });
@@ -53,7 +57,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== RUNTIME_CACHE) {
             return caches.delete(key);
           }
         })
@@ -63,21 +67,33 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (!event.request.url.startsWith('http')) return;
+  const { request } = event;
+  if (!request.url.startsWith('http') || request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  // Never cache authenticated Supabase API or Edge Function responses.
+  if (url.hostname.endsWith('.supabase.co')) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(async () => (await caches.match(request)) || caches.match('./index.html')),
+    );
+    return;
+  }
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (event.request.method === 'GET' && response.status === 200 && response.type === 'basic') {
-          const resClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, resClone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+      if (response.ok || response.type === 'opaque') {
+        const copy = response.clone();
+        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    })),
   );
 });

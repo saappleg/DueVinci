@@ -127,7 +127,7 @@ export function initNetworkStatusListeners() {
                 badge = document.createElement('div');
                 badge.id = 'offlineStatusBadge';
                 badge.className = 'fixed top-4 right-4 z-[9999] bg-amber-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 animate-bounce';
-                badge.innerHTML = `<span>⚡</span> Offline Mode (Changes Saved Locally)`;
+                badge.innerHTML = `<span>⚡</span> Offline Mode — reconnect to save changes`;
                 document.body.appendChild(badge);
             }
             badge.classList.remove('hidden');

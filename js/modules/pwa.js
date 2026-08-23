@@ -21,10 +21,14 @@ export function initPWA() {
         if (banner) banner.classList.add('hidden');
     });
 
-    // Service Worker Registration
+    // Register from the manifest directory so dashboard and nested pages use
+    // the same root service worker (for example /courses/ must not seek
+    // /courses/sw.js).
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(err => {
+            const manifestHref = document.querySelector('link[rel="manifest"]')?.href || new URL('manifest.json', window.location.href).href;
+            const serviceWorkerUrl = new URL('sw.js', manifestHref).href;
+            navigator.serviceWorker.register(serviceWorkerUrl).catch(err => {
                 console.log('SW registration error:', err);
             });
         });
