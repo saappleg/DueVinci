@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Added user-content and external-link hardening, and release checks in the Pages deployment workflow.
+- Added daily privacy retention: browser error events expire after 90 days, and
+  resolved or closed support tickets expire 90 days after they are resolved.
+- Added a post-deploy release smoke test. It verifies public pages and PWA
+  assets on every Main deployment; authenticated checks activate only after
+  dedicated GitHub Actions secrets are configured.
+
+### Changed
+- Free planner data and the application shell are cached per signed-in user for
+  offline use, with queued planner mutations replayed after reconnection.
+- Non-sensitive preferences now synchronize between signed-in devices.
 
 ---
 

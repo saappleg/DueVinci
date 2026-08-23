@@ -11,7 +11,7 @@ flowchart TD
     subgraph Client Browser
         subgraph UI Layer
             HTML[HTML5 Semantic Pages]
-            TW[Tailwind CSS CDN]
+            TW[Locally hosted Tailwind CSS]
             Icons[Heroicons & SVG Icons]
             FC[FullCalendar UI]
         end
@@ -58,7 +58,7 @@ flowchart TD
 
 ### Frontend
 - **Language**: Native Modern JavaScript (ES6+ Modules, zero-bundler dependency).
-- **Styling**: Tailwind CSS (CDN) configured with custom dark-mode color palettes (`zinc-900`, `zinc-950`, accent colors).
+- **Styling**: Locally hosted Tailwind CSS and vendor assets, pre-cached for PWA availability, with custom dark-mode color palettes.
 - **Icons**: Inline SVG / Heroicons for lightweight, crisp vector rendering.
 - **Interactive Calendar**: [FullCalendar](https://fullcalendar.io/) (v6) for month, week, day, and list schedule visualization.
 - **Document Rendering**: [PDF.js](https://mozilla.github.io/pdf.js/) for client-side text extraction from uploaded PDF documents.
@@ -66,7 +66,8 @@ flowchart TD
 - **Sound Synthesis**: Native Web Audio API for synthetic chimes and alerts without requiring external `.mp3` dependencies.
 
 ### Persistence & Cloud Sync
-- **Browser Preferences**: `localStorage` stores non-sensitive UI preferences such as theme, timer, rest-day, and display settings.
+- **Offline planner cache**: IndexedDB keeps a per-user cache and queued free-planner mutations for replay after reconnecting.
+- **Browser preferences**: Non-sensitive UI preferences are cached locally and synchronize through the RLS-protected `user_preferences` table for signed-in users.
 - **Cloud Backend**: [Supabase](https://supabase.com) (PostgreSQL and Auth) stores authenticated coursework and calendar data. Row Level Security policies scope data to `auth.uid() = user_id`.
 - **Edge Computing**: Supabase Edge Functions (Deno runtime) for proxying AI requests securely without exposing developer API keys in frontend client bundles.
 - **AI Processing**: Google Gemini API (`gemini-1.5-flash` / `gemini-1.5-pro`) for multimodal syllabus analysis.

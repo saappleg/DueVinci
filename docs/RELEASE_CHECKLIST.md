@@ -1,5 +1,17 @@
 # DueVinci subscription release checklist
 
+## Shared release checks
+
+- Confirm the GitHub Pages deployment workflow passed its post-deploy PWA smoke
+  test.
+- To enable its authenticated checks, create a dedicated disposable production
+  account and add `DUEVINCI_SMOKE_EMAIL` and `DUEVINCI_SMOKE_PASSWORD` as
+  repository Actions secrets. The test signs in, creates and deletes one
+  temporary course, and sends a clearly labeled support test email.
+- Confirm the `duevinci-privacy-retention` Supabase Cron job is active. It
+  deletes browser error events after 90 days and resolved/closed support tickets
+  90 days after resolution.
+
 - Promote the reviewed Dev commit to `main`; never copy Test Stripe price IDs or webhook secrets to production.
 - Confirm production has Live `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, monthly/yearly price IDs, and `APP_URL=https://duevinci.tech`.
 - Enable and configure Stripe's Customer Portal (cancellation and plan management) before exposing the portal button.
