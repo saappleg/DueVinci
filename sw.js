@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v4.9';
+const CACHE_NAME = 'duevinci-v5.0';
 const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
@@ -47,7 +47,10 @@ const ASSETS_TO_CACHE = [
   './assets/vendor/driver.js',
   './assets/vendor/driver.css',
   './assets/vendor/fullcalendar.js',
-  './assets/vendor/canvas-confetti.js'
+  './assets/vendor/canvas-confetti.js',
+  './assets/vendor/pdf.js',
+  './assets/vendor/pdf.worker.js',
+  './assets/vendor/tesseract.js'
 ];
 
 self.addEventListener('install', (event) => {
