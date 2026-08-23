@@ -28,12 +28,21 @@ export async function checkUser() {
 
 export async function handleAuth(session) {
     if (typeof document === 'undefined') return;
+    if (!session && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        try {
+            const offlineUser = JSON.parse(localStorage.getItem('duevinci_offline_user') || 'null');
+            if (offlineUser?.id) session = { access_token: `offline:${offlineUser.id}`, user: offlineUser };
+        } catch { /* Show the normal auth screen if no prior local session exists. */ }
+    }
     const token = session?.access_token || null;
     if (token === lastProcessedSessionToken) return;
     lastProcessedSessionToken = token;
 
     if (session) {
         currentUser = session.user;
+        if (currentUser?.id && typeof localStorage !== 'undefined') {
+            localStorage.setItem('duevinci_offline_user', JSON.stringify({ id: currentUser.id, email: currentUser.email || '' }));
+        }
         // Preference sync is an enhancement, never a prerequisite for opening
         // the cached planner. A network failure here must not leave an offline
         // page hidden behind the auth screen.
