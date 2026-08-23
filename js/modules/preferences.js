@@ -45,6 +45,10 @@ async function uploadPreferences() {
 export async function initializePreferenceSync(user) {
     if (!user?.id || typeof localStorage === 'undefined') return;
     activeUserId = user.id;
+    // This table is intentionally cloud-synced, not part of the planner's
+    // mutation queue. Never start a request that will hold offline startup
+    // behind the browser's network timeout.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const localUpdatedAt = localStorage.getItem(UPDATED_AT_KEY) || '';
     let data;
     let error;

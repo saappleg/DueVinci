@@ -180,7 +180,11 @@ function applyReadOptions(records, state) {
 async function currentOfflineUser(client) {
     // getUser() verifies against Supabase over the network. The persisted
     // session is the correct identity source while the PWA is offline.
-    try { return (await client.auth.getSession()).data?.session?.user || null; } catch { return null; }
+    try {
+        const sessionUser = (await client.auth.getSession()).data?.session?.user;
+        if (sessionUser) return sessionUser;
+    } catch { /* Fall back to the last authenticated local identity. */ }
+    try { return JSON.parse(localStorage.getItem('duevinci_offline_user') || 'null'); } catch { return null; }
 }
 
 async function resolveOfflineQuery(state, userId) {
