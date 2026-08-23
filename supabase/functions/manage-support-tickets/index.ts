@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
     if (body.action === 'list') {
-      const { data, error } = await admin.from('support_tickets').select('id, email, category, subject, message, status, created_at').order('created_at', { ascending: false }).limit(100)
+      const { data, error } = await admin.from('support_tickets').select('id, email, category, subject, message, status, created_at, resolved_at').order('created_at', { ascending: false }).limit(100)
       if (error) throw error
       return json({ tickets: data || [] })
     }
@@ -25,7 +25,8 @@ Deno.serve(async (req) => {
       const id = String(body.id || '')
       const status = String(body.status || '')
       if (!id || !allowedStatuses.has(status)) throw new Error('Invalid ticket update.')
-      const { error } = await admin.from('support_tickets').update({ status }).eq('id', id)
+      const resolvedAt = status === 'resolved' || status === 'closed' ? new Date().toISOString() : null
+      const { error } = await admin.from('support_tickets').update({ status, resolved_at: resolvedAt }).eq('id', id)
       if (error) throw error
       return json({ success: true })
     }
