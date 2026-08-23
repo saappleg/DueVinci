@@ -1,6 +1,23 @@
-import { corsHeaders, authenticatedUser, json } from '../_shared/canvas.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const resendUrl = 'https://api.resend.com/emails'
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+}
+
+async function authenticatedUser(req: Request) {
+  const authorization = req.headers.get('Authorization')
+  if (!authorization) throw new Error('Missing Authorization header')
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  const { data: { user }, error } = await admin.auth.getUser(authorization.replace('Bearer ', ''))
+  if (error || !user) throw new Error('Unauthorized')
+  return { admin, user }
+}
 
 function requiredString(value: unknown, label: string, maxLength: number) {
   const result = String(value || '').trim()
