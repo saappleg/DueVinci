@@ -7,9 +7,14 @@ Frequently asked questions and solutions for common questions or errors when usi
 ## ❓ Frequently Asked Questions
 
 ### 1. Is an internet connection required to use DueVinci?
-**No.** DueVinci is built with a local-first architecture. All core features (course tracking, grade simulation, Pomodoro timer, SM-2 flashcards, calendar) work completely offline using `IndexedDB` and service worker caching. An internet connection is only needed when:
+**Not after the first online load.** DueVinci caches the app shell and supported
+free-planner data using the service worker and `IndexedDB`. Planner changes made
+offline queue for replay after reconnecting. An internet connection is still
+needed when:
 - Parsing new syllabi using the Gemini AI feature.
 - Synchronizing with your remote Supabase cloud database.
+- Sending support messages, using Canvas or billing, deleting an account, or
+  signing in for the first time on that device.
 
 ---
 

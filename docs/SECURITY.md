@@ -45,9 +45,10 @@ AI features run through secure server‑side Edge Functions:
 ---
 ## Local Storage & Device Data <a id="local-storage--device-data"></a>
 
-Non‑sensitive preferences are stored locally via `localStorage`:
+Non-sensitive preferences are cached locally and, for signed-in users,
+synchronized through an RLS-protected preferences record:
 
-- Theme (dark/light), date formats, GPA scale, Pomodoro timer settings, UI collapse states.
+- Theme (dark/light), date formats, GPA scale, Pomodoro timer settings, and UI collapse states.
 - No third‑party tracking cookies or advertising pixels are used.
 
 ---
@@ -56,6 +57,8 @@ Non‑sensitive preferences are stored locally via `localStorage`:
 - **Active Retention** – Data persists while your account is active.
 - **Immediate Deletion** – Removing a course, term, or assignment permanently erases it from the database.
 - **Account Deletion** – You may request full account and data removal at any time.
+- **Support Tickets** – Resolved or closed tickets are automatically deleted 90 days after resolution.
+- **Client Error Reports** – Browser diagnostic events are automatically deleted 90 days after creation.
 
 ---
 ## Policy Updates <a id="policy-updates"></a>

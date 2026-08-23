@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Sanitized Markdown and planner/course display content, and restricted user resource links to HTTP(S).
 - GitHub Pages deployment now runs syntax and test checks before publishing.
+- Added daily privacy retention: browser error events are deleted after 90 days;
+  resolved or closed support tickets are deleted 90 days after resolution.
+- Added a post-deploy release smoke test for public pages and PWA assets, with
+  optional authenticated sign-in, planner-write, and support-function checks.
+
+### Changed
+- Made the PWA shell and free planner data available offline after an initial
+  online load; offline planner changes queue for replay after reconnection.
+- Synced non-sensitive preferences across signed-in devices.
 
 ---
 

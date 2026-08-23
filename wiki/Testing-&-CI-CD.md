@@ -65,4 +65,10 @@ flowchart LR
     Status -->|Fail| Block[Blocked ❌]
 ```
 
-The GitHub Pages deployment workflow repeats `npm run check:syntax` and `npm test` before publishing, so a deployment cannot skip the release checks.
+The GitHub Pages deployment workflow repeats `npm run check:syntax` and `npm test` before publishing, so a deployment cannot skip the release checks. After deployment it runs `scripts/release-smoke.mjs`, which verifies the published pages, service worker, manifest, and local PWA assets.
+
+When the repository Actions secrets `DUEVINCI_SMOKE_EMAIL` and
+`DUEVINCI_SMOKE_PASSWORD` are configured for a dedicated test account, the same
+smoke test also verifies Supabase password sign-in, a temporary planner write
+(which it deletes), and the support Edge Function. Never use a personal account
+or place its password in source code.

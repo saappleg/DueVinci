@@ -52,7 +52,7 @@
             <div class="border-b border-zinc-200 dark:border-brand-700 pb-6">
                 <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider block mb-1">Privacy & Compliance</span>
                 <h1 class="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Privacy Policy & Data Retention</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: February 20, 2026</p>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 23, 2026</p>
             </div>
 
             <!-- Section 1 -->
@@ -94,7 +94,7 @@
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">D. Client-Side Preferences (Local Storage)</h3>
                         <p class="leading-relaxed">
-                            UI configuration such as your active theme (dark/light/Greek mode), preferred date format, timer audio profiles, and Pomodoro durations are stored directly on your browser device via <code class="font-mono text-zinc-800 dark:text-zinc-200">localStorage</code>.
+                            UI configuration such as your active theme (dark/light/Greek mode), preferred date format, timer audio profiles, and Pomodoro durations are cached on your browser. For signed-in users, non-sensitive preferences may also synchronize through a protected account preference record.
                         </p>
                     </div>
                 </div>
@@ -145,8 +145,18 @@
                             </tr>
                             <tr>
                                 <td class="p-3 font-medium text-zinc-900 dark:text-white">Local Preferences</td>
-                                <td class="p-3">Persistent until user clears browser cache</td>
-                                <td class="p-3">Client LocalStorage</td>
+                                <td class="p-3">Persistent until changed, account deletion, or browser-data clearing</td>
+                                <td class="p-3">Protected preference record + browser cache</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Support Tickets</td>
+                                <td class="p-3">Resolved or closed tickets are deleted 90 days after resolution</td>
+                                <td class="p-3">Supabase (PostgreSQL with RLS)</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Browser Error Reports</td>
+                                <td class="p-3">Deleted automatically after 90 days</td>
+                                <td class="p-3">Supabase (restricted diagnostic table)</td>
                             </tr>
                         </tbody>
                     </table>

@@ -42,7 +42,7 @@ DueVinci’s essential planning workflow—course setup, lesson and due-date tra
 
 **Frontend:**
 - HTML5 & Vanilla JavaScript
-- Tailwind CSS (CDN) for rapid prototyping and dark‑mode support
+- Tailwind CSS and browser libraries served as local, pre-cached vendor assets for reliable PWA startup
 - FullCalendar for schedule visualization
 - PDF.js for client‑side PDF text extraction
 - Canvas‑Confetti for micro‑interactions and rewards
@@ -98,7 +98,12 @@ DueVinci/
 ├── docs/
 │   ├── CHANGELOG.md             # Version release history
 │   ├── CONTRIBUTING.md          # Contribution guidelines
+│   ├── FEATURE_READINESS.md     # Dev capability and verification map
+│   ├── RELEASE_CHECKLIST.md     # Production release checks
 │   └── SECURITY.md              # Security policies & reporting
+├── scripts/
+│   └── release-smoke.mjs        # Post-deploy production smoke test
+├── supabase/                    # Migrations and Edge Functions
 ├── assets/                      # CSS themes, icons, and image assets
 ├── js/
 │   ├── app.js                   # Application orchestrator
@@ -110,6 +115,9 @@ DueVinci/
 ## Contributing & Releases 🤝
 
 Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
+
+For the Main release workflow and its optional authenticated smoke-test secrets,
+see [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
 ---
 ## License 📄
