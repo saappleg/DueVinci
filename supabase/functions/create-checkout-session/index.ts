@@ -31,9 +31,12 @@ serve(async (req) => {
     if (interval !== 'monthly' && interval !== 'yearly') throw new Error('Invalid billing interval')
 
     const appUrl = Deno.env.get('APP_URL')!
-    if (returnUrl !== appUrl && returnUrl !== `${appUrl}/index.html`) {
+    const localReturnUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/index\.html)?\/?$/.test(returnUrl)
+    const allowLocalReturnUrls = Deno.env.get('ALLOW_LOCALHOST_RETURN_URLS') === 'true'
+    if (returnUrl !== appUrl && returnUrl !== `${appUrl}/index.html` && !(allowLocalReturnUrls && localReturnUrl)) {
       throw new Error('Invalid checkout return URL')
     }
+    const redirectBase = returnUrl.replace(/\/index\.html\/?$/, '').replace(/\/$/, '')
 
     const priceId = interval === 'monthly'
       ? Deno.env.get('STRIPE_MONTHLY_PRICE_ID')
@@ -75,8 +78,8 @@ serve(async (req) => {
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
       payment_method_collection: 'always',
-      success_url: `${appUrl}/index.html?canvas_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/index.html?canvas_checkout=canceled`,
+      success_url: `${redirectBase}/?canvas_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${redirectBase}/?canvas_checkout=canceled`,
       metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval },
       subscription_data: {
         metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval },
