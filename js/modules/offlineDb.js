@@ -12,6 +12,16 @@ function isOnline() {
 }
 
 function cacheKey(userId, id) { return `${userId}:${id}`; }
+function fallbackCacheKey(storeName, userId) { return `duevinci_offline:${storeName}:${userId}`; }
+function writeFallbackCache(storeName, items, userId) {
+    try { localStorage.setItem(fallbackCacheKey(storeName, userId), JSON.stringify(items)); } catch { /* IndexedDB remains the primary cache. */ }
+}
+function readFallbackCache(storeName, userId) {
+    try {
+        const items = JSON.parse(localStorage.getItem(fallbackCacheKey(storeName, userId)) || '[]');
+        return Array.isArray(items) ? items : [];
+    } catch { return []; }
+}
 function makeId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
     return `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -52,7 +62,11 @@ function runTransaction(storeName, mode, operation) {
 
 export async function cacheDataLocally(storeName, items = [], userId) {
     if (!DATA_STORES.includes(storeName) || !userId || !Array.isArray(items)) return false;
-    return runTransaction(storeName, 'readwrite', (store, resolve) => {
+    // Keep a compact per-user fallback. It makes the planner usable in
+    // browsers where IndexedDB is disabled and gives the PWA a second durable
+    // cache layer for its essential academic records.
+    writeFallbackCache(storeName, items, userId);
+    const saved = await runTransaction(storeName, 'readwrite', (store, resolve) => {
         const request = store.getAll();
         request.onsuccess = () => {
             (request.result || []).filter((item) => item.user_id === userId).forEach((item) => store.delete(item.cache_key));
@@ -61,15 +75,17 @@ export async function cacheDataLocally(storeName, items = [], userId) {
         request.onerror = () => resolve(false);
         store.transaction.oncomplete = () => resolve(true);
     });
+    return saved !== null;
 }
 
 export async function getLocalCachedData(storeName, userId) {
     if (!DATA_STORES.includes(storeName) || !userId) return [];
-    return runTransaction(storeName, 'readonly', (store, resolve) => {
+    const records = await runTransaction(storeName, 'readonly', (store, resolve) => {
         const request = store.getAll();
         request.onsuccess = () => resolve((request.result || []).filter((item) => item.user_id === userId).map(({ cache_key, ...item }) => item));
         request.onerror = () => resolve([]);
-    }) || [];
+    });
+    return records?.length ? records : readFallbackCache(storeName, userId);
 }
 
 async function applyLocalMutation(action, table, payload, filters, userId) {
