@@ -16,6 +16,8 @@ supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyz
 supabase functions deploy create-portal-session canvas-connect canvas-courses canvas-sync canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy submit-support-ticket --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy manage-support-tickets --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy report-client-error --project-ref kinsxkeerxguqkyzrjfm
 ```
 
 `start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`. Stripe billing functions require
@@ -49,3 +51,10 @@ keys, localhost return URLs, and the Dev Canvas mock flag.
 through Resend. Set `RESEND_API_KEY`, `SUPPORT_TO_EMAIL`, and
 `SUPPORT_FROM_EMAIL` as project secrets. `SUPPORT_FROM_EMAIL` must use a domain
 verified in Resend; the function only confirms delivery after Resend accepts it.
+
+## Privacy retention
+
+Migration `20260823142000_privacy_retention.sql` schedules a daily Supabase Cron
+job named `duevinci-privacy-retention`. It deletes `app_error_events` after 90
+days and tickets marked `resolved` or `closed` 90 days after their
+`resolved_at` timestamp. The job must be present in both Dev and Production.
