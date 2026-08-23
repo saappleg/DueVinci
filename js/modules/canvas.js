@@ -168,6 +168,13 @@ export async function initCanvasSettingsTab() {
             msg.textContent = 'Your subscription is active. Canvas LMS Sync is enabled.';
             manageBillingBtn?.classList.remove('hidden');
             _showConnectorOrSync(profile);
+        } else if (status === 'past_due' || status === 'unpaid') {
+            msg.textContent = 'Your subscription payment needs attention. Update your payment method to keep Canvas LMS Sync enabled.';
+            if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
+            checkoutArea?.classList.remove('hidden');
+        } else if (status === 'canceled') {
+            msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas LMS Sync again.';
+            checkoutArea?.classList.remove('hidden');
         } else {
             msg.textContent = 'Your subscription is not active. Choose a plan to continue.';
             checkoutArea?.classList.remove('hidden');
@@ -385,7 +392,7 @@ export async function openCanvasSyncModal() {
 
         _renderCourseList();
     } catch (err) {
-        showSyncModalMsg(err.message || 'Failed to load Canvas courses.');
+        showSyncModalMsg(await functionErrorMessage(err, 'Failed to load Canvas courses.'));
         if (list) list.innerHTML = '';
     }
 }

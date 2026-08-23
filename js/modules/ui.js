@@ -765,6 +765,9 @@ export async function confirmAccountDeletion() {
             await supabaseClient.from('assignments').delete().eq('user_id', currentUser.id);
             await supabaseClient.from('courses').delete().eq('user_id', currentUser.id);
             await supabaseClient.from('custom_events').delete().eq('user_id', currentUser.id);
+            const { data: deleteAccountData, error: deleteAccountError } = await supabaseClient.functions.invoke('delete-account');
+            if (deleteAccountError) throw deleteAccountError;
+            if (!deleteAccountData?.success) throw new Error(deleteAccountData?.error || 'Unable to delete account.');
         }
 
         if (typeof localStorage !== 'undefined') localStorage.clear();

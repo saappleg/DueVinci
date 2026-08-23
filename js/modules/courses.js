@@ -1098,6 +1098,9 @@ export async function loadAssignments(courseId, page = 1) {
     paginatedAssignments.forEach(assign => {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
+        const canvasBadge = assign.lms_provider === 'canvas'
+            ? '<span class="text-[10px] bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from Canvas">↻ Canvas</span>'
+            : '';
 
         // Determine current type (respect local overrides & explicit assignment type over regex heuristics)
         let currentType = localTypes[assign.id] || assign.task_type || assign.type;
@@ -1158,7 +1161,7 @@ export async function loadAssignments(courseId, page = 1) {
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                     <div class="flex items-center gap-2 flex-1 min-w-[180px] group/title">
                         ${checkboxHtml}
-                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(assign.title)}</span>
+                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(assign.title)}</span>${canvasBadge}
                         <button type="button" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">

@@ -76,5 +76,9 @@ Deno.serve(async (req) => {
       admin.from('canvas_connections').update({ last_synced_at: now, updated_at: now }).eq('user_id', user.id),
     ])
     return json({ success: true, synced: selectedCourses.length, syncedCourses: selectedCourses.length, syncedAssignments: assignmentPayload.length, syncedAt: now })
-  } catch (error) { return json({ error: error.message }, 400) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Canvas sync error.'
+    console.error('canvas-sync error:', message)
+    return json({ error: message }, 400)
+  }
 })

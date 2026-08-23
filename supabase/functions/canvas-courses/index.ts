@@ -11,5 +11,9 @@ Deno.serve(async (req) => {
     const courses = (await response.json()).filter((course: any) => String(course.name || '').trim())
       .map((course: any) => ({ id: course.id, name: course.name, course_code: course.course_code, term: course.term ? { name: course.term.name } : null }))
     return json({ courses })
-  } catch (error) { return json({ error: error.message }, 400) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Canvas course loading error.'
+    console.error('canvas-courses error:', message)
+    return json({ error: message }, 400)
+  }
 })

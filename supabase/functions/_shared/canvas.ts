@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { decryptCanvasToken, encryptCanvasToken } from './canvas_crypto.ts'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,10 +47,22 @@ export async function entitledConnection(req: Request, featureKey = 'canvas_sync
   if (profileError) throw profileError
   if (!isSubscriptionActive(profile) || !await hasFeature(admin, profile || {}, featureKey)) throw new Error('Your plan does not include Canvas LMS Sync.')
   const { data: connection, error: connectionError } = await admin.from('canvas_connections')
-    .select('canvas_domain, canvas_token').eq('user_id', user.id).maybeSingle()
+    .select('canvas_domain, canvas_token, canvas_token_encrypted').eq('user_id', user.id).maybeSingle()
   if (connectionError) throw connectionError
   if (!connection) throw new Error('Canvas credentials not found. Connect Canvas first.')
-  return { admin, user, connection }
+  let canvasToken = connection.canvas_token_encrypted
+    ? await decryptCanvasToken(connection.canvas_token_encrypted)
+    : connection.canvas_token
+  if (!canvasToken) throw new Error('Canvas credentials not found. Connect Canvas first.')
+  // Legacy tokens are upgraded on their first use, then the plaintext copy is removed.
+  if (!connection.canvas_token_encrypted) {
+    const encryptedToken = await encryptCanvasToken(canvasToken)
+    const { error: upgradeError } = await admin.from('canvas_connections')
+      .update({ canvas_token: null, canvas_token_encrypted: encryptedToken, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+    if (upgradeError) throw upgradeError
+  }
+  return { admin, user, connection: { canvas_domain: connection.canvas_domain, canvas_token: canvasToken } }
 }
 
 export function json(body: unknown, status = 200) {
