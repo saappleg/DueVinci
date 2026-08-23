@@ -89,11 +89,25 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         // Find assignments due on or shortly after this date
         const relevantTasks = pendingAssignments.filter(a => {
             const daysLeft = calculateDaysRemaining(a.due_date, currentDate);
-            return daysLeft >= 0 && daysLeft <= 4;
+            const isExam = /exam|final|midterm|test/i.test(a.title);
+            // On Today (dayOffset === 0), include any overdue tasks
+            if (dayOffset === 0 && daysLeft < 0) return true;
+            // Include exams up to 6 days ahead, standard tasks up to 4 days ahead
+            const maxDaysAhead = isExam ? 6 : 4;
+            return daysLeft >= 0 && daysLeft <= maxDaysAhead;
         });
 
         // Enforce proper Unit & Lesson organization and strict sequential order (Lesson 1 -> 2 -> 3 -> 4)
         relevantTasks.sort((a, b) => {
+            const daysLeftA = calculateDaysRemaining(a.due_date, currentDate);
+            const daysLeftB = calculateDaysRemaining(b.due_date, currentDate);
+
+            // Overdue tasks have top priority on current day
+            const isOverdueA = daysLeftA < 0;
+            const isOverdueB = daysLeftB < 0;
+            if (isOverdueA && !isOverdueB) return -1;
+            if (!isOverdueA && isOverdueB) return 1;
+
             // 1. Urgency / Due date order
             const dateDiff = new Date(a.due_date) - new Date(b.due_date);
             if (dateDiff !== 0) return dateDiff;
@@ -136,7 +150,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             let lessonBadgeText = hasExplicitLesson ? `Lesson ${lessonNum}` : '';
 
             let dueText = 'Due today';
-            if (daysLeft === 1) dueText = 'Due tomorrow';
+            if (daysLeft < 0) dueText = `Overdue (${Math.abs(daysLeft)}d ago)`;
+            else if (daysLeft === 1) dueText = 'Due tomorrow';
             else if (daysLeft > 1) dueText = `Due in ${daysLeft} days`;
 
             let recommendation = 'Break task into active work sprints. Review core assignment rubrics.';
@@ -237,9 +252,29 @@ export async function openStudyPlanDayModal(dateStr) {
 
     if (!day) {
         // Recalculate if not found in cache
-        const { data: courses } = await supabaseClient.from('courses').select('*');
-        const { data: assignments } = await supabaseClient.from('assignments').select('*');
-        if (courses && assignments) {
+        let courses = [];
+        let assignments = [];
+        try {
+            if (supabaseClient) {
+                const { data: c } = await supabaseClient.from('courses').select('*');
+                const { data: a } = await supabaseClient.from('assignments').select('*');
+                if (c && c.length > 0) courses = c;
+                if (a && a.length > 0) assignments = a;
+            }
+        } catch (e) {}
+
+        if (courses.length === 0 && typeof window !== 'undefined' && Array.isArray(window.localCourses)) {
+            courses = window.localCourses;
+        }
+        if (assignments.length === 0 && courses.length > 0) {
+            courses.forEach(c => {
+                if (Array.isArray(c.assignments)) {
+                    c.assignments.forEach(a => assignments.push({ ...a, course_id: a.course_id || c.id }));
+                }
+            });
+        }
+
+        if (courses.length > 0) {
             const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7);
             day = plan.find(d => d.date === dateStr) || plan[0];
         }
@@ -455,9 +490,58 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
 
     ensureStudyPlanDayModalExists();
 
-    const { data: courses } = await supabaseClient.from('courses').select('*');
-    const { data: assignments } = await supabaseClient.from('assignments').select('*');
-    if (!courses || !assignments) return;
+    let courses = [];
+    let assignments = [];
+
+    try {
+        if (supabaseClient) {
+            const coursesRes = await supabaseClient.from('courses').select('*');
+            if (coursesRes.data && coursesRes.data.length > 0) courses = coursesRes.data;
+
+            const assignRes = await supabaseClient.from('assignments').select('*');
+            if (assignRes.data && assignRes.data.length > 0) assignments = assignRes.data;
+        }
+    } catch (e) {
+        console.warn('Supabase fetch failed in study plan:', e);
+    }
+
+    // Fallback to localCourses or cached memory
+    if (courses.length === 0 && typeof window !== 'undefined' && Array.isArray(window.localCourses) && window.localCourses.length > 0) {
+        courses = window.localCourses;
+    }
+
+    if (assignments.length === 0 && courses.length > 0) {
+        courses.forEach(c => {
+            if (Array.isArray(c.assignments)) {
+                c.assignments.forEach(a => assignments.push({ ...a, course_id: a.course_id || c.id }));
+            }
+        });
+    }
+
+    if (courses.length === 0) {
+        container.innerHTML = `
+            <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-zinc-200 dark:border-brand-700">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">🗓️</div>
+                        <div>
+                            <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="py-8 px-4 text-center space-y-3 bg-zinc-50 dark:bg-brand-900/50 rounded-xl border border-dashed border-zinc-300 dark:border-brand-700">
+                    <span class="text-3xl">📚</span>
+                    <h4 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No Enrolled Courses Yet</h4>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">Add your classes and parse your syllabus to automatically balance your weekly study schedule.</p>
+                    <a href="courses/index.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        + Add Courses
+                    </a>
+                </div>
+            </div>
+        `;
+        return;
+    }
 
     const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5);
 

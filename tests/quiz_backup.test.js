@@ -183,5 +183,23 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(() => triggerMaestroRain()).not.toThrow();
         });
     });
+
+    describe('Tour Cookie & State Persistence across Refresh', () => {
+        it('sets, reads, and clears tour completion flag correctly across cookie and storage', async () => {
+            const { getTourCookie, setTourCookie } = await import('../js/modules/utils.js');
+            
+            // Set tour cookie
+            setTourCookie('duevinci_tour_done', 'true', 365);
+            expect(getTourCookie('duevinci_tour_done')).toBe(true);
+
+            // Clear tour cookie (for replay)
+            setTourCookie('duevinci_tour_done', '', -1);
+            expect(getTourCookie('duevinci_tour_done')).toBe(false);
+
+            // Re-mark tour complete
+            setTourCookie('duevinci_tour_done', 'true');
+            expect(getTourCookie('duevinci_tour_done')).toBe(true);
+        });
+    });
 });
 

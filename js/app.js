@@ -1,7 +1,7 @@
 // --- DUEVINCI APPLICATION ENTRY POINT ---
 
 import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/config.js';
-import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm, toggleAmbientNoise, speakText } from './modules/utils.js';
+import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm, toggleAmbientNoise, speakText, getTourCookie, setTourCookie, getBasePath } from './modules/utils.js';
 import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
@@ -41,6 +41,9 @@ export {
     playTimerAlarm,
     toggleAmbientNoise,
     speakText,
+    getTourCookie,
+    setTourCookie,
+    getBasePath,
     calculateStudyStreak,
     calculateDaysRemaining,
     getWorkloadIntensity,
@@ -278,6 +281,8 @@ _rootScope.buildBackupPayload = buildBackupPayload;
 _rootScope.validateBackupPayload = validateBackupPayload;
 _rootScope.exportUserDataJSON = exportUserDataJSON;
 _rootScope.importUserDataJSON = importUserDataJSON;
+_rootScope.getTourCookie = getTourCookie;
+_rootScope.setTourCookie = setTourCookie;
 _rootScope.startWalkthrough = startWalkthrough;
 _rootScope.updateTourButtonVisibility = updateTourButtonVisibility;
 _rootScope.replayTourFromSettings = replayTourFromSettings;

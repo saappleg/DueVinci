@@ -4,17 +4,58 @@ let ambientAudioCtx = null;
 let ambientNoiseNode = null;
 let ambientGainNode = null;
 
-export function getTourCookie() {
+export function getTourCookie(name = 'duevinci_tour_done') {
     if (typeof document === 'undefined') return false;
-    const match = document.cookie.match(new RegExp('(^| )duevinci_tour_done=([^;]+)'));
-    return match ? match[2] === 'true' : false;
+
+    // 1. Check LocalStorage first (robust across refresh, PWA offline, strict privacy modes)
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const lsVal = localStorage.getItem(name);
+            if (lsVal === 'true' || lsVal === '1') return true;
+            if (lsVal === 'false' || lsVal === '0') return false;
+        }
+    } catch (e) {}
+
+    // 2. Check document.cookie
+    try {
+        if (document.cookie) {
+            const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + escapedName + '=([^;]+)'));
+            if (match) {
+                const val = decodeURIComponent(match[1]).trim();
+                return val === 'true' || val === '1';
+            }
+        }
+    } catch (e) {}
+
+    return false;
 }
 
-export function setTourCookie() {
+export function setTourCookie(name = 'duevinci_tour_done', val = 'true', days = 365) {
     if (typeof document === 'undefined') return;
-    const d = new Date();
-    d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000));
-    document.cookie = `duevinci_tour_done=true;expires=${d.toUTCString()};path=/;SameSite=Lax`;
+    const isClearing = (days < 0 || val === '' || val === 'false' || val === false || val === null);
+
+    // Sync LocalStorage
+    try {
+        if (typeof localStorage !== 'undefined') {
+            if (isClearing) {
+                localStorage.removeItem(name);
+            } else {
+                localStorage.setItem(name, 'true');
+            }
+        }
+    } catch (e) {}
+
+    // Sync Cookie
+    try {
+        if (isClearing) {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax`;
+        } else {
+            const d = new Date();
+            d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=true;expires=${d.toUTCString()};path=/;SameSite=Lax`;
+        }
+    } catch (e) {}
 }
 
 export function getBasePath() {

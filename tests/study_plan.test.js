@@ -146,6 +146,24 @@ describe('AI Study Schedule & Workload Balancer', () => {
                 expect(readingBlock.recommendation).toContain('Synthesize key definitions');
             }
         });
+
+        it('prioritizes overdue tasks on Today and parses ISO timestamps cleanly', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [
+                { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
+            ];
+            const assignments = [
+                { id: 'a1', course_id: 'c1', title: '↳ Overdue Lab', due_date: '2026-08-18T14:30:00Z', is_completed: false },
+                { id: 'a2', course_id: 'c1', title: '↳ Future Lesson', due_date: '2026-08-22', is_completed: false }
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 3);
+            const todayBlocks = plan[0].allBlocks;
+
+            expect(todayBlocks.length).toBe(2);
+            expect(todayBlocks[0].title).toBe('Overdue Lab');
+            expect(todayBlocks[0].dueText).toContain('Overdue');
+        });
     });
 
     describe('Modal and Timer Helpers', () => {

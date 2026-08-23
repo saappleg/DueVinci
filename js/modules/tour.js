@@ -54,7 +54,11 @@ export function startWalkthrough(manualStart = false) {
         onDestroyStarted: () => {
             setTourCookie('duevinci_tour_done', 'true');
             if (typeof updateTourButtonVisibility === 'function') updateTourButtonVisibility();
-            driverObj.destroy();
+            if (driverObj && typeof driverObj.destroy === 'function') driverObj.destroy();
+        },
+        onDestroyed: () => {
+            setTourCookie('duevinci_tour_done', 'true');
+            if (typeof updateTourButtonVisibility === 'function') updateTourButtonVisibility();
         }
     });
 
@@ -63,7 +67,7 @@ export function startWalkthrough(manualStart = false) {
 
 export function updateTourButtonVisibility() {
     if (typeof document === 'undefined') return;
-    const isDone = getTourCookie('duevinci_tour_done') === 'true';
+    const isDone = Boolean(getTourCookie('duevinci_tour_done'));
     document.querySelectorAll('#interactiveTourSidebarBtn').forEach(btn => {
         if (isDone) {
             btn.classList.add('hidden');

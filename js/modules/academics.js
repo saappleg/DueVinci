@@ -30,9 +30,11 @@ export function calculateStudyStreak(activityDates = [], baseDate = new Date()) 
  */
 export function calculateDaysRemaining(dueDateStr, baseDate = new Date()) {
     if (!dueDateStr) return 0;
-    const due = new Date(dueDateStr + 'T00:00:00');
+    const cleanDateStr = String(dueDateStr).split('T')[0].trim();
+    const due = new Date(cleanDateStr + 'T00:00:00');
     const base = new Date(baseDate);
     base.setHours(0, 0, 0, 0);
+    if (isNaN(due.getTime()) || isNaN(base.getTime())) return 0;
     const diffTime = due.getTime() - base.getTime();
     return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }

@@ -128,6 +128,10 @@ export async function loadDashboardStats() {
                 </div>`;
         });
     }
+
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
 }
 
 export function celebrateRunner(el, pct) {

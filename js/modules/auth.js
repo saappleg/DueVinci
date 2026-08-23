@@ -37,12 +37,13 @@ export function handleAuth(session) {
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
 
         const page = getCurrentPageName();
-        if ((page === 'index' || page === 'index.html') && document.getElementById('dashboardGrid')) {
+        if ((page === 'index' || page === 'index.html' || page === '') && document.getElementById('dashboardGrid')) {
             if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
             if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
+            if (typeof window.renderStudyPlanDashboardWidget === 'function') window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
 
             // Auto launch walkthrough on first login if cookies are empty
-            if (getTourCookie('duevinci_tour_done') !== 'true') {
+            if (!getTourCookie('duevinci_tour_done')) {
                 setTimeout(() => {
                     if (typeof window.startWalkthrough === 'function') window.startWalkthrough(false);
                 }, 1000);
