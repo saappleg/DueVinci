@@ -305,6 +305,7 @@ export function ensureSettingsModalExists() {
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Subscription</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Canvas LMS Sync is the first subscription benefit. All existing DueVinci planning features remain free forever.</p>
+                            <p class="mt-2 text-xs text-indigo-600 dark:text-indigo-300">Included now: course syncing, assignment importing, and due-date updates.</p>
                         </div>
 
                         <!-- Subscription Status Banner -->
@@ -357,12 +358,13 @@ export function ensureSettingsModalExists() {
                                         <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Canvas Connected
                                     </div>
                                     <div id="canvasConnectedDomain" class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono"></div>
+                                    <div id="canvasLastSynced" class="text-[11px] text-zinc-400 mt-0.5">Not synced yet</div>
                                 </div>
                                 <button type="button" onclick="handleCanvasDisconnect()" class="text-[11px] text-zinc-400 hover:text-red-500 transition font-medium">Disconnect</button>
                             </div>
                             <button type="button" onclick="openCanvasSyncModal()" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
                                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-                                Sync Canvas Courses…
+                                Sync Canvas coursework…
                             </button>
                         </div>
 
@@ -371,8 +373,8 @@ export function ensureSettingsModalExists() {
                             <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                                 <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                     <div>
-                                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas Courses</h3>
-                                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Select active courses to import into DueVinci.</p>
+                                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
+                                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Import selected courses plus their dated assignments.</p>
                                     </div>
                                     <button type="button" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
                                 </div>
@@ -387,7 +389,7 @@ export function ensureSettingsModalExists() {
                                     <span id="canvasSyncCount" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
                                     <div class="flex gap-2">
                                         <button type="button" onclick="closeCanvasSyncModal()" class="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-brand-700 hover:bg-zinc-200 dark:hover:bg-brand-600 rounded-lg transition">Cancel</button>
-                                        <button type="button" id="canvasSyncConfirmBtn" onclick="handleCanvasSyncConfirm()" class="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition disabled:opacity-50">Sync Selected</button>
+                                        <button type="button" id="canvasSyncConfirmBtn" onclick="handleCanvasSyncConfirm()" class="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition disabled:opacity-50">Sync selected</button>
                                     </div>
                                 </div>
                             </div>
@@ -756,6 +758,10 @@ export async function confirmAccountDeletion() {
 
     try {
         if (currentUser && currentUser.id) {
+            // Canvas credentials live in a server-only table, so remove them via
+            // the authenticated Edge Function before deleting local coursework.
+            const { error: canvasDisconnectError } = await supabaseClient.functions.invoke('canvas-disconnect');
+            if (canvasDisconnectError) throw canvasDisconnectError;
             await supabaseClient.from('assignments').delete().eq('user_id', currentUser.id);
             await supabaseClient.from('courses').delete().eq('user_id', currentUser.id);
             await supabaseClient.from('custom_events').delete().eq('user_id', currentUser.id);

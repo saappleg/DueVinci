@@ -28,6 +28,8 @@ feature mapping, then use the shared Edge Function entitlement check.
 
 Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.
 
+Canvas sync imports selected courses and Canvas assignments that have due dates. LMS source IDs make repeat syncs update the same courses and assignments instead of creating duplicates.
+
 ## Dev Canvas mock
 
 Set `ENABLE_CANVAS_MOCK=true` only in the Dev project to show the local-only sample

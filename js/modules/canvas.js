@@ -127,7 +127,7 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, canvas_domain')
+            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, canvas_domain, canvas_last_synced_at')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -182,11 +182,17 @@ function _showConnectorOrSync(profile) {
     const connectorArea = document.getElementById('canvasConnectorArea');
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
     const domainDisplay = document.getElementById('canvasConnectedDomain');
+    const lastSyncedDisplay = document.getElementById('canvasLastSynced');
 
     if (profile?.canvas_domain) {
         // Already connected — show sync trigger
         syncTriggerArea?.classList.remove('hidden');
         if (domainDisplay) domainDisplay.textContent = profile.canvas_domain;
+        if (lastSyncedDisplay) {
+            lastSyncedDisplay.textContent = profile.canvas_last_synced_at
+                ? `Last synced ${new Date(profile.canvas_last_synced_at).toLocaleString()}`
+                : 'Not synced yet';
+        }
         // Pre-fill only the non-secret domain. The Canvas token stays server-side.
         const domainInput = document.getElementById('canvasDomainInput');
         const tokenInput  = document.getElementById('canvasTokenInput');
@@ -366,7 +372,7 @@ export async function openCanvasSyncModal() {
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                 </svg>
-                <span class="text-xs">Fetching active courses from Canvas…</span>
+                <span class="text-xs">Fetching active Canvas coursework…</span>
             </div>`;
     }
 
@@ -451,12 +457,16 @@ export async function handleCanvasSyncConfirm() {
         const { data, error } = await withTimeout(supabaseClient.functions.invoke('canvas-sync', { body: { selectedIds: [..._canvasSelectedIds] } }), 'Syncing Canvas courses took too long. Please try again.');
         if (error) throw error;
         if (!data?.success) throw new Error(data?.error || 'Unable to sync Canvas courses.');
-        showSyncModalMsg(`✓ Synced ${data.synced} course${data.synced === 1 ? '' : 's'} successfully!`, 'success');
+        const courseCount = data.syncedCourses ?? data.synced ?? 0;
+        const assignmentCount = data.syncedAssignments ?? 0;
+        const lastSyncedDisplay = document.getElementById('canvasLastSynced');
+        if (lastSyncedDisplay && data.syncedAt) lastSyncedDisplay.textContent = `Last synced ${new Date(data.syncedAt).toLocaleString()}`;
+        showSyncModalMsg(`✓ Synced ${courseCount} course${courseCount === 1 ? '' : 's'} and ${assignmentCount} assignment${assignmentCount === 1 ? '' : 's'} successfully!`, 'success');
         setTimeout(() => closeCanvasSyncModal(), 1500);
     } catch (err) {
-        showSyncModalMsg(err.message || 'Failed to sync courses.');
+        showSyncModalMsg(await functionErrorMessage(err, 'Failed to sync Canvas coursework.'));
     } finally {
-        if (confirmBtn) { confirmBtn.textContent = 'Sync Selected'; confirmBtn.disabled = false; }
+        if (confirmBtn) { confirmBtn.textContent = 'Sync selected'; confirmBtn.disabled = false; }
     }
 }
 
