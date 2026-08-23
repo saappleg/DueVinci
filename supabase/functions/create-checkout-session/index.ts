@@ -12,6 +12,12 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
   httpClient: Stripe.createFetchHttpClient(),
 })
 
+function isMissingStripeResource(error: unknown) {
+  return typeof error === 'object' && error !== null
+    && ((error as { code?: string }).code === 'resource_missing'
+      || (error as { message?: string }).message?.startsWith('No such '))
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -50,9 +56,34 @@ serve(async (req) => {
       .maybeSingle()
     if (profileErr) throw profileErr
     if (profile?.subscription_status === 'active') throw new Error('Canvas Sync is already active')
-    if (profile?.stripe_subscription_id) throw new Error('A Canvas Sync subscription is already scheduled. Manage it in the billing portal.')
+    if (profile?.stripe_subscription_id) {
+      try {
+        await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+        throw new Error('A Canvas Sync subscription is already scheduled. Manage it in the billing portal.')
+      } catch (error) {
+        if (!isMissingStripeResource(error)) throw error
+        const { error: clearSubscriptionErr } = await supabaseAdmin
+          .from('profiles')
+          .update({ stripe_subscription_id: null, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+        if (clearSubscriptionErr) throw clearSubscriptionErr
+      }
+    }
 
     let customerId = profile?.stripe_customer_id
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId)
+      } catch (error) {
+        if (!isMissingStripeResource(error)) throw error
+        customerId = undefined
+        const { error: clearCustomerErr } = await supabaseAdmin
+          .from('profiles')
+          .update({ stripe_customer_id: null, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+        if (clearCustomerErr) throw clearCustomerErr
+      }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email || undefined,
