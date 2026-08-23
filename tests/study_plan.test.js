@@ -164,6 +164,38 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(todayBlocks[0].title).toBe('Overdue Lab');
             expect(todayBlocks[0].dueText).toContain('Overdue');
         });
+
+        it('distributes multi-lesson units evenly across days leading up to deadline instead of dumping everything on Day 0', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [
+                { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
+            ];
+            // 4 lessons due in 4 days (Aug 24)
+            const assignments = [
+                { id: 'u1', course_id: 'c1', unit_number: 1, title: 'Unit 1: Fundamentals', due_date: '2026-08-24', is_completed: false },
+                { id: 'l1', course_id: 'c1', unit_number: 1, title: '↳ Lesson 1: Syntax', due_date: '2026-08-24', is_completed: false },
+                { id: 'l2', course_id: 'c1', unit_number: 1, title: '↳ Lesson 2: Logic', due_date: '2026-08-24', is_completed: false },
+                { id: 'l3', course_id: 'c1', unit_number: 1, title: '↳ Lesson 3: Loops', due_date: '2026-08-24', is_completed: false },
+                { id: 'l4', course_id: 'c1', unit_number: 1, title: '↳ Lesson 4: OOP', due_date: '2026-08-24', is_completed: false }
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 5);
+            expect(plan.length).toBe(5);
+
+            // Day 0 (Aug 20) should have Lesson 1
+            expect(plan[0].allBlocks.map(b => b.title)).toContain('Lesson 1: Syntax');
+            // Day 1 (Aug 21) should have Lesson 2
+            expect(plan[1].allBlocks.map(b => b.title)).toContain('Lesson 2: Logic');
+            // Day 2 (Aug 22) should have Lesson 3
+            expect(plan[2].allBlocks.map(b => b.title)).toContain('Lesson 3: Loops');
+            // Day 3 (Aug 23) should have Lesson 4
+            expect(plan[3].allBlocks.map(b => b.title)).toContain('Lesson 4: OOP');
+            // Day 4 (Aug 24, deadline day) should have Unit Synthesis
+            expect(plan[4].allBlocks.some(b => b.title.includes('Unit Synthesis'))).toBe(true);
+
+            // Day 0 should NOT be overloaded with all 5 items
+            expect(plan[0].allBlocks.length).toBe(1);
+        });
     });
 
     describe('Modal and Timer Helpers', () => {
