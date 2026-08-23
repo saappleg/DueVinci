@@ -7,6 +7,7 @@
 ---
 ## Table of Contents
 - [Features ✨](#features)
+- [Roadmap 🗺️](ROADMAP.md)
 - [Tech Stack 🛠️](#tech-stack)
 - [Setup & Installation 🚀](#setup--installation)
 - [Project Structure 📂](#project-structure)
