@@ -49,3 +49,12 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Run deployed release smoke test
+        env:
+          DUEVINCI_RELEASE_URL: ${{ steps.deployment.outputs.page_url }}
+          DUEVINCI_SMOKE_EMAIL: ${{ secrets.DUEVINCI_SMOKE_EMAIL }}
+          DUEVINCI_SMOKE_PASSWORD: ${{ secrets.DUEVINCI_SMOKE_PASSWORD }}
+          DUEVINCI_SMOKE_SUPABASE_URL: https://lzmsguzlmjmedlaybckc.supabase.co
+          DUEVINCI_SMOKE_SUPABASE_ANON_KEY: sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ
+        run: node scripts/release-smoke.mjs
