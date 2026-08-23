@@ -15,6 +15,7 @@ supabase functions deploy start-trial --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-portal-session canvas-connect canvas-courses canvas-sync canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy submit-support-ticket --project-ref kinsxkeerxguqkyzrjfm
 ```
 
 `start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`. Stripe billing functions require
@@ -41,3 +42,10 @@ fixture courses. Do not set this variable in Production.
 Before a future Production release, run `npm run verify:production-release` with
 the intended Production environment variables loaded. It rejects Test Stripe
 keys, localhost return URLs, and the Dev Canvas mock flag.
+
+## Support email
+
+`submit-support-ticket` records the authenticated user's ticket and sends it
+through Resend. Set `RESEND_API_KEY`, `SUPPORT_TO_EMAIL`, and
+`SUPPORT_FROM_EMAIL` as project secrets. `SUPPORT_FROM_EMAIL` must use a domain
+verified in Resend; the function only confirms delivery after Resend accepts it.
