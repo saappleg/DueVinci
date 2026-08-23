@@ -590,7 +590,12 @@ export async function submitSupportMessage(e) {
         const { data, error } = await supabaseClient.functions.invoke('submit-support-ticket', {
             body: { category, email, subject, message }
         });
-        if (error || !data?.success) throw new Error(data?.error || error?.message || 'Unable to send support message.');
+        let functionMessage = data?.error || error?.message;
+        if (error?.context && typeof error.context.json === 'function') {
+            const details = await error.context.json().catch(() => null);
+            functionMessage = details?.error || functionMessage;
+        }
+        if (error || !data?.success) throw new Error(functionMessage || 'Unable to send support message.');
         fireConfetti();
 
         if (feedback) {
