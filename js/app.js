@@ -353,7 +353,7 @@ if (typeof document !== 'undefined') {
         applyTimerCollapse();
         updateTimerDisplay();
         initMultiTimersUI();
-        initNetworkStatusListeners();
+        initNetworkStatusListeners(supabaseClient);
         initPasskeyUI();
         initCourseForm();
 
