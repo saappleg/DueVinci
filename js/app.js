@@ -2,9 +2,9 @@
 
 import { supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './modules/config.js';
 import { getCurrentPageName, smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, playTimerAlarm, toggleAmbientNoise, speakText, getTourCookie, setTourCookie, getBasePath } from './modules/utils.js';
-import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, signInWithPasskey, registerPasskey } from './modules/auth.js';
+import { currentUser, checkUser, handleAuth, showAuthMessage, signInWithEmail, signUpWithEmail, logout, initPasskeyUI, signInWithPasskey, registerPasskey } from './modules/auth.js';
 import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, calculateCumulativeGpa, renderAcademicsDashboardWidget, injectAcademicsSettingsToggle, toggleAcademicsVisibility } from './modules/academics.js';
-import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
+import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, setTimerDuration, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
 import { localCourses, loadDashboardStats, loadCoursesPage, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
 import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
@@ -31,6 +31,7 @@ export {
     signInWithEmail,
     signUpWithEmail,
     logout,
+    initPasskeyUI,
     signInWithPasskey,
     registerPasskey,
     getCurrentPageName,
@@ -66,6 +67,7 @@ export {
     skipTimer,
     toggleTimerSettings,
     saveTimerSettings,
+    setTimerDuration,
     toggleTimerCollapse,
     toggleCustomTimersSection,
     dismissFloatingTimer,
@@ -182,6 +184,7 @@ _rootScope.signInWithEmail = signInWithEmail;
 _rootScope.signUpWithEmail = signUpWithEmail;
 _rootScope.logout = logout;
 _rootScope.signOut = logout;
+_rootScope.initPasskeyUI = initPasskeyUI;
 _rootScope.signInWithPasskey = signInWithPasskey;
 _rootScope.registerPasskey = registerPasskey;
 _rootScope.getCurrentPageName = getCurrentPageName;
@@ -213,6 +216,7 @@ _rootScope.resetTimer = resetTimer;
 _rootScope.skipTimer = skipTimer;
 _rootScope.toggleTimerSettings = toggleTimerSettings;
 _rootScope.saveTimerSettings = saveTimerSettings;
+_rootScope.setTimerDuration = setTimerDuration;
 _rootScope.toggleTimerCollapse = toggleTimerCollapse;
 _rootScope.toggleCustomTimersSection = toggleCustomTimersSection;
 _rootScope.dismissFloatingTimer = dismissFloatingTimer;
@@ -322,6 +326,7 @@ if (typeof document !== 'undefined') {
         updateTimerDisplay();
         initMultiTimersUI();
         initNetworkStatusListeners();
+        initPasskeyUI();
 
         // Restore ambient noise if active
         const savedAmbient = localStorage.getItem('duevinci_ambient_noise');

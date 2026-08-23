@@ -186,6 +186,20 @@ export function saveTimerSettings() {
     resetTimer();
 }
 
+export function setTimerDuration(minutes = 25, isWork = true) {
+    if (isWork) {
+        focusMinutes = minutes;
+        if (typeof localStorage !== 'undefined') localStorage.setItem('focusMinutes', minutes);
+    } else {
+        breakMinutes = minutes;
+        if (typeof localStorage !== 'undefined') localStorage.setItem('breakMinutes', minutes);
+    }
+    isWorking = isWork;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('timerIsWorking', isWork ? 'true' : 'false');
+    resetTimer();
+    updateTimerDisplay();
+}
+
 export function applyTimerCollapse() {
     const content = document.getElementById('timerContent');
     const icon = document.getElementById('timerCollapseIcon');
@@ -440,6 +454,7 @@ _timerScope.resetMultiTimer = resetMultiTimer;
 _timerScope.toggleMultiTimerRun = toggleMultiTimerRun;
 _timerScope.initMultiTimersUI = initMultiTimersUI;
 _timerScope.renderTimersManager = renderTimersManager;
+_timerScope.setTimerDuration = setTimerDuration;
 
 // Auto-initialize timer collapse, display, and multi-timers on DOM ready
 if (typeof document !== 'undefined') {

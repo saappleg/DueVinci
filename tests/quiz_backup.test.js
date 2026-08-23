@@ -201,5 +201,17 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(getTourCookie('duevinci_tour_done')).toBe(true);
         });
     });
+
+    describe('Passkey & Biometric WebAuthn Authentication', () => {
+        it('exports initPasskeyUI, signInWithPasskey, and registerPasskey functions safely', async () => {
+            const { initPasskeyUI, signInWithPasskey, registerPasskey } = await import('../js/modules/auth.js');
+            expect(typeof initPasskeyUI).toBe('function');
+            expect(typeof signInWithPasskey).toBe('function');
+            expect(typeof registerPasskey).toBe('function');
+
+            // Running in node/mock environment should not throw
+            expect(() => initPasskeyUI()).not.toThrow();
+        });
+    });
 });
 

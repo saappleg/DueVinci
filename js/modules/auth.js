@@ -99,34 +99,59 @@ export async function logout() {
     }
 }
 
+export function initPasskeyUI() {
+    if (typeof document === 'undefined') return;
+    const passkeySection = document.getElementById('passkeySignInSection');
+    if (!passkeySection) return;
+
+    // Check if WebAuthn / Platform Authenticator or Passkey is available in the browser
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+        passkeySection.classList.remove('hidden');
+    }
+}
+
 export async function signInWithPasskey() {
     try {
-        if (!supabaseClient.auth.signInWithPasskey) {
-            showAuthMessage("Passkey authentication is not configured in this client.");
+        if (supabaseClient && supabaseClient.auth && typeof supabaseClient.auth.signInWithPasskey === 'function') {
+            const { data, error } = await supabaseClient.auth.signInWithPasskey();
+            if (error) {
+                showAuthMessage(error.message || "Passkey sign-in failed. Please use email/password.");
+            }
             return;
         }
-        const { data, error } = await supabaseClient.auth.signInWithPasskey();
-        if (error) showAuthMessage(error.message);
+
+        // WebAuthn platform prompt fallback
+        if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+            showAuthMessage("Passkey credentials not found on this device. Sign in with email to register a passkey.");
+        } else {
+            showAuthMessage("Passkey authentication is not supported by your browser.");
+        }
     } catch (err) {
         console.error("Passkey sign in error:", err);
-        showAuthMessage("Passkey sign-in failed. Please use email/password.");
+        showAuthMessage("Passkey sign-in was cancelled or encountered an error.");
     }
 }
 
 export async function registerPasskey() {
     try {
-        if (!supabaseClient.auth.registerPasskey) {
-            alert("Passkeys are not supported on this browser or configuration.");
+        if (supabaseClient && supabaseClient.auth && typeof supabaseClient.auth.registerPasskey === 'function') {
+            const { data, error } = await supabaseClient.auth.registerPasskey();
+            if (error) {
+                alert(`Passkey registration failed: ${error.message}`);
+            } else {
+                alert("Passkey registered successfully! You can now use Touch ID, Face ID, or your security key to log in.");
+            }
             return;
         }
-        const { data, error } = await supabaseClient.auth.registerPasskey();
-        if (error) {
-            alert(`Passkey registration failed: ${error.message}`);
+
+        if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+            alert("Passkey registration requires an active online session. Your biometric device is ready.");
         } else {
-            alert("Passkey registered successfully!");
+            alert("Passkeys are not supported on this browser or platform.");
         }
     } catch (err) {
         console.error("Passkey registration error:", err);
+        alert("Passkey registration was cancelled or encountered an error.");
     }
 }
 
@@ -139,6 +164,15 @@ if (typeof window !== 'undefined') {
     window.signInWithEmail = signInWithEmail;
     window.logout = logout;
     window.signOut = logout;
+    window.initPasskeyUI = initPasskeyUI;
     window.signInWithPasskey = signInWithPasskey;
     window.registerPasskey = registerPasskey;
+
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPasskeyUI);
+        } else {
+            initPasskeyUI();
+        }
+    }
 }

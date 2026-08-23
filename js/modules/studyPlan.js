@@ -450,14 +450,20 @@ export function closeStudyPlanDayModal() {
  * @param {string} taskTitle Title of task being studied
  */
 export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
-    if (typeof window !== 'undefined' && typeof window.toggleTimer === 'function') {
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('focusMinutes', durationMinutes);
-            localStorage.setItem('timeLeft', durationMinutes * 60);
-            localStorage.setItem('timerIsWorking', 'true');
+    if (typeof window !== 'undefined') {
+        if (typeof window.setTimerDuration === 'function') {
+            window.setTimerDuration(durationMinutes, true);
+        } else {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('focusMinutes', durationMinutes);
+                localStorage.setItem('timeLeft', durationMinutes * 60);
+                localStorage.setItem('timerIsWorking', 'true');
+            }
+            if (typeof window.resetTimer === 'function') window.resetTimer();
         }
-        if (window.resetTimer) window.resetTimer();
-        if (!window.timerRunning && window.toggleTimer) window.toggleTimer();
+        if (!window.timerRunning && typeof window.toggleTimer === 'function') {
+            window.toggleTimer();
+        }
     }
     closeStudyPlanDayModal();
 }

@@ -163,6 +163,18 @@ export function ensureSettingsModalExists() {
 
                         <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl">
                             <div>
+                                <div class="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                    <span>🔑</span> Passkeys & Biometric Login
+                                </div>
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400">Log in seamlessly using Touch ID, Face ID, or Windows Hello</div>
+                            </div>
+                            <button type="button" onclick="registerPasskey()" class="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 hover:opacity-90 text-white dark:text-zinc-900 rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-1">
+                                + Register Passkey
+                            </button>
+                        </div>
+
+                        <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl">
+                            <div>
                                 <div class="font-bold text-sm text-zinc-900 dark:text-white">Interactive Walkthrough</div>
                                 <div class="text-xs text-zinc-500 dark:text-zinc-400">Relaunch the step-by-step tour anytime</div>
                             </div>
