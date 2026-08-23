@@ -954,12 +954,15 @@ export async function loadAssignments(courseId, page = 1) {
         const isSubItem = assign.title.startsWith('↳');
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
 
-        // Determine current type
-        let currentType = assign.task_type || assign.type || 'lesson';
-        if (/exam|final|midterm|test/i.test(assign.title)) currentType = 'exam';
-        else if (/review|recap|summary|synthesis/i.test(assign.title)) currentType = 'review';
-        else if (/lab|project|code/i.test(assign.title)) currentType = 'lab';
-        else if (/reading|chapter|book/i.test(assign.title)) currentType = 'reading';
+        // Determine current type (respect explicit assignment type over regex heuristics)
+        let currentType = assign.task_type || assign.type;
+        if (!currentType) {
+            if (/exam|final|midterm|test/i.test(assign.title)) currentType = 'exam';
+            else if (/review|recap|summary|synthesis/i.test(assign.title)) currentType = 'review';
+            else if (/lab|project|code/i.test(assign.title)) currentType = 'lab';
+            else if (/reading|chapter|book/i.test(assign.title)) currentType = 'reading';
+            else currentType = 'lesson';
+        }
 
         // Determine current priority
         let currentPriority = assign.priority || 'medium';

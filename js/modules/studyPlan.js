@@ -129,11 +129,14 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     // Helper to generate rich block
     function createStudyBlock(task, course, currentDate, customTitle = null, customMinutes = null, customRec = null) {
-        let taskType = task.task_type || task.type || 'lesson';
-        if (/exam|final|midterm|test/i.test(task.title)) taskType = 'exam';
-        else if (/review|recap|summary|synthesis/i.test(task.title)) taskType = 'review';
-        else if (/lab|project|code/i.test(task.title)) taskType = 'lab';
-        else if (/reading|chapter|book/i.test(task.title)) taskType = 'reading';
+        let taskType = task.task_type || task.type;
+        if (!taskType) {
+            if (/exam|final|midterm|test/i.test(task.title)) taskType = 'exam';
+            else if (/review|recap|summary|synthesis/i.test(task.title)) taskType = 'review';
+            else if (/lab|project|code/i.test(task.title)) taskType = 'lab';
+            else if (/reading|chapter|book/i.test(task.title)) taskType = 'reading';
+            else taskType = 'lesson';
+        }
 
         const isExam = taskType === 'exam';
         const isReview = taskType === 'review';
@@ -277,16 +280,27 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         courseQueues.set('orphaned', sortTasks(orphanedTasks, baseDate, false));
     }
 
-    // Allocate lessons day-by-day across active subjects
-    // Each day advances 1 lesson per subject (interleaving different subjects on the same day)
+    // Allocate lessons day-by-day with Deadline-Driven Pacing to ensure all coursework is finished on or before due date
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
         const day = days[dayOffset];
 
         courseQueues.forEach((queue, courseId) => {
             if (queue.length === 0) return;
 
-            const nextTask = queue.shift();
-            day.assignedTasks.push({ task: nextTask });
+            // Calculate required pace based on earliest deadline in queue
+            const nextTask = queue[0];
+            const daysUntilDue = calculateDaysRemaining(nextTask.due_date, baseDate);
+            const daysRemainingUntilDeadline = Math.max(1, (daysUntilDue - dayOffset) + 1);
+
+            const tasksInWindow = queue.filter(t => calculateDaysRemaining(t.due_date, baseDate) <= daysUntilDue).length;
+            const requiredLessonsToday = Math.max(1, Math.ceil(tasksInWindow / daysRemainingUntilDeadline));
+
+            let allocated = 0;
+            while (queue.length > 0 && allocated < requiredLessonsToday) {
+                const task = queue.shift();
+                day.assignedTasks.push({ task });
+                allocated++;
+            }
         });
     }
 

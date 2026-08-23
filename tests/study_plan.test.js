@@ -279,6 +279,45 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(readingBlock.priority).toBe('low');
             expect(readingBlock.priorityBadgeText).toBe('🌱 Low');
         });
+
+        it('guarantees that all units and lessons are scheduled and finished on or before their due date', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [
+                { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
+            ];
+
+            // 6 lessons due in 3 days (Aug 23)
+            const assignments = [
+                { id: 'l1', course_id: 'cs', title: '↳ Lesson 1', due_date: '2026-08-23', is_completed: false },
+                { id: 'l2', course_id: 'cs', title: '↳ Lesson 2', due_date: '2026-08-23', is_completed: false },
+                { id: 'l3', course_id: 'cs', title: '↳ Lesson 3', due_date: '2026-08-23', is_completed: false },
+                { id: 'l4', course_id: 'cs', title: '↳ Lesson 4', due_date: '2026-08-23', is_completed: false },
+                { id: 'l5', course_id: 'cs', title: '↳ Lesson 5', due_date: '2026-08-23', is_completed: false },
+                { id: 'l6', course_id: 'cs', title: '↳ Final Review Exam', task_type: 'exam', due_date: '2026-08-23', is_completed: false }
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 7);
+
+            // All 6 lessons must be scheduled across Day 0, Day 1, Day 2, Day 3 (before/on deadline Aug 23)
+            const scheduledDays = plan.slice(0, 4); // Days 0 to 3
+            const allScheduledTaskIds = scheduledDays.flatMap(d => d.assignedTasks.map(t => t.task.id));
+
+            expect(allScheduledTaskIds).toContain('l1');
+            expect(allScheduledTaskIds).toContain('l2');
+            expect(allScheduledTaskIds).toContain('l3');
+            expect(allScheduledTaskIds).toContain('l4');
+            expect(allScheduledTaskIds).toContain('l5');
+            expect(allScheduledTaskIds).toContain('l6');
+
+            // No task should overflow past the due date (Days 4, 5, 6 should have 0 tasks from this deadline)
+            expect(plan[4].assignedTasks.length).toBe(0);
+            expect(plan[5].assignedTasks.length).toBe(0);
+
+            // Verify that 'Final Review Exam' with task_type: 'exam' is properly typed as an Exam
+            const examBlock = plan.flatMap(p => p.allBlocks).find(b => b.taskId === 'l6');
+            expect(examBlock.isExam).toBe(true);
+            expect(examBlock.typeBadgeText).toBe('🎯 Exam');
+        });
     });
 
     describe('Modal and Timer Helpers', () => {
