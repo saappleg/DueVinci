@@ -42,11 +42,12 @@ serve(async (req) => {
 
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .select('stripe_customer_id, subscription_status, subscription_plan')
+      .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_plan, trial_end')
       .eq('user_id', user.id)
       .maybeSingle()
     if (profileErr) throw profileErr
     if (profile?.subscription_status === 'active') throw new Error('Canvas Sync is already active')
+    if (profile?.stripe_subscription_id) throw new Error('A Canvas Sync subscription is already scheduled. Manage it in the billing portal.')
 
     let customerId = profile?.stripe_customer_id
     if (!customerId) {
@@ -62,16 +63,25 @@ serve(async (req) => {
       if (saveCustomerErr) throw saveCustomerErr
     }
 
+    const trialEnd = profile?.subscription_status === 'trialing' && profile.trial_end
+      && new Date(profile.trial_end).getTime() > Date.now()
+      ? Math.floor(new Date(profile.trial_end).getTime() / 1000)
+      : undefined
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       client_reference_id: user.id,
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
+      payment_method_collection: 'always',
       success_url: `${appUrl}/index.html?canvas_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/index.html?canvas_checkout=canceled`,
       metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval },
-      subscription_data: { metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval } },
+      subscription_data: {
+        metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval },
+        ...(trialEnd ? { trial_end: trialEnd } : {}),
+      },
     })
 
     if (!session.url) throw new Error('Stripe did not return a checkout URL')

@@ -117,7 +117,7 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, canvas_domain')
+            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, canvas_domain')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -148,6 +148,10 @@ export async function initCanvasSettingsTab() {
                 ? Math.max(0, Math.ceil((new Date(profile.trial_end) - new Date()) / 86400000))
                 : '?';
             msg.textContent = `Your 30-day trial is active — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining.`;
+            // Let trial users save a payment method now. Stripe will schedule the
+            // selected subscription to begin when their no-card trial ends.
+            checkoutArea?.classList.remove('hidden');
+            if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
             // Show connector or sync trigger depending on credentials
             _showConnectorOrSync(profile);
         } else if (status === 'active') {
