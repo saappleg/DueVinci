@@ -1,6 +1,7 @@
 // --- AUTHENTICATION & USER SESSION MODULE ---
 import { supabaseClient } from './config.js';
 import { getCurrentPageName, getBasePath, getTourCookie } from './utils.js';
+import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
 
 export let currentUser = null;
 let lastProcessedSessionToken = undefined;
@@ -25,7 +26,7 @@ export async function checkUser() {
     }
 }
 
-export function handleAuth(session) {
+export async function handleAuth(session) {
     if (typeof document === 'undefined') return;
     const token = session?.access_token || null;
     if (token === lastProcessedSessionToken) return;
@@ -33,6 +34,7 @@ export function handleAuth(session) {
 
     if (session) {
         currentUser = session.user;
+        await initializePreferenceSync(currentUser);
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
 
@@ -61,6 +63,7 @@ export function handleAuth(session) {
         }
     } else {
         currentUser = null;
+        stopPreferenceSync();
         const page = getCurrentPageName();
         if (page !== 'index' && page !== 'index.html') {
             if (typeof window !== 'undefined' && window.location) window.location.href = getBasePath() + 'index.html';
