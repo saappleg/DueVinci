@@ -63,9 +63,11 @@ serve(async (req) => {
     if (event.type === 'checkout.session.completed') {
       updatePayload.stripe_customer_id = customerId
       if (dataObj.subscription) updatePayload.stripe_subscription_id = String(dataObj.subscription)
+      if (dataObj.metadata?.plan_key) updatePayload.subscription_plan = dataObj.metadata.plan_key
     } else if (event.type.startsWith('customer.subscription.')) {
       updatePayload.subscription_status = dataObj.status
       updatePayload.stripe_subscription_id = dataObj.id
+      if (dataObj.metadata?.plan_key) updatePayload.subscription_plan = dataObj.metadata.plan_key
     } else if (event.type === 'invoice.payment_succeeded') {
       updatePayload.subscription_status = 'active'
     } else if (event.type === 'invoice.payment_failed') {

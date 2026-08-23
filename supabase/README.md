@@ -22,4 +22,8 @@ supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
 `STRIPE_YEARLY_PRICE_ID`, and `APP_URL`. Keep each environment's Test or Live Stripe
 credentials and price IDs separate.
 
+Subscription access is feature-based: `subscription_plan_features` maps a plan
+key to its enabled features. Add future paid features by creating a plan key and
+feature mapping, then use the shared Edge Function entitlement check.
+
 Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.

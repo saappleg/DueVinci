@@ -63,6 +63,7 @@ serve(async (req) => {
         .upsert({
             user_id: user.id,
             subscription_status: 'trialing',
+            subscription_plan: 'canvas_sync',
             trial_started_at: new Date().toISOString(),
             trial_end: trialEnd.toISOString(),
             updated_at: new Date().toISOString(),

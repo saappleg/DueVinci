@@ -42,7 +42,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .select('stripe_customer_id, subscription_status')
+      .select('stripe_customer_id, subscription_status, subscription_plan')
       .eq('user_id', user.id)
       .maybeSingle()
     if (profileErr) throw profileErr
@@ -70,8 +70,8 @@ serve(async (req) => {
       allow_promotion_codes: true,
       success_url: `${appUrl}/index.html?canvas_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/index.html?canvas_checkout=canceled`,
-      metadata: { supabase_user_id: user.id, plan_interval: interval },
-      subscription_data: { metadata: { supabase_user_id: user.id, plan_interval: interval } },
+      metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval },
+      subscription_data: { metadata: { supabase_user_id: user.id, plan_key: 'canvas_sync', plan_interval: interval } },
     })
 
     if (!session.url) throw new Error('Stripe did not return a checkout URL')

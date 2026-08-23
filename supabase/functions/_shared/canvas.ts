@@ -27,17 +27,24 @@ export function normalizeCanvasDomain(raw: unknown) {
   return url.origin
 }
 
-export function isEntitled(profile: { subscription_status?: string, trial_end?: string | null } | null) {
+export function isSubscriptionActive(profile: { subscription_status?: string, trial_end?: string | null } | null) {
   return profile?.subscription_status === 'active'
     || (profile?.subscription_status === 'trialing' && !!profile.trial_end && new Date(profile.trial_end).getTime() > Date.now())
 }
 
-export async function entitledConnection(req: Request) {
+export async function hasFeature(admin: ReturnType<typeof adminClient>, profile: { subscription_plan?: string | null }, featureKey: string) {
+  const { data, error } = await admin.from('subscription_plan_features')
+    .select('feature_key').eq('plan_key', profile.subscription_plan || 'canvas_sync').eq('feature_key', featureKey).maybeSingle()
+  if (error) throw error
+  return !!data
+}
+
+export async function entitledConnection(req: Request, featureKey = 'canvas_sync') {
   const { admin, user } = await authenticatedUser(req)
   const { data: profile, error: profileError } = await admin.from('profiles')
-    .select('subscription_status, trial_end, canvas_domain').eq('user_id', user.id).maybeSingle()
+    .select('subscription_status, trial_end, subscription_plan, canvas_domain').eq('user_id', user.id).maybeSingle()
   if (profileError) throw profileError
-  if (!isEntitled(profile)) throw new Error('Canvas LMS Sync requires an active plan or unexpired trial.')
+  if (!isSubscriptionActive(profile) || !await hasFeature(admin, profile || {}, featureKey)) throw new Error('Your plan does not include Canvas LMS Sync.')
   const { data: connection, error: connectionError } = await admin.from('canvas_connections')
     .select('canvas_domain, canvas_token').eq('user_id', user.id).maybeSingle()
   if (connectionError) throw connectionError
