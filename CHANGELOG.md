@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-08-23
+
+### Changed
+- Documented DueVinci’s permanent free planning core: course and lesson setup, due dates, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and data portability.
+- Corrected planner documentation to match its deadline-first, lesson-sequencing, rest-day, and timestamp-aware workload behavior.
+- Clarified that AI syllabus parsing and Supabase cloud services are optional integrations.
+
+### Security
+- Sanitized Markdown and planner/course display content, and restricted user resource links to HTTP(S).
+- GitHub Pages deployment now runs syntax and test checks before publishing.
+
+---
+
 ## [1.2.0] - 2026-08-20
 
 ### Added

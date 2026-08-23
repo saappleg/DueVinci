@@ -1,61 +1,43 @@
-# Smart Study Planner 🎯
+# Smart Study Plan & Workload Balancer 🎯
 
-The **Smart Study Planner** (`js/modules/studyPlan.js`) solves student burnout and last-minute cramming by algorithmically breaking down major deliverables into balanced, daily focus chunks.
+The Smart Study Plan is DueVinci’s free planning core. It turns incomplete, dated coursework into a short daily plan without requiring AI or a paid integration.
 
----
+## What it uses
 
-## 📊 How the Study Planner Works
+- Incomplete assignments with a valid due date
+- Course, unit, and lesson metadata
+- The next seven planning days (five days in the dashboard preview)
+- Optional rest days selected by the student
 
-Instead of waiting for an assignment due date to arrive, the planner analyzes:
-1. **Assignment Deadline ($T_{due}$)**: How many days remain before submission.
-2. **Assignment Weight & Difficulty ($W$)**: Percentage of course grade and complexity.
-3. **Daily Workload Capacity ($C_{daily}$)**: User-defined maximum focus hours per day.
-4. **Existing Commitments**: Other scheduled assignments and exams in the same timeframe.
+## Scheduling rules
 
-```mermaid
-graph LR
-    Assignments[Upcoming Deadlines & Exams] --> WeightCalc[Workload & Complexity Estimator]
-    Capacity[Student Daily Focus Target] --> Allocator[Interval Task Allocator]
-    WeightCalc --> Allocator
-    Allocator --> DailyTasks[Daily Actionable Study Checklist]
-```
+1. **Deadlines are hard constraints.** A task is scheduled on or before its due date whenever it is inside the planning window. Overdue work is surfaced today.
+2. **Earlier deadlines win.** If a later-numbered unit is due first, the planner prioritizes its deadline over unit numbering.
+3. **Lessons keep their order.** Within a unit, Lesson 1 is scheduled before Lesson 2, and units with the same deadline keep numerical order.
+4. **Work is spread across available days.** Lessons are distributed through active days leading to the unit deadline instead of being dumped onto the first day.
+5. **Rest days are respected when possible.** If the only remaining day before a deadline is a rest day, the deadline takes precedence and the task is shown that day.
 
----
+## 7-Day Workload & Stress Radar
 
-## 🚀 Key Features
+The dashboard radar counts incomplete work due on each of the next seven local calendar days.
 
-### 1. Automatic Milestone Generation
-For multi-week projects and major exam prep, the planner automatically generates progressive milestones:
-- **Phase 1: Research & Outline** (30% of timeline)
-- **Phase 2: Draft / Core Implementation** (40% of timeline)
-- **Phase 3: Review & Final Polish** (30% of timeline)
+| Signal | Meaning |
+| --- | --- |
+| Green / Chill | No due coursework that day |
+| Indigo | One task |
+| Amber | Two or three tasks |
+| Red | Four or more tasks |
+| Pulsing exam badge | At least one exam, test, quiz, final, or midterm is due |
 
-### 2. Workload Balancing
-If three exams or assignments fall on the same Friday, the planner distributes study sessions evenly across the preceding two weeks rather than concentrating them on Thursday night.
+Both date-only values (`YYYY-MM-DD`) and ISO timestamps are normalized to the deadline’s calendar date, so imported timestamp deadlines appear correctly.
 
-### 3. Integrated Daily Goals Widget
-The homepage dashboard displays today's recommended study plan with:
-- Target study duration
-- Course breakdown badges
-- Checkbox progress tracking
-- Direct "Start Pomodoro" trigger for each allocated block
+## Using it
 
----
+1. Add a course, then add units or lessons with due dates.
+2. Use clear titles such as `Unit 2` and `Lesson 3` for the strongest sequence detection; explicit unit and lesson fields are preferred when available.
+3. On the dashboard, choose rest days and open a day card to see every scheduled block, study recommendation, and timer shortcut.
+4. Mark coursework complete to remove it from future plans and radar counts.
 
-## 💻 Code Interface (`studyPlan.js`)
+## Implementation
 
-```javascript
-import { generateDailyStudySchedule, getPendingStudyTasks } from './modules/studyPlan.js';
-
-// Calculate today's study blocks based on active courses
-const todayPlan = generateDailyStudySchedule({
-  maxDailyHours: 4,
-  includeWeekends: true
-});
-
-console.log(todayPlan.tasks);
-// [
-//   { course: "CS 101", title: "Review Graph Algorithms", durationMinutes: 45 },
-//   { course: "MATH 201", title: "Complete Problem Set 3 (Part 1)", durationMinutes: 60 }
-// ]
-```
+The pure scheduler is `generateBalancedStudyPlan(courses, assignments, startDate, daysAhead, restDays)` in `js/modules/studyPlan.js`. Workload-radar data is built by `getSevenDayWorkload(...)` in `js/modules/academics.js`. Both are covered by automated regression tests.

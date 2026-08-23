@@ -4,6 +4,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 
 > **Our Mission:** Empower students and lifelong learners with an intelligent, ambient, and frictionless academic hub—unifying course management, cognitive science (SM-2 spaced repetition), AI document analysis, and focus mastery in a beautiful, privacy-first interface.
 
+> **Free Core Commitment:** Course and lesson setup, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
+
 ---
 
 ## 📌 Roadmap Status Legend
@@ -24,6 +26,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - [x] **AI Syllabus & Document Ingestion** – Automated course unit, objective, and assignment extraction via Google Gemini and Supabase Edge Functions.
 - [x] **SuperMemo SM-2 Spaced Repetition** – Flashcard mastery engine with ease factor calculation and active recall intervals.
 - [x] **Smart Study Planner & Balancer** – Automated study block distribution, exam countdowns, and cognitive workload balancing.
+- [x] **Due-Date Safety & 7-Day Workload Radar** – Deadline-first scheduling, rest-day handling, timestamp-aware workload counts, and exam-day alerts.
 - [x] **Interactive Quiz Generator** – Instant multiple-choice and true/false quiz creation from markdown notes and syllabi.
 - [x] **Academic GPA & Grade Calculator** – Real-time weighted course average and cumulative GPA simulation (4.0 / 5.0 scales).
 - [x] **Pomodoro & Focus Timer** – Floating widget, custom intervals, Web Audio alarms, and ambient background sound synthesizer (Zen singing bowl, rain, cafe).

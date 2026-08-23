@@ -9,7 +9,7 @@ This guide walks you through setting up, running, and configuring DueVinci on yo
 Before running DueVinci, ensure you have:
 - **Node.js** (v18.0.0 or higher) & **npm** (for running test suites and syntax validators).
 - Any modern web browser (Google Chrome, Mozilla Firefox, Apple Safari, or Microsoft Edge) with JavaScript and IndexedDB support.
-- *(Optional)* A **Supabase** account for cloud authentication and cross-device syncing.
+- *(Optional)* A **Supabase** account for authentication and cloud-backed data.
 - *(Optional)* A **Google Gemini API Key** for AI syllabus parsing and automated quiz generation.
 
 ---
@@ -59,17 +59,18 @@ python3 -m http.server 3000
 
 ### Supabase Setup (Cloud Sync & Auth)
 
-To enable cloud persistence across devices:
+To enable authenticated cloud persistence:
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Create database tables for `terms`, `courses`, `assignments`, and `study_plans`.
-3. Open `js/modules/config.js` and set your credentials:
+2. Create `courses`, `assignments`, and `custom_events` tables with a `user_id` column.
+3. Enable Row Level Security and add select, insert, update, and delete policies scoped to `auth.uid() = user_id` for each operation the table supports.
+4. Open `js/modules/config.js` and set the project URL and **publishable** key:
    ```javascript
    export const SUPABASE_URL = 'https://your-project-id.supabase.co';
    export const SUPABASE_ANON_KEY = 'your-anon-public-key';
    ```
 
 > [!NOTE]
-> If Supabase credentials are left empty or unreachable, DueVinci operates seamlessly in **Guest / Local-First Mode**, saving all data directly to the browser's `IndexedDB` and `localStorage`.
+> Do not put a service-role key or Gemini API key in the browser. The production application uses an authenticated Supabase Edge Function for optional Gemini parsing.
 
 ---
 
@@ -99,7 +100,7 @@ To configure the Supabase Edge Function:
 
 ## 📱 Progressive Web App (PWA) Installation
 
-DueVinci is fully PWA-enabled with service worker caching and manifest support.
+DueVinci is PWA-enabled with service-worker caching for the application shell and manifest support. Sign-in, cloud data, and AI parsing require a network connection.
 - **Desktop (Chrome / Edge / Safari)**: Click the "Install" icon in the browser address bar.
 - **iOS (Safari)**: Tap the Share button and select **"Add to Home Screen"**.
 - **Android (Chrome)**: Tap the browser menu and select **"Install App"**.

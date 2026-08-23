@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - 2026-08-23
+
+### Changed
+- Defined and documented the permanent free planning core: course and lesson management, due dates, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and portable backups.
+- Updated planner, PWA, architecture, and setup documentation to reflect the current implementation and optional nature of AI and cloud services.
+
+### Security
+- Added user-content and external-link hardening, and release checks in the Pages deployment workflow.
+
+---
+
 ## [1.1.0] - 2026-08-20
 
 ### Added

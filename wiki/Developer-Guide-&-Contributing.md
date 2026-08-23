@@ -19,15 +19,15 @@ DueVinci follows a **Vanilla Modern Web** philosophy:
 | File | Primary Responsibility |
 | :--- | :--- |
 | `js/app.js` | Main entry point; binds event listeners, routes page states, boots modules |
-| `js/modules/academics.js` | Terms, courses, categories, assignment CRUD, GPA scale definitions |
+| `js/modules/academics.js` | Academic dashboard utilities, study streaks, GPA conversion, and 7-Day Workload & Stress Radar |
 | `js/modules/courses.js` | Course detail view controller, syllabus ingestion UI, module tabs |
 | `js/modules/flashcards.js` | SuperMemo-2 spaced repetition, review queues, flip-card modal |
-| `js/modules/studyPlan.js` | Workload balancing, milestone generator, daily study checklist |
+| `js/modules/studyPlan.js` | Deadline-first study-plan balancing, lesson sequencing, rest days, and daily study blocks |
 | `js/modules/grades.js` | Weighted course average, cumulative GPA calculations, what-if simulator |
 | `js/modules/timers.js` | Pomodoro timer, stopwatch, Web Audio API chime synthesis |
 | `js/modules/calendar.js` | FullCalendar lifecycle, event parsing, RFC 5545 `.ics` generator |
-| `js/modules/markdown.js` | Markdown rendering with code formatting and KaTeX math parsing |
-| `js/modules/offlineDb.js` | IndexedDB persistent object store wrapper |
+| `js/modules/markdown.js` | Sanitized Markdown rendering with lightweight LaTex-style math formatting |
+| `js/modules/offlineDb.js` | Local persistence and offline-status helper |
 | `js/modules/ui.js` | Notification toasts, modal dialog manager, theme toggle |
 | `js/modules/utils.js` | Date formatting, sanitization, debounce, and helper utilities |
 

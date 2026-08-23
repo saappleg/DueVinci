@@ -16,14 +16,17 @@ Welcome to the official **DueVinci** Wiki! DueVinci is a modern, student-first a
 
 ---
 
-## ✨ Key Highlights
+## ✨ Free Core Highlights
+
+DueVinci’s course setup, due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar, timers, and data export are the permanent free core. AI parsing and cloud sync are optional integrations, not requirements for planning.
 
 - 🧠 **AI-Powered Syllabus Parsing**: Ingest PDF syllabi or screenshots with Google Gemini 1.5 to instantly extract weekly course breakdowns, assignments, and due dates.
-- 🎯 **Smart Study Planner**: Dynamically calculates academic workload and recommends optimal daily study blocks to prevent cramming.
+- 🎯 **Smart Study Plan & Workload Balancer**: Orders lessons, balances work before due dates, honors rest-day preferences when feasible, and never silently moves remaining deadline work late.
+- 📊 **7-Day Workload & Stress Radar**: Shows daily due-task volume and elevates exam days across the upcoming week.
 - 🃏 **SM-2 Spaced Repetition**: SuperMemo-2 flashcards algorithm with active recall quiz modes and automated flashcard generation.
 - 📊 **GPA & Grade Simulator**: Live weighted course average calculations supporting standard 4.0 and weighted 5.0 GPA scales with "What-If" final grade projections.
 - ⏱️ **Integrated Pomodoro Timer**: Ambient sounds, custom interval lengths, Web Audio alerts, and productivity stats.
-- 📱 **Progressive Web App & Offline Mode**: Full offline capability via IndexedDB with automatic background synchronization upon reconnection.
+- 📱 **Progressive Web App**: Installable application shell with cached static assets. Network-dependent services, including sign-in and cloud sync, still require connectivity.
 
 ---
 

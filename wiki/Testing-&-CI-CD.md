@@ -29,12 +29,12 @@ All test files reside in the `tests/` directory:
 
 | Test File | Target Modules / Features Covered |
 | :--- | :--- |
-| `tests/academic.test.js` | Course CRUD, category weighting, GPA calculations, scale mappings |
+| `tests/academic.test.js` | Study streaks, due-date calculations, GPA conversion, and workload-radar classification |
 | `tests/sm2_spaced_repetition.test.js` | SuperMemo-2 ease factor updates, interval progression, floor clamping |
-| `tests/study_plan.test.js` | Workload balancing, deadline allocation, daily task generator |
+| `tests/study_plan.test.js` | Lesson sequencing, deadline-first allocation, rest-day behavior, and study blocks |
 | `tests/timers.test.js` | Pomodoro interval transitions, duration formatting, state machines |
 | `tests/quiz_backup.test.js` | JSON export schema validation, import parsing, migration scripts |
-| `tests/markdown.test.js` | HTML sanitization, markdown syntax parsing, KaTeX math rendering |
+| `tests/markdown.test.js` | HTML sanitization, markdown syntax parsing, math formatting, and safe external URLs |
 
 ---
 
@@ -56,7 +56,7 @@ The project includes an automated workflow in `.github/workflows/ci.yml` that tr
 ```mermaid
 flowchart LR
     Push[Push / Pull Request] --> Checkout[Checkout Repo]
-    Checkout --> SetupNode[Setup Node.js 18 & 20]
+    Checkout --> SetupNode[Setup Node.js 24]
     SetupNode --> Install[npm ci]
     Install --> Syntax[npm run check:syntax]
     Syntax --> Test[npm test]
@@ -64,3 +64,5 @@ flowchart LR
     Status -->|Pass| Ready[PR Mergeable ✅]
     Status -->|Fail| Block[Blocked ❌]
 ```
+
+The GitHub Pages deployment workflow repeats `npm run check:syntax` and `npm test` before publishing, so a deployment cannot skip the release checks.

@@ -1,6 +1,6 @@
 # Offline Support & Progressive Web App (PWA) 📱
 
-DueVinci is built with a **Local-First, Offline-Always** philosophy. Whether you're in a basement lecture hall, on a flight, or studying with spotty Wi-Fi, DueVinci remains fully functional.
+DueVinci caches its static application shell for PWA installation and offline fallback. Authentication, Supabase data, and AI parsing are network services and are not guaranteed to work offline.
 
 ---
 
@@ -11,35 +11,30 @@ flowchart TD
     App[DueVinci App]
     SW[Service Worker: sw.js]
     Cache[(Service Worker Static Cache)]
-    IDB[(IndexedDB: duevinci_local_db)]
     Cloud[(Supabase Remote Database)]
 
-    App -- "1. Read/Write" --> IDB
-    App -- "2. Assets Request" --> SW
-    SW -- "Cache First / Network Fallback" --> Cache
-
-    subgraph Sync Reconciliation
-        IDB -- "On Online Event" --> SyncManager[Sync Queue]
-        SyncManager -- "Batch Upsert" --> Cloud
-    end
+    App -- "Assets Request" --> SW
+    SW -- "Network first; cached fallback" --> Cache
+    App -- "Authenticated data and parsing" --> Cloud
 ```
 
 ---
 
 ## 🛠️ Key Offline Modules
 
-### 1. IndexedDB Storage (`js/modules/offlineDb.js`)
-- Stores complete terms, courses, assignments, study plans, flashcards, and user settings inside structured object stores.
-- Transactions are synchronous from the UI perspective, ensuring instantaneous response times (zero spinner lag).
-
-### 2. Service Worker (`sw.js`)
+### 1. Service Worker (`sw.js`)
 - Caches all essential assets: HTML pages, JavaScript modules, stylesheets, fonts, and icons.
-- Implements a **Stale-While-Revalidate / Cache-First** strategy for core application shells.
+- Uses a network-first strategy with a cached fallback for static application requests.
+- Cache versions are bumped for application releases so installed clients receive updated planning logic.
 
-### 3. PWA Controller (`js/modules/pwa.js`)
+### 2. PWA Controller (`js/modules/pwa.js`)
 - Listens for `beforeinstallprompt` to present an unobtrusive, native-feeling install banner.
 - Displays an offline badge indicator in the top navbar when network connection drops.
-- Automatically listens for `online` and `offline` window events to trigger background reconciliation.
+- Listens for `online` and `offline` events to reflect connection state in the UI.
+
+## What works offline
+
+Previously cached pages and application assets can load when the network is unavailable. Creating, reading, or changing cloud data requires a working Supabase connection; export a JSON backup before relying on a long offline session.
 
 ---
 

@@ -4,6 +4,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This page outlines 
 
 > **Our Mission:** Empower students and lifelong learners with an intelligent, ambient, and frictionless academic hub—unifying course management, cognitive science (SM-2 spaced repetition), AI document analysis, and focus mastery in a beautiful, privacy-first interface.
 
+> **Free Core Commitment:** Course and lesson setup, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
+
 ---
 
 ## 📌 Roadmap Status Legend

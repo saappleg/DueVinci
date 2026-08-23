@@ -17,7 +17,7 @@ flowchart TD
         end
 
         subgraph Engine Layer [ES6 Feature Engines in /js/modules/]
-            Academics[academics.js - Course & Term State]
+            Academics[academics.js - Academic dashboard and workload radar]
             StudyPlan[studyPlan.js - Workload & Scheduling]
             Flashcards[flashcards.js - SM-2 Spaced Repetition]
             Grades[grades.js - GPA & What-If Engine]
@@ -33,7 +33,7 @@ flowchart TD
             Config[config.js - Constants & Keys]
             Auth[auth.js - Supabase & Guest Auth]
             Backup[backup.js - JSON Export/Import]
-            OfflineDB[offlineDb.js - IndexedDB Store]
+            OfflineDB[offlineDb.js - local persistence helper]
             PWA[pwa.js / sw.js - Service Worker Cache]
         end
     end
@@ -47,7 +47,7 @@ flowchart TD
     HTML --> App
     App --> Engine Layer
     Engine Layer --> OfflineDB
-    OfflineDB <--> Supabase
+    Engine Layer <--> Supabase
     Engine Layer --> EdgeFn
     EdgeFn --> Gemini
 ```
@@ -66,8 +66,8 @@ flowchart TD
 - **Sound Synthesis**: Native Web Audio API for synthetic chimes and alerts without requiring external `.mp3` dependencies.
 
 ### Persistence & Cloud Sync
-- **Local-First Database**: Browser `IndexedDB` with fallback to `localStorage` for instant, offline-capable, responsive data access.
-- **Cloud Backend**: [Supabase](https://supabase.com) (PostgreSQL) for user authentication, cloud backups, and multi-device sync.
+- **Browser Preferences**: `localStorage` stores non-sensitive UI preferences such as theme, timer, rest-day, and display settings.
+- **Cloud Backend**: [Supabase](https://supabase.com) (PostgreSQL and Auth) stores authenticated coursework and calendar data. Row Level Security policies scope data to `auth.uid() = user_id`.
 - **Edge Computing**: Supabase Edge Functions (Deno runtime) for proxying AI requests securely without exposing developer API keys in frontend client bundles.
 - **AI Processing**: Google Gemini API (`gemini-1.5-flash` / `gemini-1.5-pro`) for multimodal syllabus analysis.
 
@@ -90,7 +90,7 @@ DueVinci/
 ├── js/
 │   ├── app.js                   # Root initialization and module coordinator
 │   └── modules/                 # Modular feature controllers
-│       ├── academics.js         # Terms, courses, categories, assignments
+│       ├── academics.js         # Dashboard analytics and workload radar
 │       ├── auth.js              # Supabase authentication & guest state
 │       ├── backup.js            # JSON import/export & version migrations
 │       ├── calendar.js          # Calendar events & ICS generation
@@ -100,8 +100,8 @@ DueVinci/
 │       ├── easterEggs.js        # Interactive rewards & themes
 │       ├── flashcards.js        # SM-2 engine & active recall quizzes
 │       ├── grades.js            # Weighted GPA & What-If simulator
-│       ├── markdown.js          # Custom markdown & KaTeX math parser
-│       ├── offlineDb.js         # IndexedDB storage wrapper
+│       ├── markdown.js          # Sanitized markdown and math renderer
+│       ├── offlineDb.js         # Local persistence helper
 │       ├── pwa.js               # PWA install prompt & offline indicators
 │       ├── studyPlan.js         # Dynamic study scheduler
 │       ├── timers.js            # Pomodoro timer, stopwatch & audio
@@ -119,5 +119,5 @@ DueVinci/
 ## 🔒 Security & Privacy Model
 
 1. **Client-Side Secrets Protection**: API keys for AI models and privileged services are never stored in client code; requests route through authenticated Supabase Edge Functions.
-2. **Local-First Privacy**: Guest mode retains 100% of student coursework data inside the local browser sandbox (`IndexedDB`). No data is sent to cloud servers unless explicitly authenticated.
+2. **Account Data Isolation**: Authenticated course, assignment, and event records are isolated by Supabase Row Level Security policies.
 3. **Content Security & Sanitization**: Markdown and user input are strictly sanitized before insertion into the DOM to prevent XSS (Cross-Site Scripting).
