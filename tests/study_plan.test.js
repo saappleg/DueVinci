@@ -8,6 +8,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
     let closeStudyPlanDayModal;
     let startStudyPlanTimer;
     let getStudyPlanMoveError;
+    let getStudyPlanMoveTargets;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/studyPlan.js');
@@ -18,6 +19,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         closeStudyPlanDayModal = mod.closeStudyPlanDayModal || globalThis.closeStudyPlanDayModal;
         startStudyPlanTimer = mod.startStudyPlanTimer || globalThis.startStudyPlanTimer;
         getStudyPlanMoveError = mod.getStudyPlanMoveError || globalThis.getStudyPlanMoveError;
+        getStudyPlanMoveTargets = mod.getStudyPlanMoveTargets || globalThis.getStudyPlanMoveTargets;
     });
 
     describe('getUnitNumber and getLessonNumber Helpers', () => {
@@ -226,6 +228,8 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(getStudyPlanMoveError('l1', '2026-08-23')).toContain('lessons in order');
             expect(getStudyPlanMoveError('l2', '2026-08-22')).toBe('');
             expect(getStudyPlanMoveError('l2', '2026-08-25')).toContain('due date');
+            expect(getStudyPlanMoveTargets('l1').map((target) => target.date)).not.toContain('2026-08-21');
+            expect(getStudyPlanMoveTargets('l1').map((target) => target.date)).not.toContain('2026-08-23');
         });
 
         it('progresses strictly lesson by lesson through Unit 1 before starting Unit 2, and pairs different subjects together on each day', () => {

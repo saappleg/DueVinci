@@ -7,6 +7,7 @@ let cachedStudyPlan = [];
 const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
 let draggedStudyPlanTaskId = null;
 let studyPlanMoveNotice = '';
+let lastStudyPlanMove = null;
 
 function getManualStudyMoves() {
     try { return JSON.parse(localStorage.getItem(MANUAL_PLAN_MOVES_KEY) || '{}'); } catch { return {}; }
@@ -67,6 +68,19 @@ export function getStudyPlanMoveError(taskId, targetDate) {
     return '';
 }
 
+export function getStudyPlanMoveTargets(taskId) {
+    const source = getStudyPlanBlock(taskId);
+    if (!source) return [];
+    return cachedStudyPlan
+        .filter((day) => day.date !== source.day.date && !getStudyPlanMoveError(taskId, day.date))
+        .map((day) => ({
+            date: day.date,
+            label: `${day.dayOfWeek}, ${day.displayDate}`,
+            totalMinutes: day.totalMinutes,
+            sessionCount: day.allBlocks.length,
+        }));
+}
+
 function rerenderStudyPlanWithNotice(message) {
     studyPlanMoveNotice = message;
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
@@ -104,6 +118,11 @@ export async function moveStudyPlanBlock(taskId, targetDate) {
     }
     const source = getStudyPlanBlock(taskId);
     const moves = getManualStudyMoves();
+    lastStudyPlanMove = {
+        taskId,
+        previousTarget: moves[taskId] || source.day.date,
+        targetDate,
+    };
     if (source.day.date === targetDate) delete moves[taskId];
     else moves[taskId] = targetDate;
     saveManualStudyMoves(moves);
@@ -111,8 +130,37 @@ export async function moveStudyPlanBlock(taskId, targetDate) {
     return true;
 }
 
+export async function moveStudyPlanBlockAndOpenDay(taskId, targetDate) {
+    const moved = await moveStudyPlanBlock(taskId, targetDate);
+    if (moved) await openStudyPlanDayModal(targetDate);
+}
+
+export async function undoStudyPlanMove() {
+    if (!lastStudyPlanMove) {
+        await rerenderStudyPlanWithNotice('There is no recent study-block move to undo.');
+        return false;
+    }
+    const move = lastStudyPlanMove;
+    const moves = getManualStudyMoves();
+    const current = getStudyPlanBlock(move.taskId);
+    if (!current) {
+        lastStudyPlanMove = null;
+        await rerenderStudyPlanWithNotice('That study block is no longer available. Refresh the plan and try again.');
+        return false;
+    }
+    if (move.previousTarget === current.day.date) delete moves[move.taskId];
+    else moves[move.taskId] = move.previousTarget;
+    saveManualStudyMoves(moves);
+    lastStudyPlanMove = null;
+    await rerenderStudyPlanWithNotice('Study-block move undone.');
+    const modal = typeof document !== 'undefined' ? document.getElementById('studyPlanDayModal') : null;
+    if (modal && !modal.classList.contains('hidden')) await openStudyPlanDayModal(move.previousTarget);
+    return true;
+}
+
 export async function resetManualStudyPlanMoves() {
     try { localStorage.removeItem(MANUAL_PLAN_MOVES_KEY); } catch { /* Optional local preference. */ }
+    lastStudyPlanMove = null;
     await rerenderStudyPlanWithNotice('Manual placements reset to the balanced plan.');
 }
 
@@ -759,7 +807,17 @@ export async function openStudyPlanDayModal(dateStr) {
             `;
         }
     } else {
-        tasksHtml = day.allBlocks.map((block, idx) => `
+        tasksHtml = day.allBlocks.map((block, idx) => {
+            const moveTargets = getStudyPlanMoveTargets(block.taskId);
+            const moveTargetsHtml = moveTargets.length
+                ? moveTargets.map((target) => `
+                    <button type="button" onclick="moveStudyPlanBlockAndOpenDay('${escapeInlineJs(block.taskId)}', '${target.date}')" class="text-left p-2.5 rounded-xl bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition">
+                        <span class="block text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">${escapeHtml(target.label)}</span>
+                        <span class="block text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${target.totalMinutes}m planned · ${target.sessionCount} session${target.sessionCount === 1 ? '' : 's'}</span>
+                    </button>
+                `).join('')
+                : '<p class="text-[11px] text-zinc-500 dark:text-zinc-400">No other eligible day is available before this due date.</p>';
+            return `
             <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-zinc-200 dark:border-brand-700 space-y-3 transition hover:border-indigo-400 dark:hover:border-indigo-500">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div class="flex items-center gap-3 min-w-0">
@@ -791,7 +849,7 @@ export async function openStudyPlanDayModal(dateStr) {
                 </div>
 
                 <!-- Interactive Actions -->
-                <div class="flex items-center justify-between pt-1 text-xs">
+                <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
                     <button type="button" onclick="startStudyPlanTimer(${block.durationMinutes}, '${escapeInlineJs(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
                         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         Start ${block.durationMinutes}m Timer
@@ -801,8 +859,16 @@ export async function openStudyPlanDayModal(dateStr) {
                         Mark Done
                     </button>
                 </div>
+                <details class="rounded-xl border border-zinc-200 dark:border-brand-700 bg-white/70 dark:bg-brand-800/70">
+                    <summary class="cursor-pointer select-none px-3 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">⇄ Move to another day</summary>
+                    <div class="px-3 pb-3 space-y-2">
+                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Choose an eligible day. Its current workload is shown before you move this ${block.durationMinutes}m block.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${moveTargetsHtml}</div>
+                    </div>
+                </details>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     modal.innerHTML = `
@@ -825,7 +891,10 @@ export async function openStudyPlanDayModal(dateStr) {
                         </span>
                     </div>
                 </div>
-                <button type="button" onclick="closeStudyPlanDayModal()" class="w-9 h-9 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 flex items-center justify-center font-bold text-sm transition">✕</button>
+                <div class="flex items-center gap-2 shrink-0">
+                    ${lastStudyPlanMove ? '<button type="button" onclick="undoStudyPlanMove()" class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-brand-700 dark:hover:bg-brand-600 text-indigo-700 dark:text-indigo-300 font-bold text-xs transition">Undo</button>' : ''}
+                    <button type="button" onclick="closeStudyPlanDayModal()" class="w-9 h-9 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-700 dark:text-zinc-200 flex items-center justify-center font-bold text-sm transition">✕</button>
+                </div>
             </div>
 
             <!-- Rest Day Toggle Bar -->
@@ -1086,11 +1155,12 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                         <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 px-1.5">Rest:</span>
                         ${dayPillsHtml}
                     </div>
+                    ${lastStudyPlanMove ? '<button type="button" onclick="undoStudyPlanMove()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">Undo move</button>' : ''}
                     <button type="button" onclick="resetManualStudyPlanMoves()" class="text-xs text-zinc-500 dark:text-zinc-400 font-bold hover:underline px-2 py-1">Reset moves</button>
                     <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh</button>
                 </div>
             </div>
-            <p aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag a study block to an active day before its due date. Lesson order stays protected.'}</p>
+            <p aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
             </div>
@@ -1116,4 +1186,6 @@ _studyScope.startStudyPlanDrag = startStudyPlanDrag;
 _studyScope.allowStudyPlanDrop = allowStudyPlanDrop;
 _studyScope.dropStudyPlanBlock = dropStudyPlanBlock;
 _studyScope.moveStudyPlanBlock = moveStudyPlanBlock;
+_studyScope.moveStudyPlanBlockAndOpenDay = moveStudyPlanBlockAndOpenDay;
+_studyScope.undoStudyPlanMove = undoStudyPlanMove;
 _studyScope.resetManualStudyPlanMoves = resetManualStudyPlanMoves;
