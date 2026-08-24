@@ -52,7 +52,7 @@
             <div class="border-b border-zinc-200 dark:border-brand-700 pb-6">
                 <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider block mb-1">Privacy & Compliance</span>
                 <h1 class="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Privacy Policy & Data Retention</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 23, 2026</p>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 24, 2026</p>
             </div>
 
             <!-- Section 1 -->
@@ -73,7 +73,7 @@
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">A. Account & Authentication Data</h3>
                         <p class="leading-relaxed">
-                            When you register or sign in, we collect your <strong>email address</strong> and authentication credentials managed securely through Supabase Auth (including WebAuthn/Passkey public key credentials where enabled).
+                            When you register or sign in, we collect your <strong>email address</strong> and authentication credentials managed securely through Supabase Auth (including WebAuthn/Passkey public key credentials where enabled). You may also provide a display name and an optional profile photo.
                         </p>
                     </div>
 
@@ -85,17 +85,22 @@
                     </div>
 
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
-                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">C. AI Document Processing Inputs</h3>
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">C. AI Processing Inputs</h3>
                         <p class="leading-relaxed">
-                            When you upload syllabus PDFs or lesson screenshots for AI scheduling, the extracted text or image payload is transmitted ephemerally to our secure Supabase Edge Function to interface with Google Gemini. <strong>Files and prompt inputs are processed in-flight and are not used to train generalized foundation models.</strong>
+                            When you use syllabus parsing or the Socratic Study Companion, we send the minimum input needed to provide that feature through a secure server-side Supabase Edge Function to Google Gemini. This can include syllabus text or images, your Tutor question and recent session context, and—when you select a course—its description, objectives, notes, and a limited set of assignments. DueVinci does not use this content to train its own models. Google’s handling of API prompts and responses depends on the applicable Gemini service tier and terms; do not submit highly sensitive personal information to AI features.
                         </p>
                     </div>
 
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">D. Client-Side Preferences (Local Storage)</h3>
                         <p class="leading-relaxed">
-                            UI configuration such as your active theme (dark/light/Greek mode), preferred date format, timer audio profiles, and Pomodoro durations are cached on your browser. For signed-in users, non-sensitive preferences may also synchronize through a protected account preference record.
+                            UI configuration such as your active theme, preferred date format, timer audio profiles, workspace visibility, dashboard layout, and Pomodoro durations are cached on your browser. For signed-in users, non-sensitive preferences may also synchronize through a protected account preference record.
                         </p>
+                    </div>
+
+                    <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
+                        <h3 class="font-bold text-zinc-900 dark:text-white text-sm">E. Connected Services & Subscription Data</h3>
+                        <p class="leading-relaxed">If you connect Canvas, we process your Canvas instance address and access token to retrieve the coursework you request; the token is stored encrypted server-side and is removed when you disconnect or delete your account. If you subscribe, Stripe processes payment details. DueVinci stores subscription status and Stripe customer or subscription identifiers, but not full payment-card numbers. If you enable browser reminders, a browser push subscription endpoint and its keys may be stored so notices can be delivered.</p>
                     </div>
                 </div>
             </div>
@@ -107,7 +112,9 @@
                     <li>To render your personal dashboard, courses, grade simulator, and calendar timeline.</li>
                     <li>To compute cumulative GPA, course completion percentages, and 7-day workload distributions.</li>
                     <li>To authenticate your session securely across multiple devices.</li>
-                    <li>To deliver automated syllabus parsing and quiz generation via Google Gemini APIs.</li>
+                    <li>To deliver syllabus parsing and the Socratic Study Companion through Google Gemini APIs.</li>
+                    <li>To connect and import the Canvas coursework you expressly authorize.</li>
+                    <li>To administer trials, subscriptions, billing support, and browser reminders when you enable them.</li>
                     <li>To provide customer support when you reach out via our support channels.</li>
                 </ul>
             </div>
@@ -144,6 +151,21 @@
                                 <td class="p-3">Edge Function Memory (Ephemeral)</td>
                             </tr>
                             <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Tutor Session Content</td>
+                                <td class="p-3">Held in the browser for the active session; DueVinci does not provide chat-history storage</td>
+                                <td class="p-3">Browser memory; processed by Google Gemini when sent</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Canvas Connection</td>
+                                <td class="p-3">Until you disconnect it or delete your account</td>
+                                <td class="p-3">Encrypted server-side connection record</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Subscription & Push Data</td>
+                                <td class="p-3">While needed to provide the service, subject to legal or provider retention obligations</td>
+                                <td class="p-3">Supabase profile records; Stripe and browser push providers</td>
+                            </tr>
+                            <tr>
                                 <td class="p-3 font-medium text-zinc-900 dark:text-white">Local Preferences</td>
                                 <td class="p-3">Persistent until changed, account deletion, or browser-data clearing</td>
                                 <td class="p-3">Protected preference record + browser cache</td>
@@ -170,9 +192,9 @@
                     You have the right to permanently purge your account and all associated data at any time. DueVinci provides an automated, self-service <strong>Delete Account & Purge Data</strong> option inside the Settings modal.
                 </p>
                 <div class="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-700 dark:text-red-300 space-y-1">
-                    <p class="font-bold">Immediate Deletion Guarantee:</p>
+                    <p class="font-bold">What account deletion does:</p>
                     <p class="leading-relaxed">
-                        When you confirm account deletion, your user record, enrolled courses, assignments, custom calendar events, and offline caches are permanently erased immediately across database tables and local storage.
+                        When you confirm account deletion, DueVinci removes the account, primary academic records, stored Canvas connection, and profile photo, and signs the browser out. Browser caches are cleared by the app where possible. Limited records held by payment, email, AI, or infrastructure providers may remain subject to their own policies and applicable legal obligations.
                     </p>
                 </div>
             </div>
@@ -187,6 +209,7 @@
                     <li><strong>Transport Layer Security (TLS/HTTPS):</strong> All network traffic between your client browser and our servers is encrypted with modern TLS ciphers.</li>
                     <li><strong>Row Level Security (RLS):</strong> Database tables enforce PostgreSQL RLS policies ensuring users can only read and mutate records matching their authenticated UUID.</li>
                     <li><strong>Protected API Gateways:</strong> Gemini API keys are isolated within server-side Supabase Vault secrets and are never exposed in client bundles.</li>
+                    <li><strong>Private Credentials:</strong> Canvas access tokens are encrypted before storage and profile photos are protected by per-user access controls.</li>
                 </ul>
             </div>
 
@@ -199,14 +222,17 @@
                 <ul class="list-disc list-inside text-xs text-zinc-600 dark:text-zinc-300 space-y-1 leading-relaxed">
                     <li><strong>Supabase Inc.:</strong> Database hosting, user authentication, and serverless Edge Functions.</li>
                     <li><strong>Google Cloud (Gemini API):</strong> Natural language and optical document processing for syllabus parsing.</li>
+                    <li><strong>Stripe:</strong> Payment processing and subscription management; payment-card information is handled by Stripe.</li>
+                    <li><strong>Canvas LMS instances selected by you:</strong> Coursework retrieval using the access token you provide.</li>
+                    <li><strong>Resend:</strong> Delivery of support emails when you submit a support request.</li>
                 </ul>
             </div>
 
             <!-- Section 8: Contact -->
             <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-2">
-                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">8. Contact & Questions</h2>
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">8. Your Choices, Rights & Contact</h2>
                 <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    If you have questions, concerns, or requests regarding this policy or how your data is handled, please reach out to our team at <a href="mailto:support@duevinci.tech" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">support@duevinci.tech</a>.
+                    You can update much of your account information in Settings, disconnect Canvas, export your data, or delete your account. To request access, correction, deletion, or information about how your data is handled, contact <a href="mailto:support@duevinci.tech" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">support@duevinci.tech</a>. We may need to verify your request before acting on it.
                 </p>
             </div>
 

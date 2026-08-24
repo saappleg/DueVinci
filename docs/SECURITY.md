@@ -19,7 +19,7 @@
 
 To provide a personalized academic planning experience, we collect:
 
-- **Account Information** – Email address and a securely hashed password.
+- **Account Information** – Email address, authentication credentials, display name, and optional profile photo.
 - **Academic Data** – Course codes, unit titles, assignments, due dates, grades, and custom calendar events.
 - **Document & Image Uploads** – PDFs or screenshots for AI‑powered syllabus parsing.
 
@@ -40,7 +40,9 @@ We employ industry‑standard security measures:
 AI features run through secure server‑side Edge Functions:
 
 - **Secure Edge Functions** – Documents are processed in Deno Edge Functions, keeping API keys hidden.
-- **Google Gemini API** – Used solely for extracting syllabus data. According to Google Cloud’s privacy policy, processed data is not retained nor used for model training.
+- **Google Gemini API** – Used for syllabus parsing and the Socratic Study Companion. DueVinci does not train models on student inputs; Google’s handling of prompts and outputs depends on the applicable Gemini service tier and terms. Do not represent AI inputs as exempt from provider processing.
+- **Canvas LMS** – A user-provided access token is encrypted before server-side storage and used only to retrieve the authorized Canvas coursework.
+- **Stripe and Resend** – Stripe processes subscription payments; Resend delivers support emails. DueVinci does not store full payment-card numbers.
 
 ---
 ## Local Storage & Device Data <a id="local-storage--device-data"></a>
@@ -56,7 +58,7 @@ synchronized through an RLS-protected preferences record:
 
 - **Active Retention** – Data persists while your account is active.
 - **Immediate Deletion** – Removing a course, term, or assignment permanently erases it from the database.
-- **Account Deletion** – You may request full account and data removal at any time.
+- **Account Deletion** – You may remove your account, Canvas connection, and profile photo through the app. Provider-held data may remain subject to the provider’s policy or legal obligations.
 - **Support Tickets** – Resolved or closed tickets are automatically deleted 90 days after resolution.
 - **Client Error Reports** – Browser diagnostic events are automatically deleted 90 days after creation.
 
@@ -74,4 +76,4 @@ For questions or concerns, contact the team:
 - Email: <support@duevinci.tech>
 
 ---
-*Last Updated: August 23, 2026*
+*Last Updated: August 24, 2026*
