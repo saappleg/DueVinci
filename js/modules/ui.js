@@ -4,7 +4,8 @@ import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'study_plan', 'reminders', 'weekly_review']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
+const DASHBOARD_WIDGET_ORDER_KEY = 'duevinci_dashboard_widget_order';
 
 export function isWorkspaceFeatureVisible(feature) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
@@ -20,6 +21,60 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     }
     localStorage.setItem(`duevinci_workspace_${feature}`, visible ? 'visible' : 'hidden');
     if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
+    if (feature === 'today_focus') window.renderTodayWorkspace?.();
+    if (feature === 'up_next' || feature === 'goals') window.loadDashboardStats?.();
+    applyDashboardWidgetLayout();
+}
+
+export function applyDashboardWidgetLayout() {
+    if (typeof document === 'undefined') return;
+    const container = document.getElementById('dashboardWidgets');
+    if (!container) return;
+
+    let savedOrder = [];
+    try { savedOrder = JSON.parse(localStorage.getItem(DASHBOARD_WIDGET_ORDER_KEY) || '[]'); } catch { /* Default markup order is used. */ }
+    const widgets = [...container.querySelectorAll(':scope > [data-dashboard-widget]')];
+    const byId = new Map(widgets.map((widget) => [widget.dataset.dashboardWidget, widget]));
+    savedOrder.forEach((id) => {
+        const widget = byId.get(id);
+        if (widget) container.appendChild(widget);
+    });
+
+    widgets.forEach((widget) => {
+        const feature = widget.dataset.dashboardWidget;
+        widget.classList.toggle('hidden', !isWorkspaceFeatureVisible(feature));
+        widget.draggable = true;
+        widget.title = 'Drag to rearrange your dashboard';
+        if (!widget.dataset.reorderBound) {
+            widget.addEventListener('dragstart', (event) => {
+                widget.classList.add('opacity-50');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', widget.dataset.dashboardWidget || '');
+            });
+            widget.addEventListener('dragend', () => {
+                widget.classList.remove('opacity-50');
+                const order = [...container.querySelectorAll(':scope > [data-dashboard-widget]')].map((item) => item.dataset.dashboardWidget);
+                localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
+            });
+            widget.dataset.reorderBound = 'true';
+        }
+    });
+
+    if (!container.dataset.reorderBound) {
+        container.addEventListener('dragover', (event) => event.preventDefault());
+        container.addEventListener('drop', (event) => {
+            event.preventDefault();
+            const id = event.dataTransfer.getData('text/plain');
+            const dragged = [...container.children].find((item) => item.dataset?.dashboardWidget === id);
+            const target = event.target.closest?.('[data-dashboard-widget]');
+            if (!dragged || !target || dragged === target || target.parentElement !== container) return;
+            const rect = target.getBoundingClientRect();
+            container.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? target : target.nextSibling);
+            const order = [...container.querySelectorAll(':scope > [data-dashboard-widget]')].map((item) => item.dataset.dashboardWidget);
+            localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
+        });
+        container.dataset.reorderBound = 'true';
+    }
 }
 
 export function changeTheme(themeValue) {
@@ -95,6 +150,9 @@ export function injectAppearanceSettingsExtras() {
         ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
         ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
         ['academics', 'Academics widget', 'Hide dashboard analytics and progress summaries.'],
+        ['today_focus', 'Today’s focus', 'Hide the dashboard focus recommendation.'],
+        ['up_next', 'Up Next', 'Hide the upcoming coursework card.'],
+        ['goals', 'Goals & completion', 'Hide course progress summaries.'],
         ['study_plan', 'Study plan', 'Hide the dashboard study-plan workspace.'],
         ['reminders', 'Upcoming reminders', 'Hide the dashboard reminder card.'],
         ['weekly_review', 'Weekly review', 'Hide the weekly planning prompt.'],
@@ -120,7 +178,7 @@ export function injectAppearanceSettingsExtras() {
             </select>
         </div>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
-            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter the sidebar. Nothing is deleted.</p></div>
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas or drag dashboard cards to organize them. Nothing is deleted.</p></div>
             ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
         </section>
     `;
@@ -564,6 +622,7 @@ export function openSettingsModal() {
 
     const modal = document.getElementById('settingsModal');
     if (modal) modal.classList.remove('hidden');
+    applyDashboardWidgetLayout();
 }
 
 export function closeSettingsModal() {
@@ -962,6 +1021,7 @@ if (typeof window !== 'undefined') {
     window.toggleSidebar = toggleSidebar;
     window.injectAppearanceSettingsExtras = injectAppearanceSettingsExtras;
     window.setWorkspaceFeatureVisibility = setWorkspaceFeatureVisibility;
+    window.applyDashboardWidgetLayout = applyDashboardWidgetLayout;
     window.ensureSettingsModalExists = ensureSettingsModalExists;
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;

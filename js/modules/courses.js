@@ -1,6 +1,7 @@
 // --- COURSES, UNITS, ASSIGNMENTS & SYLLABUS AI PARSER MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
+import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl } from './utils.js';
 
 export let localCourses = [];
@@ -35,6 +36,8 @@ async function getPlannerUser() {
 
 export async function loadDashboardStats() {
     if (typeof document === 'undefined') return;
+    document.getElementById('upNextWidget')?.classList.toggle('hidden', !isWorkspaceFeatureVisible('up_next'));
+    document.getElementById('goalsWidget')?.classList.toggle('hidden', !isWorkspaceFeatureVisible('goals'));
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
     if (!courses || !assignments) return;
@@ -159,6 +162,7 @@ export async function loadDashboardStats() {
     if (typeof window !== 'undefined' && typeof window.renderAcademicsDashboardWidget === 'function') {
         window.renderAcademicsDashboardWidget('dashboardGrid');
     }
+    applyDashboardWidgetLayout();
 }
 
 export function celebrateRunner(el, pct) {

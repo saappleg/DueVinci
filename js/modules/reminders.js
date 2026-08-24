@@ -1,6 +1,6 @@
 // --- LOCAL-FIRST DUE DATE & CALENDAR REMINDERS ---
 import { supabaseClient } from './config.js';
-import { isWorkspaceFeatureVisible } from './ui.js';
+import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 
 const ENABLED_KEY = 'duevinci_reminders_enabled';
 const OFFSETS_KEY = 'duevinci_reminder_offsets';
@@ -124,15 +124,16 @@ export async function renderReminderDashboard() {
         return;
     }
     if (typeof document === 'undefined') return;
-    const host = document.getElementById('dashboardGrid');
+    const host = document.getElementById('dashboardWidgets') || document.getElementById('dashboardGrid');
     if (!host) return;
     let card = document.getElementById('remindersDashboardCard');
     if (!card) {
         card = document.createElement('section');
         card.id = 'remindersDashboardCard';
-        card.className = 'mt-6 bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700';
+        card.dataset.dashboardWidget = 'reminders';
         host.appendChild(card);
     }
+    card.className = 'lg:col-span-2 bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700';
     const prefs = getReminderPreferences();
     const data = await loadReminderData();
     const items = collectReminderItems(data.assignments, data.customEvents, data.courses).slice(0, 4);
@@ -142,11 +143,12 @@ export async function renderReminderDashboard() {
     card.innerHTML = `
         <div class="flex items-start justify-between gap-3 mb-4">
             <div><h3 class="text-md font-bold text-zinc-800 dark:text-zinc-200">🔔 Upcoming Reminders</h3><p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${prefs.enabled ? 'Due dates and calendar plans, kept on this device.' : 'Reminders are paused in Settings.'}</p></div>
-            <button type="button" onclick="openSettingsModal(); switchSettingsTab('appearance')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Manage</button>
+            <button type="button" onclick="openSettingsModal(); switchSettingsTab('study')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Manage</button>
         </div>
         <p class="mb-3 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-200">${nextAction}</p>
         ${items.length ? `<ul class="space-y-2">${items.map((item) => `<li class="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-brand-900 border border-zinc-200/70 dark:border-brand-700 px-3 py-2.5"><span class="min-w-0"><span class="block text-xs font-bold text-zinc-800 dark:text-white truncate">${item.title}</span><span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${item.kind} · ${item.detail}</span></span><span class="shrink-0 text-[11px] font-bold ${item.daysUntil === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}">${relativeDate(item.daysUntil)}</span></li>`).join('')}</ul>` : ''}
     `;
+    applyDashboardWidgetLayout();
 }
 
 export async function checkDueReminders() {
