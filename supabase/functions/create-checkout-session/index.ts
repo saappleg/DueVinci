@@ -18,6 +18,12 @@ function isMissingStripeResource(error: unknown) {
       || (error as { message?: string }).message?.startsWith('No such '))
 }
 
+function shouldBlockNewCheckout(status: string | null | undefined) {
+  // A customer may have a scheduled subscription even if a webhook was missed.
+  // Never create a second Checkout Session (and therefore a second trial) then.
+  return ['active', 'trialing', 'past_due', 'unpaid', 'paused', 'incomplete'].includes(status || '')
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -58,8 +64,15 @@ serve(async (req) => {
     if (profile?.subscription_status === 'active') throw new Error('Your subscription is already active')
     if (profile?.stripe_subscription_id) {
       try {
-        await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
-        throw new Error('A subscription is already scheduled. Manage it in the billing portal.')
+        const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+        if (shouldBlockNewCheckout(subscription.status)) {
+          throw new Error('A subscription is already scheduled. Manage it in the billing portal.')
+        }
+        const { error: clearEndedSubscriptionErr } = await supabaseAdmin
+          .from('profiles')
+          .update({ stripe_subscription_id: null, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+        if (clearEndedSubscriptionErr) throw clearEndedSubscriptionErr
       } catch (error) {
         if (!isMissingStripeResource(error)) throw error
         const { error: clearSubscriptionErr } = await supabaseAdmin
@@ -95,6 +108,24 @@ serve(async (req) => {
         .from('profiles')
         .upsert({ user_id: user.id, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       if (saveCustomerErr) throw saveCustomerErr
+    }
+
+    // Reconcile Stripe before creating a new session. This protects against
+    // duplicate trials when Checkout completed while webhook delivery failed.
+    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 })
+    const existingSubscription = subscriptions.data.find(subscription => shouldBlockNewCheckout(subscription.status))
+    if (existingSubscription) {
+      const { error: saveSubscriptionErr } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          stripe_subscription_id: existingSubscription.id,
+          subscription_status: existingSubscription.status,
+          ...(existingSubscription.trial_end ? { trial_end: new Date(existingSubscription.trial_end * 1000).toISOString() } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+      if (saveSubscriptionErr) throw saveSubscriptionErr
+      throw new Error('A subscription is already scheduled. Manage it in the billing portal.')
     }
 
     const trialEnd = profile?.subscription_status === 'trialing' && profile.trial_end

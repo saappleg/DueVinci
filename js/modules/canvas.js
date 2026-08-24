@@ -127,7 +127,7 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, canvas_domain, canvas_last_synced_at')
+            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, canvas_domain, canvas_last_synced_at')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -158,9 +158,14 @@ export async function initCanvasSettingsTab() {
                 ? Math.max(0, Math.ceil((new Date(profile.trial_end) - new Date()) / 86400000))
                 : '?';
             msg.textContent = `Your 30-day trial is active — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining.`;
-            // Let trial users save a payment method now. Stripe will schedule the
-            // selected subscription to begin when their no-card trial ends.
-            checkoutArea?.classList.remove('hidden');
+            // Let trial users save a payment method once. When a Stripe
+            // subscription is already scheduled, show that state instead of a
+            // second Checkout button that could look like another free trial.
+            if (profile?.stripe_subscription_id) {
+                msg.textContent += ' Your subscription is scheduled to start when the trial ends.';
+            } else {
+                checkoutArea?.classList.remove('hidden');
+            }
             if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
             // Show connector or sync trigger depending on credentials
             _showConnectorOrSync(profile);
@@ -264,7 +269,12 @@ export async function handleCanvasCheckout(interval) {
         if (!data?.url) throw new Error(data?.error || 'Unable to create a checkout session.');
         window.location.assign(data.url);
     } catch (err) {
-        if (message) message.textContent = await functionErrorMessage(err, 'Unable to open checkout. Please try again.');
+        const errorMessage = await functionErrorMessage(err, 'Unable to open checkout. Please try again.');
+        if (/subscription is already scheduled/i.test(errorMessage)) {
+            await initCanvasSettingsTab();
+        } else if (message) {
+            message.textContent = errorMessage;
+        }
         buttons.forEach(button => { button.disabled = false; });
     }
 }
