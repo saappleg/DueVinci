@@ -73,6 +73,7 @@ const rawSupabaseClient = (typeof window !== 'undefined' && window.supabase) ? w
         getSession: async () => ({ data: { session: null }, error: null }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         signInWithPassword: async () => ({ data: null, error: null }),
+        signInWithOAuth: async () => ({ data: null, error: null }),
         signUp: async () => ({ data: null, error: null }),
         signOut: async () => ({ error: null }),
         signInWithPasskey: async () => ({ data: null, error: null }),
