@@ -20,10 +20,19 @@ function initialsFor(user, displayName = '') {
 }
 
 function setProfileIdentity(user, displayName = '') {
-    const image = document.getElementById('profileAvatarImage');
     const initials = document.getElementById('profileAvatarInitials');
     const name = document.getElementById('profileIdentityName');
     const email = document.getElementById('profileIdentityEmail');
+    if (initials) {
+        initials.textContent = initialsFor(user, displayName);
+    }
+    if (name) name.textContent = String(displayName || fallbackNameFor(user));
+    if (email) email.textContent = user?.email || 'Signed in';
+}
+
+function showAvatarFallback(user, displayName = '') {
+    const image = document.getElementById('profileAvatarImage');
+    const initials = document.getElementById('profileAvatarInitials');
     if (image) {
         image.removeAttribute('src');
         image.classList.add('hidden');
@@ -32,8 +41,6 @@ function setProfileIdentity(user, displayName = '') {
         initials.textContent = initialsFor(user, displayName);
         initials.classList.remove('hidden');
     }
-    if (name) name.textContent = String(displayName || fallbackNameFor(user));
-    if (email) email.textContent = user?.email || 'Signed in';
 }
 
 export async function getProfileDisplayName(user) {
@@ -66,6 +73,7 @@ export async function saveProfileDisplayName(value, user) {
         .eq('user_id', user.id);
     if (error) throw error;
     setProfileIdentity(user, displayName);
+    await refreshProfileAvatar(user);
     return displayName;
 }
 
@@ -73,15 +81,27 @@ export async function refreshProfileAvatar(user) {
     if (typeof document === 'undefined' || !user?.id) return;
     await refreshProfileIdentity(user);
     const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(avatarPath(user.id), 60 * 60);
-    if (error || !data?.signedUrl) return;
+    if (error || !data?.signedUrl) {
+        // A missing object is normal for accounts without a photo. Keep an
+        // already-rendered image intact during transient refresh failures.
+        const image = document.getElementById('profileAvatarImage');
+        if (!image?.getAttribute('src')) showAvatarFallback(user);
+        if (error && !/not found|object not found/i.test(error.message || '')) console.warn('Unable to refresh profile photo:', error.message || error);
+        return false;
+    }
     const image = document.getElementById('profileAvatarImage');
     const initials = document.getElementById('profileAvatarInitials');
-    if (!image) return;
+    if (!image) return false;
     image.onload = () => {
         image.classList.remove('hidden');
         initials?.classList.add('hidden');
     };
+    image.onerror = () => {
+        showAvatarFallback(user);
+        console.warn('Unable to display profile photo.');
+    };
     image.src = `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+    return true;
 }
 
 function profileMessage(message, color = 'text-red-500') {
@@ -124,7 +144,7 @@ export async function removeProfileAvatar(user) {
     try {
         const { error } = await supabaseClient.storage.from(BUCKET).remove([avatarPath(user.id)]);
         if (error) throw error;
-        await refreshProfileAvatar(user);
+        showAvatarFallback(user);
         profileMessage('Profile photo removed.', 'text-green-500');
     } catch (error) {
         profileMessage(error?.message || 'Could not remove profile photo.');
