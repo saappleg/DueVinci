@@ -6,6 +6,14 @@ import { refreshReminderSettings } from './reminders.js';
 
 const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
 const DASHBOARD_WIDGET_ORDER_KEY = 'duevinci_dashboard_widget_order';
+const DASHBOARD_WIDGETS = [
+    ['today_focus', 'Today’s focus'],
+    ['up_next', 'Up Next'],
+    ['goals', 'Goals & completion'],
+    ['study_plan', 'Study plan'],
+    ['reminders', 'Upcoming reminders'],
+    ['weekly_review', 'Weekly review'],
+];
 
 export function isWorkspaceFeatureVisible(feature) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
@@ -23,7 +31,41 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
     if (feature === 'today_focus') window.renderTodayWorkspace?.();
     if (feature === 'up_next' || feature === 'goals') window.loadDashboardStats?.();
+    if (feature === 'study_plan') window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+    if (feature === 'reminders') window.renderReminderDashboard?.();
+    if (feature === 'weekly_review') window.renderWeeklyReview?.();
     applyDashboardWidgetLayout();
+}
+
+function getDashboardWidgetOrder() {
+    const defaultOrder = DASHBOARD_WIDGETS.map(([id]) => id);
+    try {
+        const saved = JSON.parse(localStorage.getItem(DASHBOARD_WIDGET_ORDER_KEY) || '[]');
+        if (!Array.isArray(saved)) return defaultOrder;
+        return [...saved.filter((id) => defaultOrder.includes(id)), ...defaultOrder.filter((id) => !saved.includes(id))];
+    } catch {
+        return defaultOrder;
+    }
+}
+
+export function moveDashboardWidget(feature, direction) {
+    const order = getDashboardWidgetOrder();
+    const index = order.indexOf(feature);
+    const nextIndex = index + Number(direction);
+    if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return;
+    [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
+    localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
+    applyDashboardWidgetLayout();
+    refreshDashboardLayoutControls();
+}
+
+function refreshDashboardLayoutControls() {
+    const order = getDashboardWidgetOrder();
+    document.querySelectorAll('[data-dashboard-order]').forEach((row) => {
+        const index = order.indexOf(row.dataset.dashboardOrder);
+        row.querySelector('[data-move="up"]')?.toggleAttribute('disabled', index <= 0);
+        row.querySelector('[data-move="down"]')?.toggleAttribute('disabled', index < 0 || index >= order.length - 1);
+    });
 }
 
 export function applyDashboardWidgetLayout() {
@@ -31,8 +73,7 @@ export function applyDashboardWidgetLayout() {
     const container = document.getElementById('dashboardWidgets');
     if (!container) return;
 
-    let savedOrder = [];
-    try { savedOrder = JSON.parse(localStorage.getItem(DASHBOARD_WIDGET_ORDER_KEY) || '[]'); } catch { /* Default markup order is used. */ }
+    const savedOrder = getDashboardWidgetOrder();
     const widgets = [...container.querySelectorAll(':scope > [data-dashboard-widget]')];
     const byId = new Map(widgets.map((widget) => [widget.dataset.dashboardWidget, widget]));
     savedOrder.forEach((id) => {
@@ -43,38 +84,10 @@ export function applyDashboardWidgetLayout() {
     widgets.forEach((widget) => {
         const feature = widget.dataset.dashboardWidget;
         widget.classList.toggle('hidden', !isWorkspaceFeatureVisible(feature));
-        widget.draggable = true;
-        widget.title = 'Drag to rearrange your dashboard';
-        if (!widget.dataset.reorderBound) {
-            widget.addEventListener('dragstart', (event) => {
-                widget.classList.add('opacity-50');
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', widget.dataset.dashboardWidget || '');
-            });
-            widget.addEventListener('dragend', () => {
-                widget.classList.remove('opacity-50');
-                const order = [...container.querySelectorAll(':scope > [data-dashboard-widget]')].map((item) => item.dataset.dashboardWidget);
-                localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
-            });
-            widget.dataset.reorderBound = 'true';
-        }
+        widget.draggable = false;
+        widget.removeAttribute('title');
     });
-
-    if (!container.dataset.reorderBound) {
-        container.addEventListener('dragover', (event) => event.preventDefault());
-        container.addEventListener('drop', (event) => {
-            event.preventDefault();
-            const id = event.dataTransfer.getData('text/plain');
-            const dragged = [...container.children].find((item) => item.dataset?.dashboardWidget === id);
-            const target = event.target.closest?.('[data-dashboard-widget]');
-            if (!dragged || !target || dragged === target || target.parentElement !== container) return;
-            const rect = target.getBoundingClientRect();
-            container.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? target : target.nextSibling);
-            const order = [...container.querySelectorAll(':scope > [data-dashboard-widget]')].map((item) => item.dataset.dashboardWidget);
-            localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
-        });
-        container.dataset.reorderBound = 'true';
-    }
+    refreshDashboardLayoutControls();
 }
 
 export function changeTheme(themeValue) {
@@ -178,8 +191,12 @@ export function injectAppearanceSettingsExtras() {
             </select>
         </div>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
-            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas or drag dashboard cards to organize them. Nothing is deleted.</p></div>
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter your workspace. Nothing is deleted.</p></div>
             ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
+        </section>
+        <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Dashboard layout</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Use the arrows to arrange dashboard cards. Your order is saved on this device.</p></div>
+            ${DASHBOARD_WIDGETS.map(([feature, label]) => `<div data-dashboard-order="${feature}" class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="flex gap-1"><button type="button" data-move="up" onclick="moveDashboardWidget('${feature}', -1)" aria-label="Move ${label} up" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-bold text-zinc-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-600 dark:text-zinc-200">↑</button><button type="button" data-move="down" onclick="moveDashboardWidget('${feature}', 1)" aria-label="Move ${label} down" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-bold text-zinc-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-600 dark:text-zinc-200">↓</button></span></div>`).join('')}
         </section>
     `;
     appearanceTab.appendChild(container);
@@ -1022,6 +1039,7 @@ if (typeof window !== 'undefined') {
     window.injectAppearanceSettingsExtras = injectAppearanceSettingsExtras;
     window.setWorkspaceFeatureVisibility = setWorkspaceFeatureVisibility;
     window.applyDashboardWidgetLayout = applyDashboardWidgetLayout;
+    window.moveDashboardWidget = moveDashboardWidget;
     window.ensureSettingsModalExists = ensureSettingsModalExists;
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;
