@@ -20,20 +20,20 @@ export function showFirstRunOnboarding(user) {
         <div class="w-full max-w-lg overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl dark:bg-brand-800">
             <div class="bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-7 text-white">
                 <img src="assets/images/maestro-logo.svg" alt="DueVinci" class="h-10 w-10 rounded-xl bg-white/15 p-1.5 mb-4">
-                <h2 class="text-2xl font-black">Welcome to DueVinci</h2>
-                <p class="mt-1 text-sm text-white/85">Set up your study space in a few minutes.</p>
+                <h2 class="text-2xl font-black">Set up your study space</h2>
+                <p class="mt-1 text-sm text-white/85">A short checklist to make your dashboard useful from day one.</p>
             </div>
             <div class="p-6">
-                <ol class="space-y-3 text-sm text-zinc-700 dark:text-zinc-200">
-                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">1</span><span><strong>Add your classes.</strong> Give each course a home for its coursework.</span></li>
-                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">2</span><span><strong>Add due dates.</strong> They appear on your dashboard and calendar automatically.</span></li>
-                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">3</span><span><strong>Make time to study.</strong> Use the focus timer and reminders when you are ready.</span></li>
+                <ol class="space-y-2 text-sm text-zinc-700 dark:text-zinc-200">
+                    <li class="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-brand-700"><span class="flex min-w-0 gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">1</span><span><strong class="block">Add a class</strong><span class="text-xs text-zinc-500 dark:text-zinc-400">Create a home for your coursework.</span></span></span><button type="button" id="onboardingAddClass" class="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300">Open</button></li>
+                    <li class="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-brand-700"><span class="flex min-w-0 gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">2</span><span><strong class="block">Import a syllabus</strong><span class="text-xs text-zinc-500 dark:text-zinc-400">Let DueVinci build your plan from it.</span></span></span><button type="button" id="onboardingImportSyllabus" class="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300">Open</button></li>
+                    <li class="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-brand-700"><span class="flex min-w-0 gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">3</span><span><strong class="block">Choose your workspace</strong><span class="text-xs text-zinc-500 dark:text-zinc-400">Hide cards and arrange your dashboard.</span></span></span><button type="button" id="onboardingWorkspace" class="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300">Open</button></li>
+                    <li class="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-brand-700"><span class="flex min-w-0 gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">4</span><span><strong class="block">Try Study Companion</strong><span class="text-xs text-zinc-500 dark:text-zinc-400">Ask for guided help in a course context.</span></span></span><button type="button" id="onboardingTutor" class="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300">Open</button></li>
                 </ol>
-                <div class="mt-6 grid gap-2 sm:grid-cols-2">
-                    <button type="button" id="onboardingAddClass" class="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700">Add my first class</button>
+                <div class="mt-5 grid gap-2 sm:grid-cols-2">
                     <button type="button" id="onboardingTour" class="rounded-xl bg-zinc-100 px-4 py-3 text-sm font-bold text-zinc-800 hover:bg-zinc-200 dark:bg-brand-700 dark:text-white dark:hover:bg-brand-600">Take the quick tour</button>
+                    <button type="button" id="onboardingDismiss" class="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700">I’ll set this up later</button>
                 </div>
-                <button type="button" id="onboardingDismiss" class="mt-3 w-full text-xs font-semibold text-zinc-500 hover:text-indigo-600 dark:text-zinc-400">I’ll explore on my own</button>
             </div>
         </div>`;
     document.body.appendChild(modal);
@@ -42,6 +42,9 @@ export function showFirstRunOnboarding(user) {
         if (event.target === modal) finish();
     });
     document.getElementById('onboardingAddClass')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
+    document.getElementById('onboardingImportSyllabus')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
+    document.getElementById('onboardingWorkspace')?.addEventListener('click', () => { finish(); window.openSettingsModal?.(); window.switchSettingsTab?.('appearance'); });
+    document.getElementById('onboardingTutor')?.addEventListener('click', () => { finish(); window.location.href = 'tutor/index.html'; });
     document.getElementById('onboardingTour')?.addEventListener('click', () => { finish(); startWalkthrough(false); });
     document.getElementById('onboardingDismiss')?.addEventListener('click', finish);
 }
