@@ -30,6 +30,7 @@ pnpm-debug.log*
 
 # Supabase local config
 .supabase/
+supabase/.temp/
 
 # Temporary / Scratch files
 scratch/
