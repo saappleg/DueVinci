@@ -79,6 +79,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  let payload = { title: 'DueVinci reminder', body: 'You have coursework coming up.' };
+  try { payload = { ...payload, ...(event.data ? event.data.json() : {}) }; } catch { /* Keep the safe fallback. */ }
+  event.waitUntil(self.registration.showNotification(payload.title, {
+    body: payload.body,
+    icon: './assets/icons/icon-192x192.png',
+    badge: './assets/icons/icon-192x192.png',
+    data: { url: './index.html' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data?.url || './index.html'));
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (!request.url.startsWith('http') || request.method !== 'GET') return;

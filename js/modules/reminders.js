@@ -4,6 +4,7 @@ import { supabaseClient } from './config.js';
 const ENABLED_KEY = 'duevinci_reminders_enabled';
 const OFFSETS_KEY = 'duevinci_reminder_offsets';
 const NOTIFIED_KEY = 'duevinci_reminders_notified';
+export const VAPID_PUBLIC_KEY = 'BILOB6qV0YeHq3UWchV7RvZC9yUOTtc8DKq4miAsE5ZLy3zsT1Sy2cdk5xEPhQZoMst6SKA9_NdyoBShpJ-F28o';
 let reminderTimer = null;
 
 function localDate(value) {
@@ -87,6 +88,26 @@ export async function requestReminderPermission() {
         : { granted: false, message: 'Notification permission was not granted.' };
 }
 
+function urlBase64ToUint8Array(value) {
+    const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, '=');
+    const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+export async function subscribeToPushNotifications(user = window.currentUser) {
+    const permission = await requestReminderPermission();
+    if (!permission.granted) return permission;
+    if (!user?.id || !navigator.serviceWorker || !window.PushManager) return { granted: false, message: 'Push notifications are not supported by this browser.' };
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+    const json = subscription.toJSON();
+    const { error } = await supabaseClient.from('push_subscriptions').upsert({
+        user_id: user.id, endpoint: subscription.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth, updated_at: new Date().toISOString(),
+    }, { onConflict: 'endpoint' });
+    if (error) throw error;
+    return { granted: true, message: 'Background reminders are enabled on this device.' };
+}
+
 async function loadReminderData() {
     const [{ data: assignments }, { data: customEvents }, { data: courses }] = await Promise.all([
         supabaseClient.from('assignments').select('*'),
@@ -162,6 +183,9 @@ export async function saveReminderSettingsFromUI() {
     const enabled = document.getElementById('remindersEnabled')?.checked !== false;
     const offsets = String(document.getElementById('reminderSchedule')?.value || '0').split(',').map(Number);
     saveReminderPreferences({ enabled, offsets });
+    if (window.currentUser?.id && navigator.onLine !== false) {
+        await supabaseClient.from('profiles').update({ reminders_enabled: enabled, reminder_offsets: offsets, updated_at: new Date().toISOString() }).eq('user_id', window.currentUser.id);
+    }
     const message = document.getElementById('reminderSettingsMsg');
     if (message) { message.textContent = enabled ? 'Reminder schedule saved on this device.' : 'Reminders are paused on this device.'; message.classList.remove('hidden'); }
     startReminderService();
@@ -169,7 +193,8 @@ export async function saveReminderSettingsFromUI() {
 
 if (typeof window !== 'undefined') {
     window.requestReminderPermission = async () => {
-        const result = await requestReminderPermission();
+        let result;
+        try { result = await subscribeToPushNotifications(window.currentUser); } catch (error) { result = { granted: false, message: error?.message || 'Could not enable background reminders.' }; }
         const message = document.getElementById('reminderSettingsMsg');
         if (message) { message.textContent = result.message; message.classList.remove('hidden'); }
     };
