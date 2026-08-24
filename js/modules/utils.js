@@ -92,12 +92,11 @@ export function setTourCookie(name = 'duevinci_tour_done', val = 'true', days = 
 export function getBasePath() {
     if (typeof window === 'undefined' || !window.location) return './';
     const path = window.location.pathname || '';
-    const segments = path.split('/').filter(Boolean);
-    // If inside a subfolder like /courses/, /courses/index.html, /legal/privacy.html
-    if (segments.length >= 2 || (segments.length === 1 && !path.endsWith('.html') && !segments[0].includes('.'))) {
-        return '../';
-    }
-    return './';
+    // A hosted project can live under its own root path (for example
+    // /DueVinci-dev/). Only actual application subpages need to climb out of
+    // their directory; treating every single directory as a page made assets
+    // such as profile Easter-egg badges resolve one level too high.
+    return /\/(?:courses|grades|calendar|legal)(?:\/|$)/.test(path) ? '../' : './';
 }
 
 export function getCurrentPageName() {

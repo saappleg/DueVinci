@@ -161,6 +161,10 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(getBasePath()).toBe('./');
             expect(getCurrentPageName()).toBe('index');
 
+            // A hosted project root is not an application subdirectory.
+            globalThis.window = { location: { pathname: '/DueVinci-dev/' } };
+            expect(getBasePath()).toBe('./');
+
             // Courses directory
             globalThis.window = { location: { pathname: '/courses/index.html' } };
             expect(getBasePath()).toBe('../');
@@ -224,4 +228,3 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
         });
     });
 });
-

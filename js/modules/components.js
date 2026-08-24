@@ -11,6 +11,7 @@ import {
     initMultiTimersUI
 } from './timers.js';
 import { openSettingsModal, openSupportModal } from './ui.js';
+import { renderProfileEasterEgg } from './profileAvatar.js';
 
 const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
 
@@ -21,6 +22,7 @@ class DueVinciSidebar extends BaseElement {
             applyTimerCollapse();
             updateTimerDisplay();
             initMultiTimersUI();
+            renderProfileEasterEgg();
         }, 50);
     }
 
@@ -101,6 +103,7 @@ class DueVinciSidebar extends BaseElement {
                     <span class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-xs font-extrabold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
                         <img id="profileAvatarImage" class="hidden h-full w-full object-cover" alt="Your profile photo">
                         <span id="profileAvatarInitials">DV</span>
+                        <img id="profileAvatarEasterEgg" class="pointer-events-none absolute bottom-0 right-0 z-10 h-6 w-6 object-contain drop-shadow-sm" alt="" hidden>
                     </span>
                     <span class="min-w-0 flex-1">
                         <span id="profileIdentityName" class="block truncate text-xs font-bold text-zinc-800 dark:text-white">Your account</span>

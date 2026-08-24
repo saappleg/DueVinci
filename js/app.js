@@ -13,7 +13,7 @@ import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
 import { getUnitNumber, getLessonNumber, getRestDays, setRestDays, toggleRestDay, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
-import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar } from './modules/profileAvatar.js';
+import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar, getProfileEasterEgg, renderProfileEasterEgg, activateProfileEasterEgg } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
@@ -160,6 +160,9 @@ export {
     refreshProfileAvatar,
     uploadProfileAvatar,
     removeProfileAvatar,
+    getProfileEasterEgg,
+    renderProfileEasterEgg,
+    activateProfileEasterEgg,
     buildBackupPayload,
     validateBackupPayload,
     exportUserDataJSON,

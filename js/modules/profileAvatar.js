@@ -4,6 +4,70 @@ const BUCKET = 'profile-avatars';
 const AVATAR_FILE = 'avatar';
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_BYTES = 2 * 1024 * 1024;
+const PROFILE_EASTER_EGG_KEY = 'duevinci_profile_easter_egg';
+const PROFILE_EASTER_EGG_CLASS = 'pointer-events-none absolute bottom-0 right-0 z-10 h-6 w-6 object-contain drop-shadow-sm';
+const PROFILE_EASTER_EGGS = {
+    maestro: { asset: new URL('../../assets/images/maestro-logo.svg', import.meta.url).href, label: 'Maestro shield' },
+    nightowl: { asset: new URL('../../assets/images/wgu-owl.png', import.meta.url).href, label: 'Night Owl badge' },
+};
+
+function profileEasterEggKey(user) {
+    return `${PROFILE_EASTER_EGG_KEY}:${user?.id || 'guest'}`;
+}
+
+export function getProfileEasterEgg(user = window.currentUser) {
+    if (typeof localStorage === 'undefined') return null;
+    const egg = localStorage.getItem(profileEasterEggKey(user));
+    return PROFILE_EASTER_EGGS[egg] ? egg : null;
+}
+
+function getProfileEasterEggBadge() {
+    let badge = document.getElementById('profileAvatarEasterEgg');
+    if (badge) return badge;
+
+    // The sidebar is a custom element and can be served from an older PWA
+    // cache while this module has already updated. Create the badge on demand
+    // so the Easter egg does not depend on that markup revision arriving first.
+    const avatar = document.getElementById('profileAvatarImage') || document.getElementById('profileAvatarInitials');
+    const container = avatar?.parentElement;
+    if (!container || typeof document.createElement !== 'function') return null;
+    badge = document.createElement('img');
+    badge.id = 'profileAvatarEasterEgg';
+    badge.className = PROFILE_EASTER_EGG_CLASS;
+    badge.alt = '';
+    badge.hidden = true;
+    container.appendChild(badge);
+    return badge;
+}
+
+export function renderProfileEasterEgg(user = window.currentUser) {
+    if (typeof document === 'undefined') return;
+    const badge = getProfileEasterEggBadge();
+    if (!badge) return;
+    const egg = getProfileEasterEgg(user);
+    const config = egg ? PROFILE_EASTER_EGGS[egg] : null;
+    if (!config) {
+        badge.removeAttribute('src');
+        badge.hidden = true;
+        badge.style.display = 'none';
+        badge.removeAttribute('data-profile-easter-egg');
+        return;
+    }
+    badge.src = config.asset;
+    badge.alt = config.label;
+    badge.className = PROFILE_EASTER_EGG_CLASS;
+    badge.dataset.profileEasterEgg = egg;
+    badge.hidden = false;
+    badge.style.display = 'block';
+}
+
+export function activateProfileEasterEgg(egg, user = window.currentUser) {
+    if (!PROFILE_EASTER_EGGS[egg] || typeof localStorage === 'undefined') return false;
+    // One key stores one value, so a new activation always replaces the old badge.
+    localStorage.setItem(profileEasterEggKey(user), egg);
+    renderProfileEasterEgg(user);
+    return true;
+}
 
 const avatarPath = (userId) => `${userId}/${AVATAR_FILE}`;
 
@@ -87,6 +151,7 @@ export async function refreshProfileAvatar(user) {
         const image = document.getElementById('profileAvatarImage');
         if (!image?.getAttribute('src')) showAvatarFallback(user);
         if (error && !/not found|object not found/i.test(error.message || '')) console.warn('Unable to refresh profile photo:', error.message || error);
+        renderProfileEasterEgg(user);
         return false;
     }
     const image = document.getElementById('profileAvatarImage');
@@ -101,6 +166,7 @@ export async function refreshProfileAvatar(user) {
         console.warn('Unable to display profile photo.');
     };
     image.src = `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+    renderProfileEasterEgg(user);
     return true;
 }
 
@@ -154,4 +220,5 @@ export async function removeProfileAvatar(user) {
 if (typeof window !== 'undefined') {
     window.uploadProfileAvatar = (event) => uploadProfileAvatar(event?.target?.files?.[0], window.currentUser);
     window.removeProfileAvatar = () => removeProfileAvatar(window.currentUser);
+    window.renderProfileEasterEgg = () => renderProfileEasterEgg(window.currentUser);
 }

@@ -2,6 +2,11 @@
 import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
 
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
+// Production's current feature drop is 2.2. Dev contains the next, unreleased
+// set of features, so keep its announcement and dismissal marker on 2.3.
+export const WHATS_NEW_VERSION = '2.3';
+const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
+const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 
 function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
 
@@ -135,7 +140,7 @@ export function ensureWhatsNewModalExists() {
                     <span class="text-3xl">✨</span>
                     <div>
                         <h3 class="font-black text-lg text-zinc-900 dark:text-white">What's New in DueVinci</h3>
-                        <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version 1.3 Feature Drop</p>
+                        <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version ${WHATS_NEW_VERSION} Feature Drop</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
@@ -187,13 +192,13 @@ export function openWhatsNewModal() {
 }
 
 export function closeWhatsNewModal() {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_whats_new_seen', 'v1.3');
+    if (typeof localStorage !== 'undefined') localStorage.setItem(WHATS_NEW_SEEN_KEY, WHATS_NEW_SEEN_VALUE);
     const m = document.getElementById('whatsNewModal');
     if (m) m.classList.add('hidden');
 }
 
 export function checkWhatsNewOnLaunch() {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_whats_new_seen') !== 'v1.3') {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(WHATS_NEW_SEEN_KEY) !== WHATS_NEW_SEEN_VALUE) {
         setTimeout(openWhatsNewModal, 900);
     }
 }
