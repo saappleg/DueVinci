@@ -8,6 +8,14 @@ export function isTutorAccessActive(profile, now = Date.now()) {
         || (profile?.subscription_status === 'trialing' && !!profile.trial_end && new Date(profile.trial_end).getTime() > now);
 }
 
+async function tutorErrorMessage(error) {
+    try {
+        const body = await error?.context?.clone?.().json();
+        if (body?.error) return body.error;
+    } catch { /* Fall back to the SDK message below. */ }
+    return error?.message || 'Tutor unavailable. Please try again.';
+}
+
 function addMessage(role, text) {
     const feed = document.getElementById('tutorMessages');
     if (!feed) return;
@@ -62,7 +70,7 @@ export async function submitTutorMessage() {
         addMessage('model', data.reply);
     } catch (error) {
         conversation.pop();
-        addMessage('model', error?.message || 'Tutor unavailable. Please try again.');
+        addMessage('model', await tutorErrorMessage(error));
     } finally {
         if (send) { send.disabled = false; send.textContent = 'Send'; }
         input.focus();
