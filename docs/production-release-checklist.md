@@ -22,3 +22,12 @@ Use this checklist after the `main` freeze ends.
 - [ ] Scan a non-sensitive syllabus and confirm the review prompt appears before anything is saved.
 - [ ] Confirm Canvas sync, reminders, and workspace visibility preferences work.
 - [ ] Verify errors never expose provider responses or API keys.
+
+## Operations handoff
+
+- [ ] Confirm `Production health monitor` is enabled and its first scheduled or
+  manually dispatched run is green.
+- [ ] Follow the Production Stripe validation table in `docs/OPERATIONS.md`;
+  do not enable billing until each value is confirmed in the live Stripe vault.
+- [ ] Confirm the weekday monitoring owner can access GitHub Actions, Stripe
+  Workbench, Supabase Edge Function logs, and the support inbox.

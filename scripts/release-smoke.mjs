@@ -11,6 +11,7 @@ const email = process.env.DUEVINCI_SMOKE_EMAIL;
 const password = process.env.DUEVINCI_SMOKE_PASSWORD;
 const supabaseUrl = (process.env.DUEVINCI_SMOKE_SUPABASE_URL || 'https://lzmsguzlmjmedlaybckc.supabase.co').replace(/\/$/, '');
 const anonKey = process.env.DUEVINCI_SMOKE_SUPABASE_ANON_KEY || 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
+const skipSupportTicket = process.env.DUEVINCI_SMOKE_SKIP_SUPPORT === 'true';
 
 const requiredFiles = ['/', '/index.html', '/courses/', '/courses/index.html', '/grades/', '/calendar/', '/manifest.json', '/sw.js', '/js/app.js', '/assets/vendor/supabase-js.js'];
 const fail = (message) => { throw new Error(message); };
@@ -56,12 +57,16 @@ async function verifyAuthenticatedFlows() {
     if (!courseId) fail('Planner write did not return a course id.');
     console.log('✓ Planner write succeeded');
 
-    await request(`${supabaseUrl}/functions/v1/submit-support-ticket`, {
-      method: 'POST',
-      headers: { ...headers, 'x-client-info': 'duevinci-release-smoke' },
-      body: JSON.stringify({ category: 'Automated release test', email, subject: `Automated smoke test ${new Date().toISOString()}`, message: 'Automated verification only. No response is needed.' }),
-    });
-    console.log('✓ Support Edge Function accepted the release test');
+    if (!skipSupportTicket) {
+      await request(`${supabaseUrl}/functions/v1/submit-support-ticket`, {
+        method: 'POST',
+        headers: { ...headers, 'x-client-info': 'duevinci-release-smoke' },
+        body: JSON.stringify({ category: 'Automated release test', email, subject: `Automated smoke test ${new Date().toISOString()}`, message: 'Automated verification only. No response is needed.' }),
+      });
+      console.log('✓ Support Edge Function accepted the release test');
+    } else {
+      console.log('✓ Support ticket check intentionally skipped for recurring monitoring');
+    }
   } finally {
     if (courseId) {
       await fetch(`${supabaseUrl}/rest/v1/courses?id=eq.${encodeURIComponent(courseId)}`, { method: 'DELETE', headers });

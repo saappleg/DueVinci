@@ -1,0 +1,27 @@
+name: Production health monitor
+
+on:
+  schedule:
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run production health smoke test
+        env:
+          DUEVINCI_RELEASE_URL: https://duevinci.tech
+          DUEVINCI_SMOKE_EMAIL: ${{ secrets.DUEVINCI_SMOKE_EMAIL }}
+          DUEVINCI_SMOKE_PASSWORD: ${{ secrets.DUEVINCI_SMOKE_PASSWORD }}
+          DUEVINCI_SMOKE_SUPABASE_URL: https://lzmsguzlmjmedlaybckc.supabase.co
+          DUEVINCI_SMOKE_SUPABASE_ANON_KEY: sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ
+          DUEVINCI_SMOKE_SKIP_SUPPORT: 'true'
+        run: node scripts/release-smoke.mjs
