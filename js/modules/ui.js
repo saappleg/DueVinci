@@ -82,7 +82,7 @@ export function toggleSidebar(forceOpen = null) {
 
 export function injectAppearanceSettingsExtras() {
     if (typeof document === 'undefined') return;
-    const appearanceTab = document.getElementById('content-appearance');
+    const appearanceTab = document.getElementById('content-workspace');
     if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
 
     const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
@@ -155,7 +155,7 @@ export function injectAppearanceSettingsExtras() {
 
 function injectReminderSettings() {
     if (typeof document === 'undefined') return;
-    const appearanceTab = document.getElementById('content-appearance');
+    const appearanceTab = document.getElementById('content-reminders');
     if (!appearanceTab || document.getElementById('reminderSettingsContainer')) return;
     const container = document.createElement('div');
     container.id = 'reminderSettingsContainer';
@@ -184,6 +184,8 @@ export function ensureSettingsModalExists() {
                         <nav class="flex gap-1 overflow-x-auto sm:block sm:space-y-1">
                             <button type="button" onclick="switchSettingsTab('profile')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
                             <button type="button" onclick="switchSettingsTab('appearance')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                            <button type="button" onclick="switchSettingsTab('workspace')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-workspace">Study & Workspace</button>
+                            <button type="button" onclick="switchSettingsTab('reminders')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-reminders">Reminders</button>
                             <button type="button" onclick="switchSettingsTab('backup')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
                             <button type="button" onclick="switchSettingsTab('privacy')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
                             <button type="button" onclick="switchSettingsTab('canvas')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">💳 Subscription</button>
@@ -283,6 +285,9 @@ export function ensureSettingsModalExists() {
                             </select>
                         </div>
                     </div>
+
+                    <div id="content-workspace" class="hidden space-y-6"><div><h2 class="text-xl font-bold dark:text-white mb-1">Study & Workspace</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Customize study tools and choose what you see.</p></div></div>
+                    <div id="content-reminders" class="hidden space-y-6"><div><h2 class="text-xl font-bold dark:text-white mb-1">Reminders</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Control due-date reminders and browser alerts.</p></div></div>
 
                     <!-- Tab: Backup & Cloud Sync -->
                     <div id="content-backup" class="hidden space-y-6">
@@ -592,7 +597,7 @@ export function showSettingsMovedNotice() {
 }
 
 export function switchSettingsTab(tabName) {
-    const tabs = ['profile', 'appearance', 'backup', 'privacy', 'canvas'];
+    const tabs = ['profile', 'appearance', 'workspace', 'reminders', 'backup', 'privacy', 'canvas'];
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);
