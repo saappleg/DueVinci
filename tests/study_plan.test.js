@@ -7,6 +7,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
     let ensureStudyPlanDayModalExists;
     let closeStudyPlanDayModal;
     let startStudyPlanTimer;
+    let getStudyPlanMoveError;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/studyPlan.js');
@@ -16,6 +17,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         ensureStudyPlanDayModalExists = mod.ensureStudyPlanDayModalExists || globalThis.ensureStudyPlanDayModalExists;
         closeStudyPlanDayModal = mod.closeStudyPlanDayModal || globalThis.closeStudyPlanDayModal;
         startStudyPlanTimer = mod.startStudyPlanTimer || globalThis.startStudyPlanTimer;
+        getStudyPlanMoveError = mod.getStudyPlanMoveError || globalThis.getStudyPlanMoveError;
     });
 
     describe('getUnitNumber and getLessonNumber Helpers', () => {
@@ -209,6 +211,21 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(plan[1].totalMinutes).toBe(0);
             expect(plan.flatMap((day) => day.allBlocks).map((block) => block.taskId).sort()).toEqual(assignments.map((task) => task.id).sort());
             expect(plan.slice(0, 4).some((day, index) => index > 0 && !day.isRestDay && day.allBlocks.length > 0)).toBe(true);
+        });
+
+        it('only allows manual moves that preserve deadlines, rest days, and lesson sequence', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = [{ id: 'c1', code: 'CS 101', name: 'Computer Science' }];
+            const assignments = [
+                { id: 'l1', course_id: 'c1', unit_number: 1, title: 'Lesson 1: Foundations', due_date: '2026-08-24', is_completed: false },
+                { id: 'l2', course_id: 'c1', unit_number: 1, title: 'Lesson 2: Practice', due_date: '2026-08-24', is_completed: false }
+            ];
+            generateBalancedStudyPlan(courses, assignments, baseDate, 6, ['Fri']);
+
+            expect(getStudyPlanMoveError('l1', '2026-08-21')).toContain('Rest days');
+            expect(getStudyPlanMoveError('l1', '2026-08-23')).toContain('lessons in order');
+            expect(getStudyPlanMoveError('l2', '2026-08-22')).toBe('');
+            expect(getStudyPlanMoveError('l2', '2026-08-25')).toContain('due date');
         });
 
         it('progresses strictly lesson by lesson through Unit 1 before starting Unit 2, and pairs different subjects together on each day', () => {

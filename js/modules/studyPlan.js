@@ -4,6 +4,117 @@ import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti } from './utils.js';
 
 let cachedStudyPlan = [];
+const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
+let draggedStudyPlanTaskId = null;
+let studyPlanMoveNotice = '';
+
+function getManualStudyMoves() {
+    try { return JSON.parse(localStorage.getItem(MANUAL_PLAN_MOVES_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveManualStudyMoves(moves) {
+    try { localStorage.setItem(MANUAL_PLAN_MOVES_KEY, JSON.stringify(moves)); } catch { /* Optional local preference. */ }
+}
+
+function applyManualStudyMoves(days) {
+    const moves = getManualStudyMoves();
+    let changed = false;
+    Object.entries(moves).forEach(([taskId, targetDate]) => {
+        const source = days.find((day) => day.assignedTasks.some((entry) => entry.task.id === taskId));
+        const target = days.find((day) => day.date === targetDate);
+        const entry = source?.assignedTasks.find((item) => item.task.id === taskId);
+        if (!source || !target || !entry || target.isRestDay || calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0) {
+            delete moves[taskId]; changed = true; return;
+        }
+        if (source !== target) {
+            source.assignedTasks = source.assignedTasks.filter((item) => item.task.id !== taskId);
+            target.assignedTasks.push(entry);
+        }
+    });
+    if (changed) saveManualStudyMoves(moves);
+}
+
+function getStudyPlanBlock(taskId) {
+    for (const day of cachedStudyPlan) {
+        const block = day.allBlocks?.find((item) => item.taskId === taskId);
+        if (block) return { block, day };
+    }
+    return null;
+}
+
+/** Checks whether a manual move preserves rest days, deadlines, and lesson order. */
+export function getStudyPlanMoveError(taskId, targetDate) {
+    const source = getStudyPlanBlock(taskId);
+    const target = cachedStudyPlan.find((day) => day.date === targetDate);
+    if (!source || !target) return 'That study block is no longer available. Refresh the plan and try again.';
+    if (target.isRestDay) return 'Rest days are protected. Choose an active study day instead.';
+    if (calculateDaysRemaining(source.block.dueDate, target.currentDate) < 0) return 'That assignment cannot be moved past its due date.';
+
+    if (source.block.lessonNumber !== null) {
+        const unitLessons = cachedStudyPlan.flatMap((day) => day.allBlocks
+            .filter((block) => block.courseId === source.block.courseId
+                && block.unitNumber === source.block.unitNumber
+                && block.lessonNumber !== null)
+            .map((block) => ({ block, date: day.date })));
+        const hasEarlierLessonAfterTarget = unitLessons.some(({ block, date }) =>
+            block.lessonNumber < source.block.lessonNumber && date > targetDate);
+        const hasLaterLessonBeforeTarget = unitLessons.some(({ block, date }) =>
+            block.lessonNumber > source.block.lessonNumber && date < targetDate);
+        if (hasEarlierLessonAfterTarget || hasLaterLessonBeforeTarget) {
+            return 'Keep lessons in order: move the earlier or later lesson first.';
+        }
+    }
+    return '';
+}
+
+function rerenderStudyPlanWithNotice(message) {
+    studyPlanMoveNotice = message;
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        return window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+    return Promise.resolve();
+}
+
+export function startStudyPlanDrag(event, taskId) {
+    draggedStudyPlanTaskId = taskId;
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', taskId);
+    }
+}
+
+export function allowStudyPlanDrop(event) {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+export async function dropStudyPlanBlock(event, targetDate) {
+    event.preventDefault();
+    event.stopPropagation();
+    const taskId = event.dataTransfer?.getData('text/plain') || draggedStudyPlanTaskId;
+    draggedStudyPlanTaskId = null;
+    if (taskId) await moveStudyPlanBlock(taskId, targetDate);
+}
+
+export async function moveStudyPlanBlock(taskId, targetDate) {
+    const error = getStudyPlanMoveError(taskId, targetDate);
+    if (error) {
+        await rerenderStudyPlanWithNotice(error);
+        return false;
+    }
+    const source = getStudyPlanBlock(taskId);
+    const moves = getManualStudyMoves();
+    if (source.day.date === targetDate) delete moves[taskId];
+    else moves[taskId] = targetDate;
+    saveManualStudyMoves(moves);
+    await rerenderStudyPlanWithNotice('Study block moved. Refresh keeps your manual placements.');
+    return true;
+}
+
+export async function resetManualStudyPlanMoves() {
+    try { localStorage.removeItem(MANUAL_PLAN_MOVES_KEY); } catch { /* Optional local preference. */ }
+    await rerenderStudyPlanWithNotice('Manual placements reset to the balanced plan.');
+}
 
 /**
  * Extracts unit number from an assignment or task object.
@@ -481,6 +592,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // lesson on day zero. Rebalance only when there is later, non-rest time
     // before the item's own deadline.
     rebalanceStudyPlanAssignments(days);
+    applyManualStudyMoves(days);
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {
@@ -908,7 +1020,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         } else {
             day.blocks.forEach(b => {
                 blocksHtml += `
-                    <div class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
+                    <div draggable="true" ondragstart="startStudyPlanDrag(event, '${escapeInlineJs(b.taskId)}')" onclick="event.stopPropagation()" class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs cursor-grab active:cursor-grabbing" title="Drag to another eligible study day">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-sm shrink-0">${escapeHtml(b.courseEmoji)}</span>
                             <div class="truncate flex items-center gap-1">
@@ -934,7 +1046,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         }
 
         daysHtml += `
-            <div onclick="openStudyPlanDayModal('${day.date}')" class="group cursor-pointer p-3.5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${day.isRestDay ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/70 dark:border-emerald-800/40' : (day.isToday ? 'bg-indigo-50/50 dark:bg-brand-800 border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20' : 'bg-zinc-50/80 dark:bg-brand-800 border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500')} space-y-2.5">
+            <div onclick="openStudyPlanDayModal('${day.date}')" ondragover="allowStudyPlanDrop(event)" ondrop="dropStudyPlanBlock(event, '${day.date}')" class="group cursor-pointer p-3.5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${day.isRestDay ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/70 dark:border-emerald-800/40' : (day.isToday ? 'bg-indigo-50/50 dark:bg-brand-800 border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20' : 'bg-zinc-50/80 dark:bg-brand-800 border-zinc-200 dark:border-brand-700 hover:border-indigo-400 dark:hover:border-indigo-500')} space-y-2.5">
                 <div class="flex justify-between items-center text-xs">
                     <span class="font-extrabold flex items-center gap-1.5 ${day.isRestDay ? 'text-emerald-700 dark:text-emerald-300' : (day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300')}">
                         ${day.dayOfWeek}, ${day.displayDate}
@@ -974,9 +1086,11 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                         <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 px-1.5">Rest:</span>
                         ${dayPillsHtml}
                     </div>
+                    <button type="button" onclick="resetManualStudyPlanMoves()" class="text-xs text-zinc-500 dark:text-zinc-400 font-bold hover:underline px-2 py-1">Reset moves</button>
                     <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh</button>
                 </div>
             </div>
+            <p aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag a study block to an active day before its due date. Lesson order stays protected.'}</p>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
             </div>
@@ -998,3 +1112,8 @@ _studyScope.openStudyPlanDayModal = openStudyPlanDayModal;
 _studyScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
 _studyScope.startStudyPlanTimer = startStudyPlanTimer;
 _studyScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
+_studyScope.startStudyPlanDrag = startStudyPlanDrag;
+_studyScope.allowStudyPlanDrop = allowStudyPlanDrop;
+_studyScope.dropStudyPlanBlock = dropStudyPlanBlock;
+_studyScope.moveStudyPlanBlock = moveStudyPlanBlock;
+_studyScope.resetManualStudyPlanMoves = resetManualStudyPlanMoves;
