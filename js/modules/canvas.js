@@ -127,7 +127,7 @@ export async function initCanvasSettingsTab() {
 
         const { data: profile, error } = await supabaseClient
             .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, canvas_domain, canvas_last_synced_at')
+            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -171,6 +171,15 @@ export async function initCanvasSettingsTab() {
             _showConnectorOrSync(profile);
         } else if (status === 'active') {
             msg.textContent = 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.';
+            const endDate = profile.subscription_cancel_at || profile.subscription_current_period_end;
+            if (endDate) {
+                const formattedDate = new Date(endDate).toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                });
+                msg.textContent += profile.subscription_cancel_at_period_end || profile.subscription_cancel_at
+                    ? ` Your access ends on ${formattedDate}.`
+                    : ` Your plan renews on ${formattedDate}.`;
+            }
             manageBillingBtn?.classList.remove('hidden');
             _showConnectorOrSync(profile);
         } else if (status === 'past_due' || status === 'unpaid') {

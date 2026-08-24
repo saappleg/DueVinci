@@ -70,13 +70,20 @@ serve(async (req) => {
       updatePayload.subscription_status = dataObj.status
       updatePayload.stripe_subscription_id = dataObj.id
       if (dataObj.metadata?.plan_key) updatePayload.subscription_plan = dataObj.metadata.plan_key
+      if (dataObj.current_period_end) {
+        updatePayload.subscription_current_period_end = new Date(dataObj.current_period_end * 1000).toISOString()
+      }
+      updatePayload.subscription_cancel_at_period_end = Boolean(dataObj.cancel_at_period_end)
+      updatePayload.subscription_cancel_at = dataObj.cancel_at
+        ? new Date(dataObj.cancel_at * 1000).toISOString()
+        : null
     } else if (event.type === 'invoice.payment_succeeded') {
       updatePayload.subscription_status = 'active'
     } else if (event.type === 'invoice.payment_failed') {
       updatePayload.subscription_status = 'past_due'
     }
 
-    // Capture trial_end if present
+    // Capture trial_end if present.
     if (dataObj.trial_end) {
       updatePayload.trial_end = new Date(dataObj.trial_end * 1000).toISOString()
     }
