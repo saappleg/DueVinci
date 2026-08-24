@@ -37,7 +37,8 @@ class DueVinciSidebar extends BaseElement {
         const navInactiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
 
         this.innerHTML = `
-        <aside class="w-64 bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-colors duration-200 overflow-y-auto shrink-0 h-full">
+        <div id="sidebarBackdrop" onclick="toggleSidebar(false)" class="hidden fixed inset-0 z-30 bg-zinc-900/50 backdrop-blur-[1px] lg:hidden"></div>
+        <aside id="appSidebar" class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-transform duration-200 overflow-y-auto shrink-0 h-full lg:static lg:z-auto lg:w-64 lg:translate-x-0">
             <div class="border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>

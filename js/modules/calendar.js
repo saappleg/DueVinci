@@ -2,6 +2,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti } from './utils.js';
+import { generateBalancedStudyPlan } from './studyPlan.js';
 
 export let calendarInstance = null;
 
@@ -93,6 +94,30 @@ export async function loadCalendarCourses() {
     if (customEvents) customEvents.forEach(ev => {
         calendarEvents.push({ title: ev.title, start: ev.event_date, color: ev.color, extendedProps: { isCustom: true, eventId: ev.id } });
     });
+
+    // Planned focus blocks are separate from due dates: they show when the
+    // student intends to work, without changing the assignment itself.
+    if (courses && assignments) {
+        const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 21);
+        let syncedMoves = [];
+        if (currentUser?.id) {
+            const { data } = await supabaseClient.from('study_plan_moves')
+                .select('task_id, planned_for')
+                .eq('user_id', currentUser.id);
+            syncedMoves = data || [];
+        }
+        const remoteMoveByTask = new Map(syncedMoves.filter((move) => move.planned_for).map((move) => [move.task_id, move.planned_for]));
+        plan.forEach((day) => day.allBlocks.forEach((block) => {
+            const plannedFor = remoteMoveByTask.get(block.taskId) || day.date;
+            calendarEvents.push({
+                title: `🧠 Study · ${block.courseCode}: ${block.title}`,
+                start: plannedFor,
+                color: '#6366f1',
+                textColor: '#ffffff',
+                extendedProps: { isStudyPlan: true, taskId: block.taskId, durationMinutes: block.durationMinutes },
+            });
+        }));
+    }
 
     if (calendarInstance) {
         calendarInstance.removeAllEvents();

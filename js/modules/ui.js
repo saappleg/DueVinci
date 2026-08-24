@@ -45,11 +45,19 @@ export function updateGpaScale(scale) {
     if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
 }
 
-export function toggleSidebar() {
+export function toggleSidebar(forceOpen = null) {
     if (typeof document === 'undefined') return;
-    const aside = document.querySelector('aside');
+    const aside = document.getElementById('appSidebar') || document.querySelector('aside');
     if (aside) {
-        aside.classList.toggle('hidden');
+        const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
+        if (isMobile) {
+            const shouldOpen = forceOpen === null ? aside.classList.contains('-translate-x-full') : Boolean(forceOpen);
+            aside.classList.toggle('-translate-x-full', !shouldOpen);
+            document.getElementById('sidebarBackdrop')?.classList.toggle('hidden', !shouldOpen);
+        } else {
+            if (forceOpen === null) aside.classList.toggle('hidden');
+            else aside.classList.toggle('hidden', !forceOpen);
+        }
         if (typeof window.updateFloatingTimer === 'function') window.updateFloatingTimer();
     }
 }
