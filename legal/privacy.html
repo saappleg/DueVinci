@@ -52,7 +52,7 @@
             <div class="border-b border-zinc-200 dark:border-brand-700 pb-6">
                 <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider block mb-1">Privacy & Compliance</span>
                 <h1 class="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Privacy Policy & Data Retention</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 23, 2026</p>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 24, 2026</p>
             </div>
 
             <!-- Section 1 -->
@@ -73,7 +73,7 @@
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">A. Account & Authentication Data</h3>
                         <p class="leading-relaxed">
-                            When you register or sign in, we collect your <strong>email address</strong> and authentication credentials managed securely through Supabase Auth (including WebAuthn/Passkey public key credentials where enabled).
+                            When you register or sign in, we collect your <strong>email address</strong> and authentication credentials managed securely through Supabase Auth (including WebAuthn/Passkey public key credentials where enabled). You may also provide a display name and an optional profile photo.
                         </p>
                     </div>
 
@@ -87,7 +87,7 @@
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">C. AI Document Processing Inputs</h3>
                         <p class="leading-relaxed">
-                            When you upload syllabus PDFs or lesson screenshots for AI scheduling, the extracted text or image payload is transmitted ephemerally to our secure Supabase Edge Function to interface with Google Gemini. <strong>Files and prompt inputs are processed in-flight and are not used to train generalized foundation models.</strong>
+                            When you upload syllabus PDFs or lesson screenshots for AI scheduling, the extracted text or image payload is transmitted through a secure Supabase Edge Function to interface with Google Gemini. DueVinci does not use this content to train its own models. Google’s handling of API prompts and responses depends on the applicable Gemini service tier and terms; do not submit highly sensitive personal information to AI features.
                         </p>
                     </div>
 
@@ -170,9 +170,9 @@
                     You have the right to permanently purge your account and all associated data at any time. DueVinci provides an automated, self-service <strong>Delete Account & Purge Data</strong> option inside the Settings modal.
                 </p>
                 <div class="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-700 dark:text-red-300 space-y-1">
-                    <p class="font-bold">Immediate Deletion Guarantee:</p>
+                    <p class="font-bold">What account deletion does:</p>
                     <p class="leading-relaxed">
-                        When you confirm account deletion, your user record, enrolled courses, assignments, custom calendar events, and offline caches are permanently erased immediately across database tables and local storage.
+                        When you confirm account deletion, DueVinci removes the account, primary academic records, and profile photo, and signs the browser out. Browser caches are cleared by the app where possible. Limited records held by infrastructure or AI providers may remain subject to their own policies and applicable legal obligations.
                     </p>
                 </div>
             </div>
@@ -187,6 +187,7 @@
                     <li><strong>Transport Layer Security (TLS/HTTPS):</strong> All network traffic between your client browser and our servers is encrypted with modern TLS ciphers.</li>
                     <li><strong>Row Level Security (RLS):</strong> Database tables enforce PostgreSQL RLS policies ensuring users can only read and mutate records matching their authenticated UUID.</li>
                     <li><strong>Protected API Gateways:</strong> Gemini API keys are isolated within server-side Supabase Vault secrets and are never exposed in client bundles.</li>
+                    <li><strong>Private Profile Photos:</strong> Profile photos are protected by per-user access controls.</li>
                 </ul>
             </div>
 
@@ -204,9 +205,9 @@
 
             <!-- Section 8: Contact -->
             <div class="border-t border-zinc-200 dark:border-brand-700 pt-6 space-y-2">
-                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">8. Contact & Questions</h2>
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">8. Your Choices, Rights & Contact</h2>
                 <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    If you have questions, concerns, or requests regarding this policy or how your data is handled, please reach out to our team at <a href="mailto:support@duevinci.tech" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">support@duevinci.tech</a>.
+                    You can update much of your account information in Settings, export your data, or delete your account. To request access, correction, deletion, or information about how your data is handled, contact <a href="mailto:support@duevinci.tech" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">support@duevinci.tech</a>. We may need to verify your request before acting on it.
                 </p>
             </div>
 
