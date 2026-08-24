@@ -48,6 +48,7 @@ export async function handleAuth(session) {
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
         if (typeof window !== 'undefined') window.currentUser = currentUser;
         refreshProfileAvatar(currentUser).catch(() => {});
+        setTimeout(() => window.showSettingsMovedNotice?.(), 0);
 
         // Never block cached-page rendering on a cloud preference request.
         // Chrome's DevTools offline mode can still report navigator.onLine,
