@@ -1,6 +1,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
+import { uploadProfileAvatar, removeProfileAvatar } from './profileAvatar.js';
 
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
@@ -151,6 +152,17 @@ export function ensureSettingsModalExists() {
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>
+                                <div class="flex items-center gap-3">
+                                    <label class="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition">Upload photo
+                                        <input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
+                                    </label>
+                                    <button type="button" onclick="removeProfileAvatar()" class="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400">Remove</button>
+                                    <span class="text-[11px] text-zinc-400">JPG, PNG, or WebP · up to 2 MB</span>
+                                </div>
+                                <p id="avatarMsg" class="hidden mt-2 text-xs"></p>
+                            </div>
                             <div>
                                 <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
                                 <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
@@ -441,6 +453,11 @@ export function openSettingsModal() {
     if (currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
+        const avatarInput = document.getElementById('profileAvatarInput');
+        if (avatarInput && !avatarInput.dataset.bound) {
+            avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
+            avatarInput.dataset.bound = 'true';
+        }
     }
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
@@ -840,4 +857,6 @@ if (typeof window !== 'undefined') {
     window.updateSupportTicketStatus = updateSupportTicketStatus;
     window.sendDirectMailto = sendDirectMailto;
     window.confirmAccountDeletion = confirmAccountDeletion;
+    window.uploadProfileAvatar = (event) => uploadProfileAvatar(event?.target?.files?.[0], currentUser);
+    window.removeProfileAvatar = () => removeProfileAvatar(currentUser);
 }

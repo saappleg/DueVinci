@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v5.0';
+const CACHE_NAME = 'duevinci-v5.1';
 const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
@@ -33,6 +33,7 @@ const ASSETS_TO_CACHE = [
   './js/modules/markdown.js',
   './js/modules/studyPlan.js',
   './js/modules/offlineDb.js',
+  './js/modules/profileAvatar.js',
   './js/modules/components.js',
   './js/modules/backup.js',
   './js/modules/tour.js',

@@ -2,6 +2,7 @@
 import { supabaseClient } from './config.js';
 import { getCurrentPageName, getBasePath, getTourCookie } from './utils.js';
 import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
+import { refreshProfileAvatar } from './profileAvatar.js';
 
 export let currentUser = null;
 let lastProcessedSessionToken = undefined;
@@ -45,6 +46,8 @@ export async function handleAuth(session) {
         }
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
+        if (typeof window !== 'undefined') window.currentUser = currentUser;
+        refreshProfileAvatar(currentUser).catch(() => {});
 
         // Never block cached-page rendering on a cloud preference request.
         // Chrome's DevTools offline mode can still report navigator.onLine,
@@ -78,6 +81,7 @@ export async function handleAuth(session) {
         }
     } else {
         currentUser = null;
+        if (typeof window !== 'undefined') window.currentUser = null;
         stopPreferenceSync();
         const page = getCurrentPageName();
         if (page !== 'index' && page !== 'index.html') {

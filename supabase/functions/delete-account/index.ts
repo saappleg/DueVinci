@@ -8,6 +8,8 @@ Deno.serve(async (req) => {
     const { admin, user } = await authenticatedUser(req)
     const { error: canvasError } = await admin.from('canvas_connections').delete().eq('user_id', user.id)
     if (canvasError) throw canvasError
+    const { error: avatarError } = await admin.storage.from('profile-avatars').remove([`${user.id}/avatar`])
+    if (avatarError && !/not found/i.test(avatarError.message || '')) throw avatarError
     const { error: authError } = await admin.auth.admin.deleteUser(user.id)
     if (authError) throw authError
     return json({ success: true })
