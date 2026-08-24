@@ -447,6 +447,7 @@ export function ensureSettingsModalExists() {
                                 </div>
                             </div>
                         </div>
+                    </div>
 
                     <!-- Tab: Subscription -->
                     <div id="content-canvas" class="hidden space-y-5">
