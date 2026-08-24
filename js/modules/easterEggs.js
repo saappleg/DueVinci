@@ -32,6 +32,9 @@ export function ensureCommandPaletteExists() {
         </div>
     `;
     document.body.appendChild(div);
+    div.addEventListener('click', (event) => {
+        if (event.target === div) toggleCommandPalette();
+    });
 
     const input = div.querySelector('#cmdInput');
     if (input) {

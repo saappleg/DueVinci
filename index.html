@@ -192,7 +192,7 @@
     </div>
 
     <!-- Modular Settings Modal -->
-    <div id="settingsModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="settingsModal" onclick="if (event.target === this) closeSettingsModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[460px] max-h-[90vh]">
             <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
                 <div>
@@ -469,7 +469,7 @@
                     </div>
 
                     <!-- Canvas Sync Modal -->
-                    <div id="canvasSyncModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                    <div id="canvasSyncModal" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                         <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                             <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                 <div>

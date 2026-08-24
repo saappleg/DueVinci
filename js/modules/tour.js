@@ -38,6 +38,9 @@ export function showFirstRunOnboarding(user) {
         </div>`;
     document.body.appendChild(modal);
     const finish = () => { localStorage.setItem(onboardingKey(user), 'true'); modal.remove(); };
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) finish();
+    });
     document.getElementById('onboardingAddClass')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
     document.getElementById('onboardingTour')?.addEventListener('click', () => { finish(); startWalkthrough(false); });
     document.getElementById('onboardingDismiss')?.addEventListener('click', finish);
@@ -183,6 +186,9 @@ export function ensureWhatsNewModalExists() {
         </div>
     `;
     document.body.appendChild(div);
+    div.addEventListener('click', (event) => {
+        if (event.target === div) closeWhatsNewModal();
+    });
 }
 
 export function openWhatsNewModal() {

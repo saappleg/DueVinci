@@ -96,7 +96,7 @@
     </div>
 
     <!-- Add Custom Event Modal -->
-    <div id="eventModal" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="eventModal" onclick="if (event.target === this) closeEventModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
             <div class="flex justify-between items-center border-b border-zinc-200 dark:border-brand-700 pb-3">
                 <h3 class="text-lg font-bold dark:text-white">Add Schedule Event</h3>

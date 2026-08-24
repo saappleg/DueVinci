@@ -392,6 +392,9 @@ export function ensureTermModalExists() {
                 </div>
             </div>`;
         document.body.appendChild(div);
+        div.addEventListener('click', (event) => {
+            if (event.target === div) closeTermModal();
+        });
     }
 }
 
@@ -1314,6 +1317,9 @@ export async function openQuickAddModal() {
             </div>
         `;
         document.body.appendChild(div);
+        div.addEventListener('click', (event) => {
+            if (event.target === div) closeQuickAddModal();
+        });
     }
 
     const select = document.getElementById('quickAddCourseSelect');

@@ -444,7 +444,7 @@ export function ensureSettingsModalExists() {
                         </div>
 
                         <!-- Canvas Sync Modal -->
-                        <div id="canvasSyncModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                        <div id="canvasSyncModal" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                             <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                                 <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                     <div>
@@ -475,6 +475,9 @@ export function ensureSettingsModalExists() {
             </div>
         `;
         document.body.appendChild(div);
+        div.addEventListener('click', (event) => {
+            if (event.target === div) closeSettingsModal();
+        });
     }
 
     const form = document.getElementById('settingsForm');
@@ -590,10 +593,14 @@ export function showSettingsMovedNotice() {
             <button type="button" id="settingsMovedDismiss" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button>
         </section>`;
     document.body.appendChild(modal);
-    document.getElementById('settingsMovedDismiss')?.addEventListener('click', () => {
+    const dismiss = () => {
         localStorage.setItem(SETTINGS_MOVED_NOTICE_KEY, 'true');
         modal.remove();
+    };
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) dismiss();
     });
+    document.getElementById('settingsMovedDismiss')?.addEventListener('click', dismiss);
 }
 
 export function switchSettingsTab(tabName) {
@@ -758,6 +765,9 @@ export function ensureSupportModalExists() {
             </div>
         `;
         document.body.appendChild(div);
+        div.addEventListener('click', (event) => {
+            if (event.target === div) closeSupportModal();
+        });
     }
 }
 
