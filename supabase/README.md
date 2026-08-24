@@ -14,7 +14,9 @@ supabase db push --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy start-trial --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-portal-session canvas-connect canvas-courses canvas-sync canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
-supabase functions deploy stripe-webhook --project-ref kinsxkeerxguqkyzrjfm
+# Stripe does not send a Supabase JWT; stripe-webhook verifies Stripe's signed
+# payload itself, so it must be deployed without the gateway JWT requirement.
+supabase functions deploy stripe-webhook --no-verify-jwt --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy submit-support-ticket --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy manage-support-tickets --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy report-client-error --project-ref kinsxkeerxguqkyzrjfm
