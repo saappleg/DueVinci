@@ -113,6 +113,54 @@ export function toggleRestDay(dayName) {
     return updated;
 }
 
+const DEFAULT_DAILY_FOCUS_CAP = 120;
+
+function estimatedMinutes(task) {
+    const type = task.task_type || task.type || '';
+    return type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
+}
+
+function taskMovePriority(task) {
+    const priority = task.priority || 'medium';
+    return priority === 'low' ? 2 : priority === 'high' || priority === 'urgent' ? 0 : 1;
+}
+
+/**
+ * Spreads independently allocated course work without moving an item past its
+ * deadline or onto a rest day. Moving later is curriculum-safe: it cannot put
+ * a later lesson before an earlier one already scheduled on the source day.
+ */
+export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP) {
+    const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task), 0);
+    for (let sourceIndex = 0; sourceIndex < days.length; sourceIndex++) {
+        let source = days[sourceIndex];
+        while (minutesForDay(source) > cap) {
+            const candidates = [...source.assignedTasks]
+                .map((entry, index) => ({ entry, index }))
+                .sort((a, b) => {
+                    const deadlineA = calculateDaysRemaining(a.entry.task.due_date, source.currentDate);
+                    const deadlineB = calculateDaysRemaining(b.entry.task.due_date, source.currentDate);
+                    return deadlineB - deadlineA || taskMovePriority(b.entry.task) - taskMovePriority(a.entry.task) || b.index - a.index;
+                });
+            let moved = false;
+            for (const candidate of candidates) {
+                const deadlineIndex = sourceIndex + Math.max(0, calculateDaysRemaining(candidate.entry.task.due_date, source.currentDate));
+                for (let targetIndex = sourceIndex + 1; targetIndex < days.length && targetIndex <= deadlineIndex; targetIndex++) {
+                    const target = days[targetIndex];
+                    if (target.isRestDay || minutesForDay(target) + estimatedMinutes(candidate.entry.task) > cap) continue;
+                    source.assignedTasks.splice(candidate.index, 1);
+                    target.assignedTasks.push(candidate.entry);
+                    moved = true;
+                    break;
+                }
+                if (moved) break;
+            }
+            if (!moved) break; // Hard deadlines/rest days make the load unavoidable.
+        }
+    }
+    return days;
+}
+
 /**
  * Calculates a balanced daily study schedule across multiple enrolled courses.
  * Enforces proper unit-lesson organization, strict sequential order, deadline-driven pacing, and rest day exclusion.
@@ -428,6 +476,11 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             currentDayPointer = Math.min(daysAhead - 1, lastDayAssigned + 1);
         });
     });
+
+    // A course-by-course allocation can otherwise stack every course's first
+    // lesson on day zero. Rebalance only when there is later, non-rest time
+    // before the item's own deadline.
+    rebalanceStudyPlanAssignments(days);
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {

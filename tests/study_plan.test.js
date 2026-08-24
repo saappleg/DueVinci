@@ -197,6 +197,20 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(plan[0].allBlocks.length).toBe(1);
         });
 
+        it('rebalances independent classes away from an overloaded first day without crossing deadlines or rest days', () => {
+            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const courses = Array.from({ length: 6 }, (_, index) => ({ id: `c${index}`, code: `C${index}`, name: `Class ${index}` }));
+            const assignments = courses.map((course, index) => ({
+                id: `a${index}`, course_id: course.id, title: `Lesson 1: Task ${index}`, due_date: '2026-08-23', is_completed: false,
+            }));
+            const plan = generateBalancedStudyPlan(courses, assignments, baseDate, 4, ['Fri']);
+            expect(plan[1].isRestDay).toBe(true);
+            expect(plan[0].totalMinutes).toBeLessThanOrEqual(120);
+            expect(plan[1].totalMinutes).toBe(0);
+            expect(plan.flatMap((day) => day.allBlocks).map((block) => block.taskId).sort()).toEqual(assignments.map((task) => task.id).sort());
+            expect(plan.slice(0, 4).some((day, index) => index > 0 && !day.isRestDay && day.allBlocks.length > 0)).toBe(true);
+        });
+
         it('progresses strictly lesson by lesson through Unit 1 before starting Unit 2, and pairs different subjects together on each day', () => {
             const baseDate = new Date('2026-08-20T00:00:00Z');
             const courses = [
@@ -404,4 +418,3 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
     });
 });
-
