@@ -18,6 +18,7 @@ import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUs
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, completeTodayTask, startTodayFocus } from './modules/today.js';
+import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
 import { initializeErrorReporting } from './modules/errorReporting.js';
@@ -184,6 +185,9 @@ export {
     renderTodayWorkspace,
     completeTodayTask,
     startTodayFocus,
+    summarizeWeeklyPlan,
+    renderWeeklyReview,
+    openWeeklyPlan,
     toggleCommandPalette,
     filterCommandPalette,
     executeCmd,
@@ -352,6 +356,8 @@ _rootScope.saveReminderSettingsFromUI = window.saveReminderSettingsFromUI;
 _rootScope.renderTodayWorkspace = renderTodayWorkspace;
 _rootScope.completeTodayTask = completeTodayTask;
 _rootScope.startTodayFocus = startTodayFocus;
+_rootScope.renderWeeklyReview = renderWeeklyReview;
+_rootScope.openWeeklyPlan = openWeeklyPlan;
 _rootScope.toggleCommandPalette = toggleCommandPalette;
 _rootScope.filterCommandPalette = filterCommandPalette;
 _rootScope.executeCmd = executeCmd;
