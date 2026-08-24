@@ -487,6 +487,30 @@ export function closeSettingsModal() {
     if (msg) msg.classList.add('hidden');
 }
 
+const SETTINGS_MOVED_NOTICE_KEY = 'duevinci_settings_moved_notice_v1';
+
+export function showSettingsMovedNotice() {
+    if (typeof document === 'undefined' || typeof localStorage === 'undefined') return;
+    if (localStorage.getItem(SETTINGS_MOVED_NOTICE_KEY)) return;
+    if (document.getElementById('settingsMovedNotice')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'settingsMovedNotice';
+    modal.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-zinc-900/55 p-4 backdrop-blur-sm';
+    modal.innerHTML = `
+        <section class="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-7 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800" role="dialog" aria-modal="true" aria-labelledby="settingsMovedTitle">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-2xl dark:bg-indigo-500/20">⚙️</div>
+            <h2 id="settingsMovedTitle" class="mt-5 text-xl font-extrabold text-zinc-900 dark:text-white">Settings have moved</h2>
+            <p class="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-300">Your profile card at the bottom of the sidebar is now your home for Settings, account details, and your profile photo.</p>
+            <button type="button" id="settingsMovedDismiss" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button>
+        </section>`;
+    document.body.appendChild(modal);
+    document.getElementById('settingsMovedDismiss')?.addEventListener('click', () => {
+        localStorage.setItem(SETTINGS_MOVED_NOTICE_KEY, 'true');
+        modal.remove();
+    });
+}
+
 export function switchSettingsTab(tabName) {
     const tabs = ['profile', 'appearance', 'backup', 'privacy', 'canvas'];
     tabs.forEach(t => {
@@ -847,6 +871,7 @@ if (typeof window !== 'undefined') {
     window.ensureSettingsModalExists = ensureSettingsModalExists;
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;
+    window.showSettingsMovedNotice = showSettingsMovedNotice;
     window.switchSettingsTab = switchSettingsTab;
     window.ensureSupportModalExists = ensureSupportModalExists;
     window.openSupportModal = openSupportModal;
