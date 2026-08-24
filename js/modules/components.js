@@ -10,13 +10,17 @@ import {
     updateTimerDisplay,
     initMultiTimersUI
 } from './timers.js';
-import { openSettingsModal, openSupportModal } from './ui.js';
+import { isWorkspaceFeatureVisible, openSettingsModal, openSupportModal } from './ui.js';
 import { renderProfileEasterEgg } from './profileAvatar.js';
 
 const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
 
 class DueVinciSidebar extends BaseElement {
     connectedCallback() {
+        this.refresh();
+    }
+
+    refresh() {
         this.render();
         setTimeout(() => {
             applyTimerCollapse();
@@ -35,6 +39,10 @@ class DueVinciSidebar extends BaseElement {
         const isGrades = currentPage === 'grades' || currentPage === 'grades.html';
         const isCalendar = currentPage === 'calendar' || currentPage === 'calendar.html';
         const isTutor = currentPage === 'tutor' || currentPage === 'tutor.html';
+        const showTimer = isWorkspaceFeatureVisible('timer');
+        const showGrades = isWorkspaceFeatureVisible('grades');
+        const showCalendar = isWorkspaceFeatureVisible('calendar');
+        const showTutor = isWorkspaceFeatureVisible('tutor');
 
         const navActiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
         const navInactiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
@@ -42,7 +50,7 @@ class DueVinciSidebar extends BaseElement {
         this.innerHTML = `
         <div id="sidebarBackdrop" onclick="toggleSidebar(false)" class="hidden fixed inset-0 z-30 bg-zinc-900/50 backdrop-blur-[1px] lg:hidden"></div>
         <aside id="appSidebar" class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full bg-zinc-100 dark:bg-brand-800 border-r border-zinc-200 dark:border-brand-700 flex flex-col justify-between transition-transform duration-200 overflow-y-auto shrink-0 h-full lg:static lg:z-auto lg:w-64 lg:translate-x-0">
-            <div class="border-b border-zinc-200 dark:border-brand-700">
+            <div class="${showTimer ? '' : 'hidden '}border-b border-zinc-200 dark:border-brand-700">
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>
                     <div class="flex gap-2">
@@ -90,13 +98,13 @@ class DueVinciSidebar extends BaseElement {
                     <a href="${basePath}courses/index.html" class="${isCourses ? navActiveStyle : navInactiveStyle}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Classes
                     </a>
-                    <a href="${basePath}grades/index.html" class="${isGrades ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}grades/index.html" class="${isGrades ? navActiveStyle : navInactiveStyle}${showGrades ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Grades
                     </a>
-                    <a href="${basePath}calendar/index.html" class="${isCalendar ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}calendar/index.html" class="${isCalendar ? navActiveStyle : navInactiveStyle}${showCalendar ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Calendar
                     </a>
-                    <a href="${basePath}tutor/index.html" class="${isTutor ? navActiveStyle : navInactiveStyle}">
+                    <a href="${basePath}tutor/index.html" class="${isTutor ? navActiveStyle : navInactiveStyle}${showTutor ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-1.2-.24-2.34-.68-3.38"/><path d="M8.5 10.5a3.5 3.5 0 1 1 5.5 2.87c-.96.69-1.5 1.21-1.5 2.63"/><path d="M12 18.5h.01"/></svg> Study Companion
                     </a>
                 </nav>

@@ -4,6 +4,19 @@ import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor']);
+
+export function isWorkspaceFeatureVisible(feature) {
+    if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
+    return localStorage.getItem(`duevinci_workspace_${feature}`) !== 'hidden';
+}
+
+export function setWorkspaceFeatureVisibility(feature, visible) {
+    if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return;
+    localStorage.setItem(`duevinci_workspace_${feature}`, visible ? 'visible' : 'hidden');
+    if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
+}
+
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
     if (typeof document === 'undefined') return;
@@ -74,6 +87,12 @@ export function injectAppearanceSettingsExtras() {
 
     const currentAlarmSound = localStorage.getItem('duevinci_alarm_sound') || 'gentleChime';
     const currentAmbientNoise = localStorage.getItem('duevinci_ambient_noise') || 'off';
+    const workspaceFeatures = [
+        ['timer', 'Focus timer', 'Hide the timer panel in the sidebar.'],
+        ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
+        ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
+        ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
+    ];
 
     const container = document.createElement('div');
     container.id = 'appearanceExtrasContainer';
@@ -121,6 +140,10 @@ export function injectAppearanceSettingsExtras() {
             <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Show Dashboard Academics Widget</span>
             <input type="checkbox" id="academicsSwitch" ${!isAcademicsHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
         </div>
+        <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter the sidebar. Nothing is deleted.</p></div>
+            ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
+        </section>
     `;
     appearanceTab.appendChild(container);
 }
@@ -920,6 +943,7 @@ if (typeof window !== 'undefined') {
     window.updateGpaScale = updateGpaScale;
     window.toggleSidebar = toggleSidebar;
     window.injectAppearanceSettingsExtras = injectAppearanceSettingsExtras;
+    window.setWorkspaceFeatureVisibility = setWorkspaceFeatureVisibility;
     window.ensureSettingsModalExists = ensureSettingsModalExists;
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;
