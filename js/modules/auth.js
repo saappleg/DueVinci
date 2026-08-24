@@ -62,6 +62,7 @@ export async function handleAuth(session) {
         const page = getCurrentPageName();
         if ((page === 'index' || page === 'index.html' || page === '') && document.getElementById('dashboardGrid')) {
             if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
+            if (typeof window.renderTodayWorkspace === 'function') window.renderTodayWorkspace();
             if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
             if (typeof window.renderStudyPlanDashboardWidget === 'function') window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
             setTimeout(() => window.showFirstRunOnboarding?.(currentUser), 500);
