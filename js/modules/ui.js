@@ -4,7 +4,7 @@ import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'study_plan', 'reminders', 'weekly_review']);
 
 export function isWorkspaceFeatureVisible(feature) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
@@ -92,6 +92,9 @@ export function injectAppearanceSettingsExtras() {
         ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
         ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
         ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
+        ['study_plan', 'Study plan', 'Hide the dashboard study-plan workspace.'],
+        ['reminders', 'Upcoming reminders', 'Hide the dashboard reminder card.'],
+        ['weekly_review', 'Weekly review', 'Hide the weekly planning prompt.'],
     ];
 
     const container = document.createElement('div');

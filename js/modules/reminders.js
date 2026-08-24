@@ -1,5 +1,6 @@
 // --- LOCAL-FIRST DUE DATE & CALENDAR REMINDERS ---
 import { supabaseClient } from './config.js';
+import { isWorkspaceFeatureVisible } from './ui.js';
 
 const ENABLED_KEY = 'duevinci_reminders_enabled';
 const OFFSETS_KEY = 'duevinci_reminder_offsets';
@@ -118,6 +119,10 @@ async function loadReminderData() {
 }
 
 export async function renderReminderDashboard() {
+    if (!isWorkspaceFeatureVisible('reminders')) {
+        document.getElementById('remindersDashboardCard')?.remove();
+        return;
+    }
     if (typeof document === 'undefined') return;
     const host = document.getElementById('dashboardGrid');
     if (!host) return;
@@ -131,12 +136,16 @@ export async function renderReminderDashboard() {
     const prefs = getReminderPreferences();
     const data = await loadReminderData();
     const items = collectReminderItems(data.assignments, data.customEvents, data.courses).slice(0, 4);
+    const nextAction = items[0]
+        ? items[0].daysUntil <= 0 ? `Start with “${items[0].title}” today.` : `Next step: plan time for “${items[0].title}”.`
+        : 'Nothing upcoming. Add a due date or calendar event to see it here.';
     card.innerHTML = `
         <div class="flex items-start justify-between gap-3 mb-4">
             <div><h3 class="text-md font-bold text-zinc-800 dark:text-zinc-200">🔔 Upcoming Reminders</h3><p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${prefs.enabled ? 'Due dates and calendar plans, kept on this device.' : 'Reminders are paused in Settings.'}</p></div>
             <button type="button" onclick="openSettingsModal(); switchSettingsTab('appearance')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Manage</button>
         </div>
-        ${items.length ? `<ul class="space-y-2">${items.map((item) => `<li class="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-brand-900 border border-zinc-200/70 dark:border-brand-700 px-3 py-2.5"><span class="min-w-0"><span class="block text-xs font-bold text-zinc-800 dark:text-white truncate">${item.title}</span><span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${item.kind} · ${item.detail}</span></span><span class="shrink-0 text-[11px] font-bold ${item.daysUntil === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}">${relativeDate(item.daysUntil)}</span></li>`).join('')}</ul>` : '<p class="text-sm text-zinc-500 dark:text-zinc-400 py-2">Nothing upcoming. Add a due date or calendar event to see it here.</p>'}
+        <p class="mb-3 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-200">${nextAction}</p>
+        ${items.length ? `<ul class="space-y-2">${items.map((item) => `<li class="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-brand-900 border border-zinc-200/70 dark:border-brand-700 px-3 py-2.5"><span class="min-w-0"><span class="block text-xs font-bold text-zinc-800 dark:text-white truncate">${item.title}</span><span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${item.kind} · ${item.detail}</span></span><span class="shrink-0 text-[11px] font-bold ${item.daysUntil === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}">${relativeDate(item.daysUntil)}</span></li>`).join('')}</ul>` : ''}
     `;
 }
 

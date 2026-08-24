@@ -17,6 +17,16 @@ async function getSyllabusParserError(error) {
     return error?.message || 'Error contacting the Syllabus AI.';
 }
 
+function confirmSyllabusImport(parsedData, metadataOnly) {
+    const description = String(parsedData?.description || 'No description extracted.').slice(0, 250);
+    const objectives = String(parsedData?.objectives || 'No objectives extracted.').slice(0, 250);
+    const units = Array.isArray(parsedData?.units) ? parsedData.units : [];
+    const unitPreview = units.slice(0, 8).map((unit, index) => `• Unit ${unit.num || index + 1}: ${unit.title || 'Untitled'}`).join('\n');
+    const remainder = units.length > 8 ? `\n• +${units.length - 8} more` : '';
+    const action = metadataOnly ? 'save this course metadata' : 'save this metadata and add these coursework units';
+    return window.confirm(`Review AI import before continuing:\n\nDescription: ${description}\n\nObjectives: ${objectives}${metadataOnly ? '' : `\n\nUnits to add:\n${unitPreview || 'No units found.'}${remainder}`}\n\nContinue to ${action}?`);
+}
+
 async function getPlannerUser() {
     if (currentUser) return currentUser;
     const { data } = await supabaseClient.auth.getSession();
@@ -674,6 +684,11 @@ export async function parseSyllabusPDF() {
         const rawResponse = responseData.result;
         const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsedData = JSON.parse(cleanJson);
+        if (!confirmSyllabusImport(parsedData, isMetadataOnly)) {
+            statusMsg.textContent = 'Import canceled. Review your syllabus and try again when ready.';
+            statusMsg.className = 'text-xs text-center mt-2 text-zinc-500';
+            return;
+        }
 
         let updates = {};
         if (parsedData.description) updates.description = parsedData.description;

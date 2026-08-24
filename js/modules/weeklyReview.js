@@ -1,5 +1,6 @@
 import { supabaseClient } from './config.js';
 import { generateBalancedStudyPlan, getRestDays } from './studyPlan.js';
+import { isWorkspaceFeatureVisible } from './ui.js';
 
 export function summarizeWeeklyPlan(plan = [], assignments = []) {
     const totalMinutes = plan.reduce((sum, day) => sum + (day.totalMinutes || 0), 0);
@@ -11,6 +12,10 @@ export function summarizeWeeklyPlan(plan = [], assignments = []) {
 }
 
 export async function renderWeeklyReview() {
+    if (!isWorkspaceFeatureVisible('weekly_review')) {
+        document.getElementById('weeklyReviewCard')?.remove();
+        return;
+    }
     if (typeof document === 'undefined') return;
     const dashboard = document.getElementById('dashboardGrid');
     if (!dashboard) return;

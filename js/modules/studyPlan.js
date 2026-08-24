@@ -1,5 +1,6 @@
 // --- AI STUDY SCHEDULE & WORKLOAD BALANCER MODULE ---
 import { calculateDaysRemaining, getLocalDateKey } from './academics.js';
+import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti } from './utils.js';
 
@@ -1102,6 +1103,10 @@ export async function toggleStudyPlanAssignment(assignId, currentState, courseId
  * Renders the Smart Study Plan widget into a dashboard container.
  */
 export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWidgetContainer') {
+    if (!isWorkspaceFeatureVisible('study_plan')) {
+        document.getElementById(containerId)?.replaceChildren();
+        return;
+    }
     if (typeof document === 'undefined') return;
     const container = document.getElementById(containerId);
     if (!container) return;
