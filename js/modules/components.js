@@ -96,6 +96,17 @@ class DueVinciSidebar extends BaseElement {
             </div>
 
             <div class="p-4 border-t border-zinc-200 dark:border-brand-700 space-y-2">
+                <button type="button" onclick="openSettingsModal()" class="w-full flex items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-zinc-200 dark:hover:bg-brand-700 transition" aria-label="Open profile settings">
+                    <span class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-xs font-extrabold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
+                        <img id="profileAvatarImage" class="hidden h-full w-full object-cover" alt="Your profile photo">
+                        <span id="profileAvatarInitials">DV</span>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span id="profileIdentityName" class="block truncate text-xs font-bold text-zinc-800 dark:text-white">Your account</span>
+                        <span id="profileIdentityEmail" class="block truncate text-[10px] text-zinc-500 dark:text-zinc-400">Signed in</span>
+                    </span>
+                    <svg class="h-4 w-4 shrink-0 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
                 <button type="button" onclick="openSettingsModal()" class="flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-900 dark:bg-black text-white rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-brand-900 transition shadow-md">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Settings
                 </button>

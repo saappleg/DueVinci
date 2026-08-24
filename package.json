@@ -8,7 +8,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check:syntax": "node --check js/app.js && node --check js/modules/config.js && node --check js/modules/utils.js && node --check js/modules/auth.js && node --check js/modules/academics.js && node --check js/modules/timers.js && node --check js/modules/courses.js && node --check js/modules/grades.js && node --check js/modules/calendar.js && node --check js/modules/flashcards.js && node --check js/modules/markdown.js && node --check js/modules/studyPlan.js && node --check js/modules/offlineDb.js && node --check js/modules/components.js && node --check js/modules/backup.js && node --check js/modules/tour.js && node --check js/modules/easterEggs.js && node --check js/modules/pwa.js && node --check js/modules/ui.js && node --check sw.js"
+    "check:syntax": "node --check js/app.js && node --check js/modules/config.js && node --check js/modules/utils.js && node --check js/modules/auth.js && node --check js/modules/profileAvatar.js && node --check js/modules/academics.js && node --check js/modules/timers.js && node --check js/modules/courses.js && node --check js/modules/grades.js && node --check js/modules/calendar.js && node --check js/modules/flashcards.js && node --check js/modules/markdown.js && node --check js/modules/studyPlan.js && node --check js/modules/offlineDb.js && node --check js/modules/components.js && node --check js/modules/backup.js && node --check js/modules/tour.js && node --check js/modules/easterEggs.js && node --check js/modules/pwa.js && node --check js/modules/ui.js && node --check sw.js"
   },
   "keywords": [
     "academic-planner",

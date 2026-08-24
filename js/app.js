@@ -13,6 +13,7 @@ import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
 import { getUnitNumber, getLessonNumber, getRestDays, setRestDays, toggleRestDay, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
 import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutation, initNetworkStatusListeners } from './modules/offlineDb.js';
 import { DueVinciSidebar } from './modules/components.js';
+import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
@@ -151,6 +152,9 @@ export {
     queueOfflineMutation,
     initNetworkStatusListeners,
     DueVinciSidebar,
+    refreshProfileAvatar,
+    uploadProfileAvatar,
+    removeProfileAvatar,
     buildBackupPayload,
     validateBackupPayload,
     exportUserDataJSON,

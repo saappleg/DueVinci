@@ -54,10 +54,21 @@
         </div>
     </div>
 
-    <div id="authScreen" class="flex h-screen w-screen items-center justify-center bg-zinc-100 dark:bg-brand-900">
-        <div class="bg-white dark:bg-brand-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-zinc-200 dark:border-brand-700">
-            <h1 class="text-3xl font-bold text-indigo-600 dark:text-white mb-2">DueVinci</h1>
-            <p class="text-zinc-500 dark:text-zinc-400 mb-6">Your study materials in one place.</p>
+    <div id="authScreen" class="grid min-h-screen w-full items-center gap-10 overflow-y-auto bg-zinc-50 px-6 py-10 dark:bg-brand-900 lg:grid-cols-2 lg:px-16 xl:px-24">
+        <section class="mx-auto max-w-2xl lg:mx-0">
+            <div class="mb-10 flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-black text-white shadow-lg shadow-indigo-500/25">D</div><span class="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white">DueVinci</span></div>
+            <p class="mb-4 inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-200">✦ Your study command center</p>
+            <h1 class="max-w-xl text-4xl font-black leading-tight tracking-tight text-zinc-900 dark:text-white sm:text-6xl">Make every due date feel manageable.</h1>
+            <p class="mt-5 max-w-xl text-base leading-relaxed text-zinc-600 dark:text-zinc-300 sm:text-lg">Organize classes, build a realistic study plan, track grades, and keep moving—whether you are online or working from your cached planner.</p>
+            <div class="mt-9 grid max-w-xl gap-3 sm:grid-cols-3">
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📚</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Classes & tasks</p><p class="mt-1 text-[11px] text-zinc-500">Keep every deadline together.</p></div>
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">🧠</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Study smarter</p><p class="mt-1 text-[11px] text-zinc-500">Turn work into a plan.</p></div>
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📱</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Available offline</p><p class="mt-1 text-[11px] text-zinc-500">Pick up where you left off.</p></div>
+            </div>
+        </section>
+        <div class="mx-auto w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-2xl shadow-zinc-900/10 dark:border-brand-700 dark:bg-brand-800">
+            <h2 class="text-3xl font-bold text-indigo-600 dark:text-white mb-2">Welcome back</h2>
+            <p class="text-zinc-500 dark:text-zinc-400 mb-6">Sign in to open your personal planner.</p>
             
             <form id="emailAuthForm" onsubmit="event.preventDefault(); signInWithEmail();" class="space-y-4 mb-4">
                 <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500 transition">
@@ -200,6 +211,17 @@
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
                     </div>
                     <form id="settingsForm" class="max-w-sm space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>
+                            <div class="flex items-center gap-3">
+                                <label class="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition">Upload photo
+                                    <input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
+                                </label>
+                                <button type="button" onclick="removeProfileAvatar()" class="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400">Remove</button>
+                                <span class="text-[11px] text-zinc-400">JPG, PNG, or WebP · up to 2 MB</span>
+                            </div>
+                            <p id="avatarMsg" class="hidden mt-2 text-xs"></p>
+                        </div>
                         <div>
                             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
                             <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
