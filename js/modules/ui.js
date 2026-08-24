@@ -4,15 +4,20 @@ import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'study_plan', 'reminders', 'weekly_review']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'study_plan', 'reminders', 'weekly_review']);
 
 export function isWorkspaceFeatureVisible(feature) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
+    if (feature === 'academics') return localStorage.getItem('duevinci_hide_academics') !== 'true';
     return localStorage.getItem(`duevinci_workspace_${feature}`) !== 'hidden';
 }
 
 export function setWorkspaceFeatureVisibility(feature, visible) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return;
+    if (feature === 'academics') {
+        window.toggleAcademicsVisibility?.(visible);
+        return;
+    }
     localStorage.setItem(`duevinci_workspace_${feature}`, visible ? 'visible' : 'hidden');
     if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
 }
@@ -92,6 +97,7 @@ export function injectAppearanceSettingsExtras() {
         ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
         ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
         ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
+        ['academics', 'Academics widget', 'Hide dashboard analytics and progress summaries.'],
         ['study_plan', 'Study plan', 'Hide the dashboard study-plan workspace.'],
         ['reminders', 'Upcoming reminders', 'Hide the dashboard reminder card.'],
         ['weekly_review', 'Weekly review', 'Hide the weekly planning prompt.'],
@@ -138,10 +144,6 @@ export function injectAppearanceSettingsExtras() {
                 <option value="4.0" ${currentGpaScale === '4.0' ? 'selected' : ''}>4.0 Scale</option>
                 <option value="5.0" ${currentGpaScale === '5.0' ? 'selected' : ''}>5.0 Scale</option>
             </select>
-        </div>
-        <div class="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-brand-800">
-            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Show Dashboard Academics Widget</span>
-            <input type="checkbox" id="academicsSwitch" ${!isAcademicsHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
         </div>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
             <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter the sidebar. Nothing is deleted.</p></div>

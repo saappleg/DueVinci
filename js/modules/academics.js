@@ -300,23 +300,8 @@ export async function renderAcademicsDashboardWidget(containerId) {
 }
 
 export function injectAcademicsSettingsToggle() {
-    if (typeof document === 'undefined') return;
-    const appearanceTab = document.getElementById('content-appearance');
-    if (!appearanceTab || document.getElementById('academicsToggleContainer')) return;
-
-    const toggleDiv = document.createElement('div');
-    toggleDiv.id = 'academicsToggleContainer';
-    toggleDiv.className = 'max-w-sm mt-6 pt-6 border-t border-zinc-200 dark:border-brand-700';
-
-    const isHidden = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_academics') === 'true';
-    toggleDiv.innerHTML = `
-        <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Academics Widget</label>
-        <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">Show analytics widget on dashboard</span>
-            <input type="checkbox" id="academicsSwitch" ${!isHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
-        </div>
-    `;
-    appearanceTab.appendChild(toggleDiv);
+    // Workspace visibility is rendered centrally by ui.js.
+    document.getElementById('academicsToggleContainer')?.remove();
 }
 
 export function toggleAcademicsVisibility(show) {
