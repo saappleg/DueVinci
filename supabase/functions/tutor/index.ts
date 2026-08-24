@@ -44,9 +44,9 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: prompt }] },
+        system_instruction: { parts: [{ text: prompt }] },
         contents: [...safeHistory, { role: 'user', parts: [{ text: question }] }],
-        generationConfig: { temperature: 0.45, maxOutputTokens: 700 },
+        generationConfig: { maxOutputTokens: 700 },
       }),
     })
     if (!response.ok) {
