@@ -86,12 +86,9 @@ export function injectAppearanceSettingsExtras() {
     if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
 
     const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
-    const isMuted = localStorage.getItem('duevinci_mute_alarm') === 'true';
     const currentGpaScale = localStorage.getItem('duevinci_gpa_scale') || '4.0';
     const isAcademicsHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
 
-    const currentAlarmSound = localStorage.getItem('duevinci_alarm_sound') || 'gentleChime';
-    const currentAmbientNoise = localStorage.getItem('duevinci_ambient_noise') || 'off';
     const workspaceFeatures = [
         ['timer', 'Focus timer', 'Hide the timer panel in the sidebar.'],
         ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
@@ -108,35 +105,12 @@ export function injectAppearanceSettingsExtras() {
     container.className = 'max-w-sm space-y-4 pt-4 border-t border-zinc-200 dark:border-brand-700';
     container.innerHTML = `
         <div>
-            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Timer Alarm Chime</label>
-            <div class="flex gap-2 items-center">
-                <select id="alarmSoundSelect" onchange="updateAlarmSound(this.value)" class="flex-1 text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
-                    <option value="gentleChime" ${currentAlarmSound === 'gentleChime' ? 'selected' : ''}>🔔 Gentle Rising Chime</option>
-                    <option value="zenBowl" ${currentAlarmSound === 'zenBowl' ? 'selected' : ''}>🧘 Zen Singing Bowl</option>
-                    <option value="digitalBeep" ${currentAlarmSound === 'digitalBeep' ? 'selected' : ''}>⏱️ Digital Beep</option>
-                </select>
-                <button type="button" onclick="playTimerAlarm(document.getElementById('alarmSoundSelect').value)" class="px-2.5 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded text-xs font-bold transition">▶ Test</button>
-            </div>
-        </div>
-        <div>
-            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Ambient Focus Generator</label>
-            <select id="ambientNoiseSelect" onchange="updateAmbientNoise(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
-                <option value="off" ${currentAmbientNoise === 'off' ? 'selected' : ''}>🔇 Off</option>
-                <option value="brown" ${currentAmbientNoise === 'brown' ? 'selected' : ''}>🌧️ Soothing Rain / Brown Noise</option>
-                <option value="white" ${currentAmbientNoise === 'white' ? 'selected' : ''}>💨 Pure Focus White Noise</option>
-            </select>
-        </div>
-        <div>
             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format Display</label>
             <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
                 <option value="YYYY-MM-DD" ${currentFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
                 <option value="MM-DD-YYYY" ${currentFormat === 'MM-DD-YYYY' ? 'selected' : ''}>MM-DD-YYYY</option>
                 <option value="DD-MM-YYYY" ${currentFormat === 'DD-MM-YYYY' ? 'selected' : ''}>DD-MM-YYYY</option>
             </select>
-        </div>
-        <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Mute Timer Alarm Sound</span>
-            <input type="checkbox" id="muteAlarmSwitch" ${isMuted ? 'checked' : ''} onchange="toggleMuteAlarm(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
         </div>
         <div>
             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">GPA Scale Target</label>
@@ -157,10 +131,36 @@ function injectReminderSettings() {
     if (typeof document === 'undefined') return;
     const appearanceTab = document.getElementById('content-study');
     if (!appearanceTab || document.getElementById('reminderSettingsContainer')) return;
+    const currentAmbientNoise = localStorage.getItem('duevinci_ambient_noise') || 'off';
+    const currentAlarmSound = localStorage.getItem('duevinci_alarm_sound') || 'gentleChime';
+    const isMuted = localStorage.getItem('duevinci_mute_alarm') === 'true';
     const container = document.createElement('div');
     container.id = 'reminderSettingsContainer';
     container.className = 'max-w-sm space-y-3 pt-4 border-t border-zinc-200 dark:border-brand-700';
     container.innerHTML = `
+        <div class="space-y-3">
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Timer Alarm Chime</label>
+            <div class="flex gap-2 items-center">
+                <select id="alarmSoundSelect" onchange="updateAlarmSound(this.value)" class="flex-1 text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <option value="gentleChime" ${currentAlarmSound === 'gentleChime' ? 'selected' : ''}>🔔 Gentle Rising Chime</option>
+                    <option value="zenBowl" ${currentAlarmSound === 'zenBowl' ? 'selected' : ''}>🧘 Zen Singing Bowl</option>
+                    <option value="digitalBeep" ${currentAlarmSound === 'digitalBeep' ? 'selected' : ''}>⏱️ Digital Beep</option>
+                </select>
+                <button type="button" onclick="playTimerAlarm(document.getElementById('alarmSoundSelect').value)" class="px-2.5 py-2 bg-zinc-200 dark:bg-brand-700 hover:bg-zinc-300 dark:hover:bg-brand-600 rounded text-xs font-bold transition">▶ Test</button>
+            </div>
+            <label class="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900">
+                <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Mute timer alarm sound</span>
+                <input type="checkbox" id="muteAlarmSwitch" ${isMuted ? 'checked' : ''} onchange="toggleMuteAlarm(this.checked)" class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+            </label>
+        </div>
+        <div>
+            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Ambient Focus Generator</label>
+            <select id="ambientNoiseSelect" onchange="updateAmbientNoise(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                <option value="off" ${currentAmbientNoise === 'off' ? 'selected' : ''}>🔇 Off</option>
+                <option value="brown" ${currentAmbientNoise === 'brown' ? 'selected' : ''}>🌧️ Soothing Rain / Brown Noise</option>
+                <option value="white" ${currentAmbientNoise === 'white' ? 'selected' : ''}>💨 Pure Focus White Noise</option>
+            </select>
+        </div>
         <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">🔔 Due-date reminders</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Assignments and dated calendar events are checked while DueVinci is open.</p></div>
         <label class="flex items-center justify-between gap-4 rounded-xl bg-zinc-50 dark:bg-brand-900 p-3 border border-zinc-200 dark:border-brand-700"><span class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Enable reminders</span><input id="remindersEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
         <div><label class="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Remind me</label><select id="reminderSchedule" class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option value="0">On the due date</option><option value="0,1">On the due date and 1 day before</option><option value="0,1,3">On the due date, 1 day, and 3 days before</option><option value="0,1,3,7">On the due date, 1 day, 3 days, and 1 week before</option></select></div>
