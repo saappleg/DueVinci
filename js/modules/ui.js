@@ -1,7 +1,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
-import { uploadProfileAvatar, removeProfileAvatar } from './profileAvatar.js';
+import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
@@ -151,6 +151,11 @@ export function ensureSettingsModalExists() {
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Display Name</label>
+                                <input type="text" id="profileDisplayName" maxlength="80" autocomplete="name" placeholder="How DueVinci should address you" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                                <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Shown in your profile menu. Your email remains private.</p>
+                            </div>
                             <div>
                                 <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>
                                 <div class="flex items-center gap-3">
@@ -323,20 +328,34 @@ export function ensureSettingsModalExists() {
             e.preventDefault();
             const email = document.getElementById('profileEmail').value;
             const password = document.getElementById('profilePassword').value;
+            const displayName = document.getElementById('profileDisplayName').value;
             const msgEl = document.getElementById('settingsMsg');
 
             let updates = {};
             if (email && email !== currentUser?.email) updates.email = email;
             if (password) updates.password = password;
 
-            if (Object.keys(updates).length === 0) {
+            const savedDisplayName = await getProfileDisplayName(currentUser);
+            const hasNameChange = String(displayName || '').trim() !== savedDisplayName;
+
+            if (Object.keys(updates).length === 0 && !hasNameChange) {
                 msgEl.textContent = "No changes made.";
                 msgEl.className = "text-xs text-center mt-2 text-zinc-500";
                 msgEl.classList.remove('hidden');
                 return;
             }
 
-            const { error } = await supabaseClient.auth.updateUser(updates);
+            let error = null;
+            if (hasNameChange) {
+                try {
+                    await saveProfileDisplayName(displayName, currentUser);
+                } catch (nameError) {
+                    error = nameError;
+                }
+            }
+            if (!error && Object.keys(updates).length > 0) {
+                ({ error } = await supabaseClient.auth.updateUser(updates));
+            }
             if (error) {
                 msgEl.textContent = error.message;
                 msgEl.className = "text-xs text-center mt-2 text-red-500";
@@ -356,6 +375,12 @@ export function openSettingsModal() {
     if (currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
+        const displayNameInput = document.getElementById('profileDisplayName');
+        if (displayNameInput) {
+            getProfileDisplayName(currentUser).then((displayName) => {
+                displayNameInput.value = displayName || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
+            });
+        }
         const avatarInput = document.getElementById('profileAvatarInput');
         if (avatarInput && !avatarInput.dataset.bound) {
             avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
