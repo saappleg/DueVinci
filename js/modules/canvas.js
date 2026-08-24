@@ -147,10 +147,10 @@ export async function initCanvasSettingsTab() {
 
         if (status === 'inactive') {
             if (profile?.trial_started_at) {
-                msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Canvas LMS Sync.';
+                msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Canvas Sync and the Socratic Study Companion.';
                 checkoutArea?.classList.remove('hidden');
             } else {
-                msg.textContent = 'Start a free trial to unlock Canvas LMS course syncing. No credit card required.';
+                msg.textContent = 'Start a free trial to unlock Canvas Sync and the Socratic Study Companion. No credit card required.';
                 trialBtn?.classList.remove('hidden');
             }
         } else if (status === 'trialing') {
@@ -165,15 +165,15 @@ export async function initCanvasSettingsTab() {
             // Show connector or sync trigger depending on credentials
             _showConnectorOrSync(profile);
         } else if (status === 'active') {
-            msg.textContent = 'Your subscription is active. Canvas LMS Sync is enabled.';
+            msg.textContent = 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.';
             manageBillingBtn?.classList.remove('hidden');
             _showConnectorOrSync(profile);
         } else if (status === 'past_due' || status === 'unpaid') {
-            msg.textContent = 'Your subscription payment needs attention. Update your payment method to keep Canvas LMS Sync enabled.';
+            msg.textContent = 'Your subscription payment needs attention. Update your payment method to keep Canvas Sync and the Socratic Study Companion enabled.';
             if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
             checkoutArea?.classList.remove('hidden');
         } else if (status === 'canceled') {
-            msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas LMS Sync again.';
+            msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas Sync and the Socratic Study Companion again.';
             checkoutArea?.classList.remove('hidden');
         } else {
             msg.textContent = 'Your subscription is not active. Choose a plan to continue.';

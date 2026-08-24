@@ -78,6 +78,9 @@ export async function handleAuth(session) {
         if ((page === 'grades' || page === 'grades.html') && document.getElementById('gradesContainer')) {
             if (typeof window.loadGradesPage === 'function') window.loadGradesPage();
         }
+        if ((page === 'tutor' || page === 'tutor.html') && document.getElementById('tutorWorkspace')) {
+            if (typeof window.loadTutorPage === 'function') window.loadTutorPage();
+        }
     } else {
         currentUser = null;
         if (typeof window !== 'undefined') window.currentUser = null;

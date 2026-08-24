@@ -69,6 +69,7 @@ export function filterCommandPalette(query) {
         { title: 'Classes & Coursework', desc: 'Manage courses, syllabus AI, and lessons', action: () => { window.location.href = base + 'courses/index.html'; }, icon: '📚' },
         { title: 'Grades & GPA Tracker', desc: 'View course averages and GPA simulator', action: () => { window.location.href = base + 'grades/index.html'; }, icon: '🎓' },
         { title: 'Master Calendar', desc: 'Deadlines, events, and .ics export', action: () => { window.location.href = base + 'calendar/index.html'; }, icon: '📅' },
+        { title: 'Study Companion', desc: 'Get Socratic tutoring with your subscription', action: () => { window.location.href = base + 'tutor/index.html'; }, icon: '🧠' },
         { title: 'What\'s New', desc: 'View latest features in version 2.3', action: () => { if (typeof window.openWhatsNewModal === 'function') window.openWhatsNewModal(); }, icon: '✨' },
         { title: '/party', desc: 'Trigger celebratory confetti storm', action: () => { fireConfetti(); }, icon: '🎉' },
         { title: '/inspire', desc: 'Leonardo da Vinci wisdom quote', action: () => { alert('"Learning never exhausts the mind." — Leonardo da Vinci'); }, icon: '📜' },

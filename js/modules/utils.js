@@ -96,7 +96,7 @@ export function getBasePath() {
     // /DueVinci-dev/). Only actual application subpages need to climb out of
     // their directory; treating every single directory as a page made assets
     // such as profile Easter-egg badges resolve one level too high.
-    return /\/(?:courses|grades|calendar|legal)(?:\/|$)/.test(path) ? '../' : './';
+    return /\/(?:courses|grades|calendar|legal|tutor)(?:\/|$)/.test(path) ? '../' : './';
 }
 
 export function getCurrentPageName() {

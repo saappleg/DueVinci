@@ -346,8 +346,8 @@ export function ensureSettingsModalExists() {
                     <div id="content-canvas" class="hidden space-y-5">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Subscription</h2>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Canvas LMS Sync is the first subscription benefit. All existing DueVinci planning features remain free forever.</p>
-                            <p class="mt-2 text-xs text-indigo-600 dark:text-indigo-300">Included now: course syncing, assignment importing, and due-date updates.</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Canvas LMS Sync and the Socratic Study Companion are subscription benefits. All existing DueVinci planning features remain free forever.</p>
+                            <p class="mt-2 text-xs text-indigo-600 dark:text-indigo-300">Included now: course syncing, assignment importing, due-date updates, and guided AI study help.</p>
                         </div>
 
                         <!-- Subscription Status Banner -->
@@ -361,7 +361,7 @@ export function ensureSettingsModalExists() {
                                 Start 30-Day Free Trial — No Card Required
                             </button>
                         <div id="canvasCheckoutOptions" class="hidden space-y-2">
-                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Canvas LMS Sync enabled. Cancel anytime.</p>
+                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Canvas Sync and the Socratic Study Companion enabled. Cancel anytime.</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
                                     <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('yearly')" class="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$45 / year</button>

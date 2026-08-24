@@ -40,12 +40,19 @@ export async function hasFeature(admin: ReturnType<typeof adminClient>, profile:
   return !!data
 }
 
-export async function entitledConnection(req: Request, featureKey = 'canvas_sync') {
+export async function requireFeature(req: Request, featureKey: string) {
   const { admin, user } = await authenticatedUser(req)
   const { data: profile, error: profileError } = await admin.from('profiles')
-    .select('subscription_status, trial_end, subscription_plan, canvas_domain').eq('user_id', user.id).maybeSingle()
+    .select('subscription_status, trial_end, subscription_plan').eq('user_id', user.id).maybeSingle()
   if (profileError) throw profileError
-  if (!isSubscriptionActive(profile) || !await hasFeature(admin, profile || {}, featureKey)) throw new Error('Your plan does not include Canvas LMS Sync.')
+  if (!isSubscriptionActive(profile) || !await hasFeature(admin, profile || {}, featureKey)) {
+    throw new Error('Your plan does not include this feature.')
+  }
+  return { admin, user, profile }
+}
+
+export async function entitledConnection(req: Request, featureKey = 'canvas_sync') {
+  const { admin, user } = await requireFeature(req, featureKey)
   const { data: connection, error: connectionError } = await admin.from('canvas_connections')
     .select('canvas_domain, canvas_token, canvas_token_encrypted').eq('user_id', user.id).maybeSingle()
   if (connectionError) throw connectionError

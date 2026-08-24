@@ -18,6 +18,7 @@ import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUs
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, completeTodayTask, startTodayFocus } from './modules/today.js';
+import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
@@ -188,6 +189,9 @@ export {
     renderTodayWorkspace,
     completeTodayTask,
     startTodayFocus,
+    isTutorAccessActive,
+    loadTutorPage,
+    submitTutorMessage,
     summarizeWeeklyPlan,
     renderWeeklyReview,
     openWeeklyPlan,
@@ -359,6 +363,8 @@ _rootScope.saveReminderSettingsFromUI = window.saveReminderSettingsFromUI;
 _rootScope.renderTodayWorkspace = renderTodayWorkspace;
 _rootScope.completeTodayTask = completeTodayTask;
 _rootScope.startTodayFocus = startTodayFocus;
+_rootScope.loadTutorPage = loadTutorPage;
+_rootScope.submitTutorMessage = submitTutorMessage;
 _rootScope.renderWeeklyReview = renderWeeklyReview;
 _rootScope.openWeeklyPlan = openWeeklyPlan;
 _rootScope.toggleCommandPalette = toggleCommandPalette;
