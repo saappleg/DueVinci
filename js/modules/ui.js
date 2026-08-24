@@ -2,6 +2,7 @@ import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
+import { refreshReminderSettings } from './reminders.js';
 
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
@@ -113,6 +114,22 @@ export function injectAppearanceSettingsExtras() {
             <input type="checkbox" id="academicsSwitch" ${!isAcademicsHidden ? 'checked' : ''} onchange="toggleAcademicsVisibility(this.checked)" class="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500 cursor-pointer">
         </div>
     `;
+    appearanceTab.appendChild(container);
+}
+
+function injectReminderSettings() {
+    if (typeof document === 'undefined') return;
+    const appearanceTab = document.getElementById('content-appearance');
+    if (!appearanceTab || document.getElementById('reminderSettingsContainer')) return;
+    const container = document.createElement('div');
+    container.id = 'reminderSettingsContainer';
+    container.className = 'max-w-sm space-y-3 pt-4 border-t border-zinc-200 dark:border-brand-700';
+    container.innerHTML = `
+        <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">🔔 Due-date reminders</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Assignments and dated calendar events are checked while DueVinci is open.</p></div>
+        <label class="flex items-center justify-between gap-4 rounded-xl bg-zinc-50 dark:bg-brand-900 p-3 border border-zinc-200 dark:border-brand-700"><span class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Enable reminders</span><input id="remindersEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
+        <div><label class="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Remind me</label><select id="reminderSchedule" class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option value="0">On the due date</option><option value="0,1">On the due date and 1 day before</option><option value="0,1,3">On the due date, 1 day, and 3 days before</option><option value="0,1,3,7">On the due date, 1 day, 3 days, and 1 week before</option></select></div>
+        <div class="flex gap-2"><button type="button" onclick="saveReminderSettingsFromUI()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save reminders</button><button type="button" onclick="requestReminderPermission()" class="rounded-lg bg-zinc-200 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-300 dark:bg-brand-700 dark:text-white">Enable browser alerts</button></div>
+        <p id="reminderSettingsMsg" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>`;
     appearanceTab.appendChild(container);
 }
 
@@ -488,6 +505,8 @@ export function openSettingsModal() {
     if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
 
     injectAppearanceSettingsExtras();
+    injectReminderSettings();
+    refreshReminderSettings();
 
     const dfSelect = document.getElementById('dateFormatSelect');
     if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';

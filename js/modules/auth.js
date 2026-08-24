@@ -1,8 +1,9 @@
 // --- AUTHENTICATION & USER SESSION MODULE ---
 import { supabaseClient } from './config.js';
-import { getCurrentPageName, getBasePath, getTourCookie } from './utils.js';
+import { getCurrentPageName, getBasePath } from './utils.js';
 import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
 import { refreshProfileAvatar } from './profileAvatar.js';
+import { startReminderService, stopReminderService } from './reminders.js';
 
 export let currentUser = null;
 let lastProcessedSessionToken = undefined;
@@ -48,6 +49,7 @@ export async function handleAuth(session) {
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
         if (typeof window !== 'undefined') window.currentUser = currentUser;
         refreshProfileAvatar(currentUser).catch(() => {});
+        startReminderService();
         setTimeout(() => window.showSettingsMovedNotice?.(), 0);
 
         // Never block cached-page rendering on a cloud preference request.
@@ -62,13 +64,7 @@ export async function handleAuth(session) {
             if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
             if (typeof window.renderAcademicsDashboardWidget === 'function') window.renderAcademicsDashboardWidget('dashboardGrid');
             if (typeof window.renderStudyPlanDashboardWidget === 'function') window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
-
-            // Auto launch walkthrough on first login if cookies are empty
-            if (!getTourCookie('duevinci_tour_done')) {
-                setTimeout(() => {
-                    if (typeof window.startWalkthrough === 'function') window.startWalkthrough(false);
-                }, 1000);
-            }
+            setTimeout(() => window.showFirstRunOnboarding?.(currentUser), 500);
         }
         if ((page === 'courses' || page === 'courses.html') && document.getElementById('coursesGrid')) {
             if (typeof window.loadCoursesPage === 'function') window.loadCoursesPage();
@@ -84,6 +80,7 @@ export async function handleAuth(session) {
         currentUser = null;
         if (typeof window !== 'undefined') window.currentUser = null;
         stopPreferenceSync();
+        stopReminderService();
         const page = getCurrentPageName();
         if (page !== 'index' && page !== 'index.html') {
             if (typeof window !== 'undefined' && window.location) window.location.href = getBasePath() + 'index.html';

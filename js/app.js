@@ -15,7 +15,8 @@ import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutatio
 import { DueVinciSidebar } from './modules/components.js';
 import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
-import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
+import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
+import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
 import { initializeErrorReporting } from './modules/errorReporting.js';
@@ -165,9 +166,19 @@ export {
     startWalkthrough,
     updateTourButtonVisibility,
     replayTourFromSettings,
+    showFirstRunOnboarding,
     openWhatsNewModal,
     closeWhatsNewModal,
     checkWhatsNewOnLaunch,
+    getReminderPreferences,
+    saveReminderPreferences,
+    collectReminderItems,
+    requestReminderPermission,
+    renderReminderDashboard,
+    checkDueReminders,
+    startReminderService,
+    stopReminderService,
+    refreshReminderSettings,
     toggleCommandPalette,
     filterCommandPalette,
     executeCmd,
@@ -327,9 +338,12 @@ _rootScope.setTourCookie = setTourCookie;
 _rootScope.startWalkthrough = startWalkthrough;
 _rootScope.updateTourButtonVisibility = updateTourButtonVisibility;
 _rootScope.replayTourFromSettings = replayTourFromSettings;
+_rootScope.showFirstRunOnboarding = showFirstRunOnboarding;
 _rootScope.openWhatsNewModal = openWhatsNewModal;
 _rootScope.closeWhatsNewModal = closeWhatsNewModal;
 _rootScope.checkWhatsNewOnLaunch = checkWhatsNewOnLaunch;
+_rootScope.requestReminderPermission = requestReminderPermission;
+_rootScope.saveReminderSettingsFromUI = window.saveReminderSettingsFromUI;
 _rootScope.toggleCommandPalette = toggleCommandPalette;
 _rootScope.filterCommandPalette = filterCommandPalette;
 _rootScope.executeCmd = executeCmd;

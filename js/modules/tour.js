@@ -1,6 +1,43 @@
 // --- WALKTHROUGH & WHAT'S NEW CHANGELOG MODAL MODULE ---
 import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
 
+const ONBOARDING_KEY = 'duevinci_onboarding_v1';
+
+function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
+
+export function showFirstRunOnboarding(user) {
+    if (typeof document === 'undefined' || !user?.id || localStorage.getItem(onboardingKey(user))) return;
+    if (document.getElementById('firstRunOnboarding')) return;
+    const modal = document.createElement('div');
+    modal.id = 'firstRunOnboarding';
+    modal.className = 'fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-950/65 backdrop-blur-sm';
+    modal.innerHTML = `
+        <div class="w-full max-w-lg overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl dark:bg-brand-800">
+            <div class="bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-7 text-white">
+                <img src="assets/images/maestro-logo.svg" alt="DueVinci" class="h-10 w-10 rounded-xl bg-white/15 p-1.5 mb-4">
+                <h2 class="text-2xl font-black">Welcome to DueVinci</h2>
+                <p class="mt-1 text-sm text-white/85">Set up your study space in a few minutes.</p>
+            </div>
+            <div class="p-6">
+                <ol class="space-y-3 text-sm text-zinc-700 dark:text-zinc-200">
+                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">1</span><span><strong>Add your classes.</strong> Give each course a home for its coursework.</span></li>
+                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">2</span><span><strong>Add due dates.</strong> They appear on your dashboard and calendar automatically.</span></li>
+                    <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">3</span><span><strong>Make time to study.</strong> Use the focus timer and reminders when you are ready.</span></li>
+                </ol>
+                <div class="mt-6 grid gap-2 sm:grid-cols-2">
+                    <button type="button" id="onboardingAddClass" class="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700">Add my first class</button>
+                    <button type="button" id="onboardingTour" class="rounded-xl bg-zinc-100 px-4 py-3 text-sm font-bold text-zinc-800 hover:bg-zinc-200 dark:bg-brand-700 dark:text-white dark:hover:bg-brand-600">Take the quick tour</button>
+                </div>
+                <button type="button" id="onboardingDismiss" class="mt-3 w-full text-xs font-semibold text-zinc-500 hover:text-indigo-600 dark:text-zinc-400">I’ll explore on my own</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    const finish = () => { localStorage.setItem(onboardingKey(user), 'true'); modal.remove(); };
+    document.getElementById('onboardingAddClass')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
+    document.getElementById('onboardingTour')?.addEventListener('click', () => { finish(); startWalkthrough(false); });
+    document.getElementById('onboardingDismiss')?.addEventListener('click', finish);
+}
+
 export function startWalkthrough(manualStart = false) {
     if (typeof window === 'undefined' || typeof window.driver === 'undefined') return;
 
@@ -163,6 +200,7 @@ export function checkWhatsNewOnLaunch() {
 
 // Bind to window for HTML inline handlers
 if (typeof window !== 'undefined') {
+    window.showFirstRunOnboarding = showFirstRunOnboarding;
     window.startWalkthrough = startWalkthrough;
     window.updateTourButtonVisibility = updateTourButtonVisibility;
     window.replayTourFromSettings = replayTourFromSettings;
