@@ -9,6 +9,14 @@ export let hideUnassignedFolder = typeof localStorage !== 'undefined' && localSt
 export let currentAssignmentPage = 1;
 export let activeTermModalName = '';
 
+async function getSyllabusParserError(error) {
+    try {
+        const body = await error?.context?.clone?.().json();
+        if (body?.error) return body.error;
+    } catch { /* Fall back to the SDK message. */ }
+    return error?.message || 'Error contacting the Syllabus AI.';
+}
+
 async function getPlannerUser() {
     if (currentUser) return currentUser;
     const { data } = await supabaseClient.auth.getSession();
@@ -661,7 +669,7 @@ export async function parseSyllabusPDF() {
             body: { type: apiCallType, text: fullText }
         });
 
-        if (functionError) throw new Error(functionError.message);
+        if (functionError) throw new Error(await getSyllabusParserError(functionError));
 
         const rawResponse = responseData.result;
         const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -762,7 +770,7 @@ export async function parseLessonsImage(inputElement) {
                 body: { type: 'screenshot', imageBase64: base64Image, mimeType: mimeType }
             });
 
-            if (functionError) throw new Error(functionError.message);
+            if (functionError) throw new Error(await getSyllabusParserError(functionError));
 
             const rawResponse = responseData.result;
             const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
