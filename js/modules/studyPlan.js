@@ -5,12 +5,22 @@ import { escapeHtml, escapeInlineJs, fireConfetti } from './utils.js';
 
 let cachedStudyPlan = [];
 const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
+const PLAN_MOVE_SYNC_INTERVAL_MS = 30_000;
 let draggedStudyPlanTaskId = null;
 let studyPlanMoveNotice = '';
 let lastStudyPlanMove = null;
+let planMoveSyncUserId = null;
+let planMoveSyncTimer = null;
+let planMoveSyncInFlight = null;
 
 function getManualStudyMoves() {
-    try { return JSON.parse(localStorage.getItem(MANUAL_PLAN_MOVES_KEY) || '{}'); } catch { return {}; }
+    try {
+        const stored = JSON.parse(localStorage.getItem(MANUAL_PLAN_MOVES_KEY) || '{}');
+        if (!stored || typeof stored !== 'object') return {};
+        return Object.fromEntries(Object.entries(stored).map(([taskId, move]) => [taskId,
+            typeof move === 'string' ? { date: move, updatedAt: '' } : move,
+        ]));
+    } catch { return {}; }
 }
 
 function saveManualStudyMoves(moves) {
@@ -20,19 +30,95 @@ function saveManualStudyMoves(moves) {
 function applyManualStudyMoves(days) {
     const moves = getManualStudyMoves();
     let changed = false;
-    Object.entries(moves).forEach(([taskId, targetDate]) => {
+    Object.entries(moves).forEach(([taskId, move]) => {
+        const targetDate = move?.date;
+        if (!targetDate) return;
         const source = days.find((day) => day.assignedTasks.some((entry) => entry.task.id === taskId));
         const target = days.find((day) => day.date === targetDate);
         const entry = source?.assignedTasks.find((item) => item.task.id === taskId);
         if (!source || !target || !entry || target.isRestDay || calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0) {
-            delete moves[taskId]; changed = true; return;
+            moves[taskId] = { date: null, updatedAt: new Date().toISOString() }; changed = true; return;
         }
         if (source !== target) {
             source.assignedTasks = source.assignedTasks.filter((item) => item.task.id !== taskId);
             target.assignedTasks.push(entry);
         }
     });
-    if (changed) saveManualStudyMoves(moves);
+    if (changed) saveAndSyncManualStudyMoves(moves);
+}
+
+function activeManualMoveDate(moves, taskId) {
+    return moves[taskId]?.date || '';
+}
+
+function currentPlanMoveUser() {
+    return typeof window !== 'undefined' ? window.currentUser : null;
+}
+
+async function syncManualStudyPlanMoves(user = currentPlanMoveUser()) {
+    if (!user?.id || (typeof navigator !== 'undefined' && navigator.onLine === false)) return false;
+    if (planMoveSyncInFlight) return planMoveSyncInFlight;
+
+    planMoveSyncInFlight = (async () => {
+        const { data: remoteMoves, error } = await supabaseClient
+            .from('study_plan_moves')
+            .select('task_id, planned_for, updated_at')
+            .eq('user_id', user.id);
+        if (error) throw error;
+
+        const localMoves = getManualStudyMoves();
+        let remoteChangesApplied = false;
+        (remoteMoves || []).forEach((row) => {
+            const localMove = localMoves[row.task_id];
+            const localTime = Date.parse(localMove?.updatedAt || '') || 0;
+            const remoteTime = Date.parse(row.updated_at || '') || 0;
+            if (!localMove || remoteTime > localTime) {
+                localMoves[row.task_id] = { date: row.planned_for || null, updatedAt: row.updated_at || '' };
+                remoteChangesApplied = true;
+            }
+        });
+
+        const uploadRows = Object.entries(localMoves)
+            .filter(([, move]) => move && move.date !== undefined)
+            .map(([taskId, move]) => {
+                const updatedAt = move.updatedAt || new Date().toISOString();
+                move.updatedAt = updatedAt;
+                return { user_id: user.id, task_id: taskId, planned_for: move.date || null, updated_at: updatedAt };
+            });
+        if (uploadRows.length > 0) {
+            const { error: uploadError } = await supabaseClient.from('study_plan_moves').upsert(uploadRows);
+            if (uploadError) throw uploadError;
+        }
+        saveManualStudyMoves(localMoves);
+        return { synced: true, remoteChangesApplied };
+    })();
+
+    try {
+        return await planMoveSyncInFlight;
+    } finally {
+        planMoveSyncInFlight = null;
+    }
+}
+
+async function initializePlanMoveSync(user = currentPlanMoveUser()) {
+    if (!user?.id || planMoveSyncUserId === user.id) return;
+    planMoveSyncUserId = user.id;
+    try {
+        await syncManualStudyPlanMoves(user);
+    } catch (error) {
+        console.warn('Study-plan move sync deferred:', error.message || error);
+    }
+    if (planMoveSyncTimer) clearInterval(planMoveSyncTimer);
+    planMoveSyncTimer = setInterval(() => {
+        syncManualStudyPlanMoves(user).then((result) => {
+            if (result?.remoteChangesApplied && typeof window !== 'undefined') window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+        }).catch((error) => console.warn('Study-plan move sync failed:', error.message || error));
+    }, PLAN_MOVE_SYNC_INTERVAL_MS);
+}
+
+function saveAndSyncManualStudyMoves(moves) {
+    saveManualStudyMoves(moves);
+    syncManualStudyPlanMoves().catch((error) => console.warn('Study-plan move will sync when reconnected:', error.message || error));
 }
 
 function getStudyPlanBlock(taskId) {
@@ -120,12 +206,11 @@ export async function moveStudyPlanBlock(taskId, targetDate) {
     const moves = getManualStudyMoves();
     lastStudyPlanMove = {
         taskId,
-        previousTarget: moves[taskId] || source.day.date,
+        previousTarget: activeManualMoveDate(moves, taskId) || source.day.date,
         targetDate,
     };
-    if (source.day.date === targetDate) delete moves[taskId];
-    else moves[taskId] = targetDate;
-    saveManualStudyMoves(moves);
+    moves[taskId] = { date: source.day.date === targetDate ? null : targetDate, updatedAt: new Date().toISOString() };
+    saveAndSyncManualStudyMoves(moves);
     await rerenderStudyPlanWithNotice('Study block moved. Refresh keeps your manual placements.');
     return true;
 }
@@ -148,9 +233,8 @@ export async function undoStudyPlanMove() {
         await rerenderStudyPlanWithNotice('That study block is no longer available. Refresh the plan and try again.');
         return false;
     }
-    if (move.previousTarget === current.day.date) delete moves[move.taskId];
-    else moves[move.taskId] = move.previousTarget;
-    saveManualStudyMoves(moves);
+    moves[move.taskId] = { date: move.previousTarget === current.day.date ? null : move.previousTarget, updatedAt: new Date().toISOString() };
+    saveAndSyncManualStudyMoves(moves);
     lastStudyPlanMove = null;
     await rerenderStudyPlanWithNotice('Study-block move undone.');
     const modal = typeof document !== 'undefined' ? document.getElementById('studyPlanDayModal') : null;
@@ -159,7 +243,11 @@ export async function undoStudyPlanMove() {
 }
 
 export async function resetManualStudyPlanMoves() {
-    try { localStorage.removeItem(MANUAL_PLAN_MOVES_KEY); } catch { /* Optional local preference. */ }
+    const moves = getManualStudyMoves();
+    Object.keys(moves).forEach((taskId) => {
+        moves[taskId] = { date: null, updatedAt: new Date().toISOString() };
+    });
+    saveAndSyncManualStudyMoves(moves);
     lastStudyPlanMove = null;
     await rerenderStudyPlanWithNotice('Manual placements reset to the balanced plan.');
 }
@@ -1019,6 +1107,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
     if (!container) return;
 
     ensureStudyPlanDayModalExists();
+    await initializePlanMoveSync();
 
     let courses = [];
     let assignments = [];

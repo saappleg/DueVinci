@@ -139,27 +139,27 @@ export function ensureSettingsModalExists() {
     if (!div) {
         div = document.createElement('div');
         div.id = 'settingsModal';
-        div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
+        div.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[460px] max-h-[90vh]">
-                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
+            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-[460px] max-h-[92vh] sm:max-h-[90vh]">
+                <div class="w-full sm:w-48 bg-zinc-50 dark:bg-brand-900 border-b sm:border-b-0 sm:border-r border-zinc-200 dark:border-brand-700 p-3 sm:p-4 shrink-0 flex flex-col justify-between">
                     <div>
-                        <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
-                        <nav class="space-y-1">
-                            <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
-                            <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
-                            <button type="button" onclick="switchSettingsTab('backup')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
-                            <button type="button" onclick="switchSettingsTab('privacy')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
-                            <button type="button" onclick="switchSettingsTab('canvas')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">💳 Subscription</button>
+                        <h3 class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                        <nav class="flex gap-1 overflow-x-auto sm:block sm:space-y-1">
+                            <button type="button" onclick="switchSettingsTab('profile')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                            <button type="button" onclick="switchSettingsTab('appearance')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
+                            <button type="button" onclick="switchSettingsTab('backup')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
+                            <button type="button" onclick="switchSettingsTab('privacy')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-privacy">Privacy & AI</button>
+                            <button type="button" onclick="switchSettingsTab('canvas')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">💳 Subscription</button>
                         </nav>
                     </div>
-                    <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
+                    <div class="hidden sm:block pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
                         <button type="button" onclick="openWhatsNewModal()" class="block text-indigo-600 dark:text-indigo-400 font-bold hover:underline">What's New ✨</button>
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
-                <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
+                <div class="flex-1 p-4 sm:p-6 relative overflow-y-auto max-h-[72vh] sm:max-h-[90vh]">
                     <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
                     
                     <!-- Tab: Profile -->
