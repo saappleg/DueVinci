@@ -115,6 +115,22 @@ export async function signInWithEmail() {
     if (error) showAuthMessage(error.message);
 }
 
+export async function signInWithGoogle() {
+    try {
+        const redirectTo = typeof window !== 'undefined'
+            ? new URL('index.html', window.location.href).toString()
+            : undefined;
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo },
+        });
+        if (error) showAuthMessage(error.message || 'Google sign-in could not be started.');
+    } catch (error) {
+        console.error('Google sign in error:', error);
+        showAuthMessage('Google sign-in could not be started. Please try again.');
+    }
+}
+
 export async function logout() {
     await supabaseClient.auth.signOut();
     if (typeof window !== 'undefined' && window.location) {
@@ -185,6 +201,7 @@ if (typeof window !== 'undefined') {
     window.showAuthMessage = showAuthMessage;
     window.signUpWithEmail = signUpWithEmail;
     window.signInWithEmail = signInWithEmail;
+    window.signInWithGoogle = signInWithGoogle;
     window.logout = logout;
     window.signOut = logout;
     window.initPasskeyUI = initPasskeyUI;
