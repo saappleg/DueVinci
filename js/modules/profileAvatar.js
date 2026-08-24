@@ -7,13 +7,19 @@ const MAX_BYTES = 2 * 1024 * 1024;
 
 const avatarPath = (userId) => `${userId}/${AVATAR_FILE}`;
 
-function initialsFor(user) {
-    const value = String(user?.email || '').split('@')[0].replace(/[._-]+/g, ' ').trim();
+function fallbackNameFor(user) {
+    const metadata = user?.user_metadata || {};
+    const providerName = metadata.full_name || metadata.name || metadata.display_name;
+    return String(providerName || user?.email || '').split('@')[0].replace(/[._-]+/g, ' ').trim() || 'Your account';
+}
+
+function initialsFor(user, displayName = '') {
+    const value = String(displayName || fallbackNameFor(user)).replace(/[._-]+/g, ' ').trim();
     const initials = value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('');
     return (initials || 'DV').toUpperCase();
 }
 
-function setAvatarFallback(user) {
+function setProfileIdentity(user, displayName = '') {
     const image = document.getElementById('profileAvatarImage');
     const initials = document.getElementById('profileAvatarInitials');
     const name = document.getElementById('profileIdentityName');
@@ -23,16 +29,49 @@ function setAvatarFallback(user) {
         image.classList.add('hidden');
     }
     if (initials) {
-        initials.textContent = initialsFor(user);
+        initials.textContent = initialsFor(user, displayName);
         initials.classList.remove('hidden');
     }
-    if (name) name.textContent = String(user?.email || 'Your account').split('@')[0] || 'Your account';
+    if (name) name.textContent = String(displayName || fallbackNameFor(user));
     if (email) email.textContent = user?.email || 'Signed in';
+}
+
+export async function getProfileDisplayName(user) {
+    if (!user?.id) return '';
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (error) return '';
+    return String(data?.display_name || '').trim();
+}
+
+export async function refreshProfileIdentity(user) {
+    if (typeof document === 'undefined' || !user?.id) return;
+    setProfileIdentity(user);
+    const displayName = await getProfileDisplayName(user);
+    if (displayName) setProfileIdentity(user, displayName);
+}
+
+export async function saveProfileDisplayName(value, user) {
+    const displayName = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!user?.id) throw new Error('Please sign in again before changing your name.');
+    if (!displayName) throw new Error('Enter the name you want DueVinci to display.');
+    if (displayName.length > 80) throw new Error('Display names must be 80 characters or fewer.');
+
+    const { error } = await supabaseClient
+        .from('profiles')
+        .update({ display_name: displayName, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    if (error) throw error;
+    setProfileIdentity(user, displayName);
+    return displayName;
 }
 
 export async function refreshProfileAvatar(user) {
     if (typeof document === 'undefined' || !user?.id) return;
-    setAvatarFallback(user);
+    await refreshProfileIdentity(user);
     const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(avatarPath(user.id), 60 * 60);
     if (error || !data?.signedUrl) return;
     const image = document.getElementById('profileAvatarImage');
