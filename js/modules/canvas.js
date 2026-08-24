@@ -66,6 +66,36 @@ function hasCanvasAccess(profile) {
     return profile?.subscription_status === 'active' || isActiveTrial(profile);
 }
 
+function renderCanvasOnboarding(profile) {
+    const area = document.getElementById('canvasOnboardingArea');
+    const steps = document.getElementById('canvasOnboardingSteps');
+    if (!area || !steps) return;
+
+    const connected = Boolean(profile?.canvas_domain);
+    const synced = Boolean(profile?.canvas_last_synced_at);
+    const accountLabel = /duevinci\.test/i.test(profile?.canvas_domain || '') ? 'Sample Canvas account' : 'Canvas account';
+    const status = (complete) => complete
+        ? '<span class="text-emerald-600 dark:text-emerald-300 font-bold">✓ Done</span>'
+        : '<span class="text-indigo-600 dark:text-indigo-300 font-bold">Next</span>';
+
+    steps.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-bold text-indigo-950 dark:text-indigo-100">Set up Canvas in three steps</h3>
+                <p class="mt-1 text-[11px] text-indigo-800/80 dark:text-indigo-200/80">Connect once, choose what matters, then import dated coursework.</p>
+            </div>
+            <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200">${synced ? 'Complete' : `${connected ? '2' : '1'} of 3`}</span>
+        </div>
+        <ol class="mt-3 space-y-2 text-xs">
+            <li class="flex items-center justify-between gap-3"><span><strong>1.</strong> Connect your Canvas account${connected ? ` <span class="text-zinc-500 dark:text-zinc-400">(${accountLabel})</span>` : ''}</span>${status(connected)}</li>
+            <li class="flex items-center justify-between gap-3"><span><strong>2.</strong> Choose the courses to import</span>${status(synced)}</li>
+            <li class="flex items-center justify-between gap-3"><span><strong>3.</strong> Import assignments and due dates</span>${status(synced)}</li>
+        </ol>
+        ${connected && !synced ? '<button type="button" onclick="openCanvasSyncModal()" class="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-500">Choose courses and import coursework</button>' : ''}
+        ${synced ? `<p class="mt-3 text-[11px] text-emerald-700 dark:text-emerald-300">Your first sync is complete${profile.canvas_last_synced_at ? ` — last synced ${new Date(profile.canvas_last_synced_at).toLocaleString()}` : ''}.</p>` : ''}`;
+    area.classList.remove('hidden');
+}
+
 async function loadCanvasSubscriptionProfile(userId) {
     const fieldsWithBillingDates = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at';
     const baseFields = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, canvas_domain, canvas_last_synced_at';
@@ -142,7 +172,7 @@ export async function initCanvasSettingsTab() {
     // Reset UI
     badge.textContent = 'Loading…';
     msg.textContent   = 'Checking your plan…';
-    [trialBtn, checkoutArea, manageBillingBtn, connectorArea, syncTriggerArea].forEach(el => el?.classList.add('hidden'));
+    [trialBtn, checkoutArea, manageBillingBtn, connectorArea, syncTriggerArea, document.getElementById('canvasOnboardingArea')].forEach(el => el?.classList.add('hidden'));
 
     try {
         const { data: { user } } = await supabaseClient.auth.getUser();
@@ -223,6 +253,8 @@ function _showConnectorOrSync(profile) {
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
     const domainDisplay = document.getElementById('canvasConnectedDomain');
     const lastSyncedDisplay = document.getElementById('canvasLastSynced');
+
+    renderCanvasOnboarding(profile);
 
     if (profile?.canvas_domain) {
         // Already connected — show sync trigger
@@ -375,7 +407,7 @@ export async function handleCanvasConnectMock() {
     } catch (err) {
         showConnectorMsg(err.message || 'Unable to connect the sample Canvas account.');
     } finally {
-        if (connectBtn) { connectBtn.textContent = 'Use sample Canvas account (Dev only)'; connectBtn.disabled = false; }
+        if (connectBtn) { connectBtn.textContent = 'Try the guided sample setup (Dev only)'; connectBtn.disabled = false; }
     }
 }
 
@@ -507,7 +539,10 @@ export async function handleCanvasSyncConfirm() {
         const lastSyncedDisplay = document.getElementById('canvasLastSynced');
         if (lastSyncedDisplay && data.syncedAt) lastSyncedDisplay.textContent = `Last synced ${new Date(data.syncedAt).toLocaleString()}`;
         showSyncModalMsg(`✓ Synced ${courseCount} course${courseCount === 1 ? '' : 's'} and ${assignmentCount} assignment${assignmentCount === 1 ? '' : 's'} successfully!`, 'success');
-        setTimeout(() => closeCanvasSyncModal(), 1500);
+        setTimeout(async () => {
+            closeCanvasSyncModal();
+            await initCanvasSettingsTab();
+        }, 1500);
     } catch (err) {
         showSyncModalMsg(await functionErrorMessage(err, 'Failed to sync Canvas coursework.'));
     } finally {
