@@ -52,9 +52,13 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const providerDetail = (await response.text()).slice(0, 500)
       console.error(`Gemini tutor request failed (${response.status}):`, providerDetail)
-      throw new Error(response.status === 401 || response.status === 403
-        ? 'Tutor AI credentials were rejected. Contact support.'
-        : 'Tutor AI could not respond. Please try again.')
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Tutor AI credentials were rejected. Contact support.')
+      }
+      if (response.status === 429) {
+        throw new Error('Tutor AI is temporarily at capacity. Please try again in a minute.')
+      }
+      throw new Error(`Tutor AI provider request failed (HTTP ${response.status}). Please try again.`)
     }
     const reply = textFrom(await response.json())
     if (!reply) throw new Error('Tutor AI returned an empty response. Please try again.')
