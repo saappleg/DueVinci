@@ -66,6 +66,29 @@ function hasCanvasAccess(profile) {
     return profile?.subscription_status === 'active' || isActiveTrial(profile);
 }
 
+async function loadCanvasSubscriptionProfile(userId) {
+    const fieldsWithBillingDates = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at';
+    const baseFields = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, canvas_domain, canvas_last_synced_at';
+    const primary = await supabaseClient
+        .from('profiles')
+        .select(fieldsWithBillingDates)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    // A Tutor page can remain open across a schema deploy. Keep the complete
+    // subscription UI usable while that page catches up; it just omits the
+    // renewal/end date until the newer columns are available.
+    if (!primary.error || !/subscription_(current_period_end|cancel_at|cancel_at_period_end)/i.test(primary.error.message || '')) {
+        return primary;
+    }
+
+    return supabaseClient
+        .from('profiles')
+        .select(baseFields)
+        .eq('user_id', userId)
+        .maybeSingle();
+}
+
 async function requireCanvasAccess() {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) throw new Error('Not signed in.');
@@ -125,11 +148,7 @@ export async function initCanvasSettingsTab() {
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (!user) throw new Error('Not signed in.');
 
-        const { data: profile, error } = await supabaseClient
-            .from('profiles')
-            .select('subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        const { data: profile, error } = await loadCanvasSubscriptionProfile(user.id);
 
         if (error) throw error;
 
