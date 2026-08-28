@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - 2026-08-23
+## [2.3.0] - 2026-08-28
+
+### Added
+- **Student workspace improvements**: Today’s Focus, weekly workload review,
+  manual study-plan scheduling, calendar study blocks, reminders, and a
+  customizable dashboard layout that students can declutter and reorder.
+- **Personal setup**: first-run onboarding, editable display names, private
+  profile avatars, and optional Night Owl or Maestro profile badges.
+- **Optional paid study tools**: Canvas LMS sync and a course-grounded
+  Socratic Study Companion, with subscription status and renewal details in
+  Settings.
+- **Production operations**: weekday health monitoring, a release smoke test,
+  and a documented Stripe/Edge Function release gate.
+
+### Fixed
+- Improved offline planner reliability, preference synchronization, PWA asset
+  updates, subscription lifecycle handling, and resilient Tutor/Gemini model
+  fallbacks.
 
 ### Changed
 - Defined and documented the permanent free planning core: course and lesson management, due dates, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and portable backups.

@@ -2,8 +2,8 @@
 import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
 
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
-// Production's current feature drop is 2.2. Dev contains the next, unreleased
-// set of features, so keep its announcement and dismissal marker on 2.3.
+// The 2.3 feature drop uses a versioned dismissal marker so students see each
+// release announcement once after the installed app updates.
 export const WHATS_NEW_VERSION = '2.3';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
