@@ -4,7 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 Deno.serve(async (req) => {
-  if (req.headers.get('x-reminder-cron-secret') !== Deno.env.get('REMINDER_CRON_SECRET')) return json({ error: 'Unauthorized' }, 401)
+  const cronSecret = Deno.env.get('REMINDER_CRON_SECRET')
+  if (!cronSecret || req.headers.get('x-reminder-cron-secret') !== cronSecret) return json({ error: 'Unauthorized' }, 401)
   const url = Deno.env.get('SUPABASE_URL')!
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT')!, Deno.env.get('VAPID_PUBLIC_KEY')!, Deno.env.get('VAPID_PRIVATE_KEY')!)
