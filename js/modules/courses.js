@@ -17,6 +17,53 @@ async function getSyllabusParserError(error) {
     } catch { /* Fall back to the SDK message. */ }
     return error?.message || 'Error contacting the Syllabus AI.';
 }
+/**
+ * Given a start date, an optional end date, and a count of items (lessons),
+ * returns an array of ISO date strings (YYYY-MM-DD) spread evenly across the range.
+ * If endDate is null/undefined, all items get startDate.
+ * Skips weekends so lessons land on school-day-friendly slots (Mon-Fri).
+ */
+function spreadDatesAcrossRange(startDateStr, endDateStr, count) {
+    if (!count || count < 1) return [];
+    const start = new Date(startDateStr + 'T12:00:00');
+    if (!endDateStr || endDateStr === startDateStr) {
+        return Array(count).fill(startDateStr);
+    }
+    const end = new Date(endDateStr + 'T12:00:00');
+    if (end <= start || count === 1) {
+        // Spread evenly but still use both endpoints as boundaries
+        const dates = [];
+        for (let i = 0; i < count; i++) {
+            dates.push(startDateStr);
+        }
+        return dates;
+    }
+
+    // Build list of weekdays in the range
+    const weekdays = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+        const dow = cursor.getDay();
+        if (dow !== 0 && dow !== 6) { // skip Sat/Sun
+            weekdays.push(cursor.toISOString().split('T')[0]);
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (weekdays.length === 0) {
+        // Fallback: just use start/end
+        weekdays.push(startDateStr, endDateStr);
+    }
+
+    // Distribute count items evenly across available weekdays
+    const result = [];
+    for (let i = 0; i < count; i++) {
+        const idx = Math.round((i / (count - 1 || 1)) * (weekdays.length - 1));
+        result.push(weekdays[Math.min(idx, weekdays.length - 1)]);
+    }
+    return result;
+}
+
 
 function confirmSyllabusImport(parsedData, metadataOnly) {
     const description = String(parsedData?.description || 'No description extracted.').slice(0, 250);
@@ -733,23 +780,27 @@ export async function parseSyllabusPDF() {
                     fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
                     targetDate = fallbackDate.toISOString().split('T')[0];
                 }
+                // Resolve optional end date for range spreading
+                const endDate = u.endDateStr ? smartParseDate(u.endDateStr) : null;
 
                 const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                     course_id: courseId, user_id: currentUser.id,
                     title: `Unit ${u.num || i + 1}: ${u.title}`,
                     unit_number: u.num || i + 1,
-                    due_date: targetDate
+                    due_date: endDate || targetDate  // unit header lands on the end of the range
                 }]).select();
 
                 if (insertedUnit && insertedUnit[0] && u.lessons) {
+                    const lessonDates = spreadDatesAcrossRange(targetDate, endDate, u.lessons.length);
                     let lessonNum = 1;
-                    for (let lessonTitle of u.lessons) {
+                    for (let li = 0; li < u.lessons.length; li++) {
+                        let lessonTitle = u.lessons[li];
                         let formattedTitle = lessonTitle.toLowerCase().startsWith('lesson') ? lessonTitle : `Lesson ${lessonNum}: ${lessonTitle}`;
                         await supabaseClient.from('assignments').insert([{
                             course_id: courseId, user_id: currentUser.id,
                             title: `↳ ${formattedTitle}`,
                             unit_number: u.num || i + 1,
-                            due_date: targetDate
+                            due_date: lessonDates[li] || targetDate
                         }]);
                         lessonNum++;
                     }
@@ -813,23 +864,27 @@ export async function parseLessonsImage(inputElement) {
                         fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
                         targetDate = fallbackDate.toISOString().split('T')[0];
                     }
+                    // Resolve optional end date for range spreading
+                    const endDate = wk.endDateStr ? smartParseDate(wk.endDateStr) : null;
 
                     const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                         course_id: courseId, user_id: currentUser.id,
                         title: wk.title || `Week ${wk.num}`,
                         unit_number: wk.num,
-                        due_date: targetDate
+                        due_date: endDate || targetDate  // unit header lands on end of range
                     }]).select();
 
                     if (insertedUnit && insertedUnit[0] && wk.lessons) {
+                        const lessonDates = spreadDatesAcrossRange(targetDate, endDate, wk.lessons.length);
                         let lessonNum = 1;
-                        for (let l of wk.lessons) {
+                        for (let li = 0; li < wk.lessons.length; li++) {
+                            let l = wk.lessons[li];
                             let formattedTitle = l.toLowerCase().startsWith('lesson') ? l : `Lesson ${lessonNum}: ${l}`;
                             await supabaseClient.from('assignments').insert([{
                                 course_id: courseId, user_id: currentUser.id,
                                 title: `↳ ${formattedTitle}`,
                                 unit_number: wk.num,
-                                due_date: targetDate
+                                due_date: lessonDates[li] || targetDate
                             }]);
                             lessonNum++;
                         }
@@ -847,6 +902,89 @@ export async function parseLessonsImage(inputElement) {
             statusMsg.className = "text-xs text-center mt-2 text-red-500";
         }
     };
+}
+
+/**
+ * Reschedules all incomplete past-due (or all incomplete) assignments for a course
+ * to spread evenly across the current week (today → Friday), sorted by urgency.
+ * High-priority items get the earliest slots; low-priority get the latest.
+ */
+export async function rescheduleOverdueToThisWeek(courseId) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Build Mon–Fri range for THIS week (starting today if weekday, else next Mon)
+    const dow = today.getDay(); // 0=Sun, 6=Sat
+    const weekStart = new Date(today);
+    if (dow === 0) weekStart.setDate(today.getDate() + 1);       // Sunday → next Mon
+    else if (dow === 6) weekStart.setDate(today.getDate() + 2);  // Saturday → next Mon
+
+    const weekdays = [];
+    const cursor = new Date(weekStart);
+    while (weekdays.length < 5) {
+        const d = cursor.getDay();
+        if (d !== 0 && d !== 6) weekdays.push(cursor.toISOString().split('T')[0]);
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Fetch all incomplete, non-completed assignments for this course
+    const { data: assignments, error } = await supabaseClient
+        .from('assignments')
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('is_completed', false);
+
+    if (error || !assignments || assignments.length === 0) {
+        alert('No incomplete lessons found to reschedule.');
+        return;
+    }
+
+    // Filter to overdue + due-this-week (exclude future items that aren't overdue)
+    const overdue = assignments.filter(a => {
+        if (!a.due_date) return true;
+        return a.due_date.split('T')[0] <= todayStr;
+    });
+
+    if (overdue.length === 0) {
+        alert('No overdue lessons found — everything looks on track! 🎉');
+        return;
+    }
+
+    // Sort by priority (high first) then by original due date ascending
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    overdue.sort((a, b) => {
+        const pa = priorityOrder[a.priority || 'medium'] ?? 1;
+        const pb = priorityOrder[b.priority || 'medium'] ?? 1;
+        if (pa !== pb) return pa - pb;
+        return (a.due_date || '').localeCompare(b.due_date || '');
+    });
+
+    // Distribute across the week slots
+    const total = overdue.length;
+    const updates = overdue.map((a, idx) => {
+        const slotIdx = Math.min(Math.floor((idx / total) * weekdays.length), weekdays.length - 1);
+        return { id: a.id, due_date: weekdays[slotIdx] };
+    });
+
+    // Batch update
+    await Promise.all(updates.map(u =>
+        supabaseClient.from('assignments').update({ due_date: u.due_date }).eq('id', u.id)
+    ));
+
+    loadAssignments(courseId, 1);
+    loadDashboardStats();
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+
+    const msg = document.getElementById('pdfStatusMsg');
+    if (msg) {
+        msg.textContent = `✅ ${total} overdue lesson${total === 1 ? '' : 's'} rescheduled across this week by urgency.`;
+        msg.className = 'text-xs text-center mt-2 text-green-500';
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 5000);
+    }
 }
 
 export async function deleteCurrentCourse() {
@@ -1412,6 +1550,7 @@ if (typeof window !== 'undefined') {
     window.parseSyllabusPDF = parseSyllabusPDF;
     window.parseLessonsImage = parseLessonsImage;
     window.deleteCurrentCourse = deleteCurrentCourse;
+    window.rescheduleOverdueToThisWeek = rescheduleOverdueToThisWeek;
     window.toggleCourseComplete = toggleCourseComplete;
     window.toggleAssignment = toggleAssignment;
     window.updateAssignmentDate = updateAssignmentDate;
