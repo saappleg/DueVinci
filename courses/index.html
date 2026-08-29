@@ -180,7 +180,18 @@
                     </div>
 
                     <div class="flex flex-col h-full">
-                        <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Weekly Units & Lessons</h3>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">Weekly Units & Lessons</h3>
+                            <button
+                                type="button"
+                                id="rescheduleOverdueBtn"
+                                onclick="rescheduleOverdueToThisWeek(document.getElementById('editCourseId').value)"
+                                title="Move all overdue incomplete lessons to this week, sorted by urgency (high priority first)"
+                                class="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition shadow-sm"
+                            >
+                                🗓 Reschedule Overdue
+                            </button>
+                        </div>
                         <form id="addAssignmentForm" onsubmit="submitAddAssignment(event)" class="space-y-2.5 mb-4 bg-zinc-50 dark:bg-brand-900 p-3.5 rounded-xl border border-zinc-200 dark:border-brand-700">
                             <div class="flex gap-2">
                                 <input type="text" id="assignTitle" placeholder="e.g. Unit 1: Foundations or Midterm Exam" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 min-w-0 font-medium">

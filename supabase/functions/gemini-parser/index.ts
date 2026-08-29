@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       bodyPayload = { contents: [{ parts: [{ text: `You are a syllabus analyzer. Read this syllabus and return ONLY a valid JSON object. Do not include markdown formatting or backticks. The JSON must have ONLY: 'description' (string, max 250 chars) and 'objectives' (string, max 250 chars). Do not include units or lessons. Syllabus text: ${text}` }] }] }
     } else if (type === 'screenshot') {
       bodyPayload = { contents: [{ parts: [
-        { text: `You are a course lesson parser. The current year is ${currentYear}. Read this screenshot. Return ONLY a valid JSON object (no markdown, no backticks). It must contain a 'units' array. Each unit should be an object with 'num' (integer), 'title' (string), 'dateStr' (string, extract the EXACT date or date range text as shown), and 'lessons' (array of strings).` },
+        { text: `You are a course lesson parser. The current year is ${currentYear}. Read this screenshot. Return ONLY a valid JSON object (no markdown, no backticks). It must contain a 'units' array. Each unit should be an object with: 'num' (integer), 'title' (string), 'dateStr' (string, the START date for this unit — if a date range is shown like "Aug 26 – Sep 2" extract only the first date "Aug 26"), 'endDateStr' (string or null, the END date if a date range is shown — e.g. "Sep 2" — otherwise null), and 'lessons' (array of strings). If a single date is shown, set endDateStr to null.` },
         { inlineData: { mimeType, data: imageBase64 } },
       ] }] }
     } else {
