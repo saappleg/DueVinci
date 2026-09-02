@@ -380,6 +380,24 @@ function taskMovePriority(task) {
  */
 export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP) {
     const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task), 0);
+    const canMoveToDay = (entry, sourceIndex, targetIndex) => {
+        const target = days[targetIndex];
+        if (!target || target.isRestDay || sourceIndex === targetIndex) return false;
+        if (calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0) return false;
+
+        // Preserve the sequence of explicitly numbered lessons when moving a
+        // block to an earlier or lighter day.
+        const lessonNumber = getLessonNumber(entry.task);
+        if (lessonNumber === 999) return true;
+        const unitNumber = getUnitNumber(entry.task);
+        return !days.some((day, dayIndex) => (day.assignedTasks || []).some(({ task }) => {
+            if (task.id === entry.task.id || task.course_id !== entry.task.course_id || getUnitNumber(task) !== unitNumber) return false;
+            const otherLesson = getLessonNumber(task);
+            if (otherLesson === 999) return false;
+            return (otherLesson < lessonNumber && dayIndex > targetIndex)
+                || (otherLesson > lessonNumber && dayIndex < targetIndex);
+        }));
+    };
     for (let sourceIndex = 0; sourceIndex < days.length; sourceIndex++) {
         let source = days[sourceIndex];
         while (minutesForDay(source) > cap) {
@@ -392,14 +410,21 @@ export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOC
                 });
             let moved = false;
             for (const candidate of candidates) {
-                const deadlineIndex = sourceIndex + Math.max(0, calculateDaysRemaining(candidate.entry.task.due_date, source.currentDate));
-                for (let targetIndex = sourceIndex + 1; targetIndex < days.length && targetIndex <= deadlineIndex; targetIndex++) {
-                    const target = days[targetIndex];
-                    if (target.isRestDay || minutesForDay(target) + estimatedMinutes(candidate.entry.task) > cap) continue;
+                const duration = estimatedMinutes(candidate.entry.task);
+                const targetIndex = days
+                    .map((target, index) => ({ target, index }))
+                    // Prefer the focus cap, but still reduce a sharp imbalance
+                    // when fixed deadlines leave no perfectly capped option.
+                    .filter(({ target, index }) => (minutesForDay(target) + duration <= cap
+                        || minutesForDay(target) + duration < minutesForDay(source))
+                        && canMoveToDay(candidate.entry, sourceIndex, index))
+                    .sort((a, b) => minutesForDay(a.target) - minutesForDay(b.target)
+                        || Math.abs(a.index - sourceIndex) - Math.abs(b.index - sourceIndex)
+                        || a.index - b.index)[0]?.index;
+                if (targetIndex !== undefined) {
                     source.assignedTasks.splice(candidate.index, 1);
-                    target.assignedTasks.push(candidate.entry);
+                    days[targetIndex].assignedTasks.push(candidate.entry);
                     moved = true;
-                    break;
                 }
                 if (moved) break;
             }
@@ -1057,6 +1082,71 @@ export function closeStudyPlanDayModal() {
     if (modal) modal.classList.add('hidden');
 }
 
+function getPlanSnapshot(plan = []) {
+    return new Map(plan.flatMap((day) => (day.allBlocks || []).map((block) => [block.taskId, {
+        date: day.date,
+        title: block.title,
+    }])));
+}
+
+function getActiveManualMoveCount() {
+    return Object.values(getManualStudyMoves()).filter((move) => move?.date).length;
+}
+
+function ensureStudyPlanUpdateModalExists() {
+    if (typeof document === 'undefined' || document.getElementById('studyPlanUpdateModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'studyPlanUpdateModal';
+    modal.className = 'fixed inset-0 z-[60] hidden items-center justify-center bg-zinc-900/70 p-4 backdrop-blur-sm';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.onclick = (event) => {
+        if (event.target === modal) closeStudyPlanUpdateModal();
+    };
+    document.body.appendChild(modal);
+}
+
+export function closeStudyPlanUpdateModal() {
+    const modal = document.getElementById('studyPlanUpdateModal');
+    modal?.classList.add('hidden');
+    modal?.classList.remove('flex');
+}
+
+function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves }) {
+    if (typeof document === 'undefined') return;
+    ensureStudyPlanUpdateModalExists();
+    const modal = document.getElementById('studyPlanUpdateModal');
+    if (!modal) return;
+    const movedHtml = moved.length
+        ? `<ul class="mt-4 max-h-40 space-y-2 overflow-y-auto text-left">${moved.slice(0, 5).map(({ title, from, to }) => `<li class="rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><strong>${escapeHtml(title)}</strong><span class="text-zinc-500 dark:text-zinc-400"> moved from ${escapeHtml(from)} to ${escapeHtml(to)}.</span></li>`).join('')}${moved.length > 5 ? `<li class="text-xs text-zinc-500">Plus ${moved.length - 5} more adjusted session${moved.length - 5 === 1 ? '' : 's'}.</li>` : ''}</ul>`
+        : '<p class="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-300">Everything is already in its best available slot. The plan still reflects your latest coursework, deadlines, and rest days.</p>';
+    modal.innerHTML = `<section class="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-2xl dark:bg-indigo-500/20">${moved.length ? '✨' : '✓'}</div><h2 class="mt-4 text-xl font-extrabold text-zinc-900 dark:text-white">${moved.length ? 'Your week was rebalanced' : 'Your plan is up to date'}</h2><p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">${totalBlocks} study session${totalBlocks === 1 ? '' : 's'} across ${activeDays} active day${activeDays === 1 ? '' : 's'}.</p>${movedHtml}${manualMoves ? `<p class="mt-4 text-xs text-indigo-600 dark:text-indigo-300">Your ${manualMoves} manual placement${manualMoves === 1 ? '' : 's'} ${manualMoves === 1 ? 'was' : 'were'} kept.</p>` : ''}<button type="button" onclick="closeStudyPlanUpdateModal()" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button></section>`;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+/** Rebuilds the study plan and confirms the result, rather than silently redrawing it. */
+export async function refreshStudyPlan() {
+    const previous = getPlanSnapshot(cachedStudyPlan);
+    const plan = await renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    const current = getPlanSnapshot(plan || cachedStudyPlan);
+    const moved = [...current.entries()]
+        .filter(([taskId, next]) => previous.has(taskId) && previous.get(taskId).date !== next.date)
+        .map(([taskId, next]) => ({ title: next.title, from: previous.get(taskId).date, to: next.date }));
+    const totalBlocks = [...current.values()].length;
+    const activeDays = (plan || cachedStudyPlan).filter((day) => !day.isRestDay && day.totalMinutes > 0).length;
+    const message = moved.length
+        ? `Plan refreshed: ${moved.length} session${moved.length === 1 ? '' : 's'} rebalanced across your available study days.`
+        : `Plan refreshed: ${totalBlocks} session${totalBlocks === 1 ? '' : 's'} are already balanced around deadlines and rest days.`;
+    const notice = document.getElementById('studyPlanNotice');
+    if (notice) {
+        notice.textContent = message;
+        notice.className = 'text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold';
+    }
+    showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves: getActiveManualMoveCount() });
+    return plan;
+}
+
 /**
  * Starts a timer session directly from a study block.
  * @param {number} durationMinutes Duration in minutes
@@ -1105,7 +1195,7 @@ export async function toggleStudyPlanAssignment(assignId, currentState, courseId
 export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWidgetContainer') {
     if (!isWorkspaceFeatureVisible('study_plan')) {
         document.getElementById(containerId)?.replaceChildren();
-        return;
+        return [];
     }
     if (typeof document === 'undefined') return;
     const container = document.getElementById(containerId);
@@ -1166,7 +1256,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                 </div>
             </div>
         `;
-        return;
+        return [];
     }
 
     const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5);
@@ -1251,15 +1341,16 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     </div>
                     ${lastStudyPlanMove ? '<button type="button" onclick="undoStudyPlanMove()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">Undo move</button>' : ''}
                     <button type="button" onclick="resetManualStudyPlanMoves()" class="text-xs text-zinc-500 dark:text-zinc-400 font-bold hover:underline px-2 py-1">Reset moves</button>
-                    <button type="button" onclick="renderStudyPlanDashboardWidget('studyPlanWidgetContainer')" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh</button>
+                    <button type="button" onclick="refreshStudyPlan()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh plan</button>
                 </div>
             </div>
-            <p aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
+            <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
             </div>
         </div>
     `;
+    return plan;
 }
 
 // Bind to window / global
@@ -1271,9 +1362,11 @@ _studyScope.setRestDays = setRestDays;
 _studyScope.toggleRestDay = toggleRestDay;
 _studyScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _studyScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
+_studyScope.refreshStudyPlan = refreshStudyPlan;
 _studyScope.ensureStudyPlanDayModalExists = ensureStudyPlanDayModalExists;
 _studyScope.openStudyPlanDayModal = openStudyPlanDayModal;
 _studyScope.closeStudyPlanDayModal = closeStudyPlanDayModal;
+_studyScope.closeStudyPlanUpdateModal = closeStudyPlanUpdateModal;
 _studyScope.startStudyPlanTimer = startStudyPlanTimer;
 _studyScope.toggleStudyPlanAssignment = toggleStudyPlanAssignment;
 _studyScope.startStudyPlanDrag = startStudyPlanDrag;

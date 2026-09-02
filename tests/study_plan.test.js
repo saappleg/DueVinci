@@ -51,6 +51,35 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(generateBalancedStudyPlan(null, null)).toEqual([]);
         });
 
+        it('uses earlier eligible days to reduce a deadline-day pileup', () => {
+            const courses = [
+                { id: 'early', code: 'EARLY', name: 'Earlier work' },
+                { id: 'deadline', code: 'DUE', name: 'Deadline work' },
+            ];
+            const assignments = [
+                ...Array.from({ length: 12 }, (_, index) => ({
+                    id: `early-${index}`,
+                    course_id: 'early',
+                    title: `Earlier task ${index}`,
+                    due_date: '2026-08-23',
+                    is_completed: false,
+                })),
+                ...Array.from({ length: 12 }, (_, index) => ({
+                    id: `deadline-${index}`,
+                    course_id: 'deadline',
+                    title: `Deadline task ${index}`,
+                    due_date: '2026-08-24',
+                    is_completed: false,
+                })),
+            ];
+
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date('2026-08-20T12:00:00'), 5);
+            const dailyMinutes = plan.map((day) => day.totalMinutes);
+
+            expect(Math.max(...dailyMinutes)).toBeLessThanOrEqual(125);
+            expect([...dailyMinutes].sort((a, b) => a - b)).toEqual([100, 125, 125, 125, 125]);
+        });
+
         it('enforces proper unit lesson organization and strict sequential order (Lesson 1 -> Lesson 2 -> Lesson 3 -> Lesson 4)', () => {
             const baseDate = new Date('2026-08-20T00:00:00Z');
             const courses = [

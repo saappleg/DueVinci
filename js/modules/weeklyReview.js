@@ -1,5 +1,5 @@
 import { supabaseClient } from './config.js';
-import { generateBalancedStudyPlan, getRestDays } from './studyPlan.js';
+import { generateBalancedStudyPlan, getRestDays, refreshStudyPlan } from './studyPlan.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 
 export function summarizeWeeklyPlan(plan = [], assignments = []) {
@@ -30,5 +30,8 @@ export async function renderWeeklyReview() {
     applyDashboardWidgetLayout();
 }
 
-export function openWeeklyPlan() { document.getElementById('studyPlanWidgetContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer'); }
+export async function openWeeklyPlan() {
+    document.getElementById('studyPlanWidgetContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    await refreshStudyPlan();
+}
 if (typeof window !== 'undefined') Object.assign(window, { renderWeeklyReview, openWeeklyPlan });
