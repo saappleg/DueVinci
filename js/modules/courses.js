@@ -2,7 +2,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
-import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl } from './utils.js';
+import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
@@ -45,7 +45,7 @@ function spreadDatesAcrossRange(startDateStr, endDateStr, count) {
     while (cursor <= end) {
         const dow = cursor.getDay();
         if (dow !== 0 && dow !== 6) { // skip Sat/Sun
-            weekdays.push(cursor.toISOString().split('T')[0]);
+            weekdays.push(getLocalDateKey(cursor));
         }
         cursor.setDate(cursor.getDate() + 1);
     }
@@ -778,7 +778,7 @@ export async function parseSyllabusPDF() {
                 if (!targetDate) {
                     let fallbackDate = new Date(baseDate);
                     fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
-                    targetDate = fallbackDate.toISOString().split('T')[0];
+                    targetDate = getLocalDateKey(fallbackDate);
                 }
                 // Resolve optional end date for range spreading
                 const endDate = u.endDateStr ? smartParseDate(u.endDateStr) : null;
@@ -862,7 +862,7 @@ export async function parseLessonsImage(inputElement) {
                     if (!targetDate) {
                         let fallbackDate = new Date(baseDate);
                         fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
-                        targetDate = fallbackDate.toISOString().split('T')[0];
+                    targetDate = getLocalDateKey(fallbackDate);
                     }
                     // Resolve optional end date for range spreading
                     const endDate = wk.endDateStr ? smartParseDate(wk.endDateStr) : null;
@@ -912,7 +912,7 @@ export async function parseLessonsImage(inputElement) {
 export async function rescheduleOverdueToThisWeek(courseId) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = getLocalDateKey(today);
 
     // Build Mon–Fri range for THIS week (starting today if weekday, else next Mon)
     const dow = today.getDay(); // 0=Sun, 6=Sat
@@ -924,7 +924,7 @@ export async function rescheduleOverdueToThisWeek(courseId) {
     const cursor = new Date(weekStart);
     while (weekdays.length < 5) {
         const d = cursor.getDay();
-        if (d !== 0 && d !== 6) weekdays.push(cursor.toISOString().split('T')[0]);
+        if (d !== 0 && d !== 6) weekdays.push(getLocalDateKey(cursor));
         cursor.setDate(cursor.getDate() + 1);
     }
 
@@ -1133,7 +1133,7 @@ export async function submitAddAssignment(event) {
     const unitNum = unitInput?.value ? parseInt(unitInput.value, 10) : null;
     const taskType = typeInput?.value || 'lesson';
     const priority = priorityInput?.value || 'medium';
-    const dueDate = dateInput?.value ? parseInputDate(dateInput.value) : new Date().toISOString().split('T')[0];
+    const dueDate = dateInput?.value ? parseInputDate(dateInput.value) : getLocalDateKey();
 
     if (!courseId || !title) {
         alert('Please provide a title for the unit or lesson.');
@@ -1176,7 +1176,7 @@ export async function addSubItem(parentId, courseId) {
 
     const { data: parentAssign } = await supabaseClient.from('assignments').select('unit_number, due_date').eq('id', parentId).single();
     const unitNum = parentAssign ? parentAssign.unit_number : null;
-    const dueDate = parentAssign ? parentAssign.due_date : new Date().toISOString().split('T')[0];
+    const dueDate = parentAssign ? parentAssign.due_date : getLocalDateKey();
 
     const user = await getPlannerUser();
     if (!user) return;

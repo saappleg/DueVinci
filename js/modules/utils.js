@@ -4,6 +4,16 @@ let ambientAudioCtx = null;
 let ambientNoiseNode = null;
 let ambientGainNode = null;
 
+/** Returns a YYYY-MM-DD key for a Date's local calendar day. */
+export function getLocalDateKey(value = new Date()) {
+    const date = value instanceof Date ? new Date(value) : new Date(value);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 /** Escapes untrusted text before interpolating it into HTML. */
 export function escapeHtml(value = '') {
     return String(value ?? '')
@@ -310,7 +320,7 @@ export function smartParseDate(dateStr) {
 
     const parsed = new Date(cleaned);
     if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString().split('T')[0];
+        return getLocalDateKey(parsed);
     }
 
     return null;
@@ -318,9 +328,10 @@ export function smartParseDate(dateStr) {
 
 export function parseInputDate(dateStr) {
     if (!dateStr) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
     const parsed = new Date(dateStr);
     if (isNaN(parsed.getTime())) return null;
-    return parsed.toISOString().split('T')[0];
+    return getLocalDateKey(parsed);
 }
 
 export function fireConfetti() {
@@ -336,7 +347,7 @@ export function fireConfetti() {
 export function recordStudyActivity() {
     try {
         if (typeof localStorage === 'undefined') return;
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalDateKey();
         let activityDates = JSON.parse(localStorage.getItem('duevinci_activity_dates')) || [];
         if (!activityDates.includes(todayStr)) {
             activityDates.push(todayStr);

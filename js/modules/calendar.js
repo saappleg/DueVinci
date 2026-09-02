@@ -1,7 +1,7 @@
 // --- FULLCALENDAR & ICS EXPORT MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
-import { fireConfetti } from './utils.js';
+import { fireConfetti, getLocalDateKey } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 
 export let calendarInstance = null;
@@ -144,7 +144,7 @@ export function exportToICS() {
     if (!calendarInstance) return;
     const events = calendarInstance.getEvents().map(ev => ({
         title: ev.title,
-        start: ev.start ? ev.start.toISOString().split('T')[0] : null
+        start: ev.start ? getLocalDateKey(ev.start) : null
     }));
     const icsContent = generateICSString(events);
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });

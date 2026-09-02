@@ -1,6 +1,6 @@
 // --- AI FLASHCARDS, STUDENT NOTES QUIZ & SM-2 SPACED REPETITION ENGINE ---
 import { supabaseClient } from './config.js';
-import { fireConfetti } from './utils.js';
+import { fireConfetti, getLocalDateKey } from './utils.js';
 import { renderMarkdownToHtml } from './markdown.js';
 
 export let currentDeckCards = [];
@@ -44,7 +44,10 @@ export function calculateSM2Repetition(card = {}, quality = 4) {
         repetitions += 1;
     }
 
-    const nextReviewDate = new Date(Date.now() + (interval * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    const reviewedAt = new Date();
+    const nextReviewAt = new Date(reviewedAt);
+    nextReviewAt.setDate(nextReviewAt.getDate() + interval);
+    const nextReviewDate = getLocalDateKey(nextReviewAt);
 
     return {
         ...card,
@@ -52,7 +55,7 @@ export function calculateSM2Repetition(card = {}, quality = 4) {
         interval,
         easinessFactor: parseFloat(ef.toFixed(2)),
         nextReviewDate,
-        lastReviewed: new Date().toISOString().split('T')[0]
+        lastReviewed: getLocalDateKey(reviewedAt)
     };
 }
 

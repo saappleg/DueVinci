@@ -1,9 +1,9 @@
 import { supabaseClient } from './config.js';
-import { escapeHtml, fireConfetti } from './utils.js';
+import { escapeHtml, fireConfetti, getLocalDateKey } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 
-function todayKey(date = new Date()) { return date.toISOString().slice(0, 10); }
+function todayKey(date = new Date()) { return getLocalDateKey(date); }
 
 export function prioritizeTodayTasks(assignments = [], today = todayKey()) {
     return assignments.filter((task) => !task.is_completed && task.due_date).sort((a, b) => {

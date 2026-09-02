@@ -1,16 +1,7 @@
 // --- DYNAMIC ACADEMICS, STUDY STREAK, GPA & WORKLOAD RADAR ---
 import { supabaseClient } from './config.js';
-import { escapeHtml, escapeInlineJs, getSafeExternalUrl } from './utils.js';
-
-/** Returns a stable YYYY-MM-DD key using the viewer's local calendar day. */
-export function getLocalDateKey(value = new Date()) {
-    const date = value instanceof Date ? new Date(value) : new Date(value);
-    if (isNaN(date.getTime())) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
+import { escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
+export { getLocalDateKey } from './utils.js';
 
 /** Normalizes database due dates, including ISO timestamps, to their calendar-date key. */
 export function getDueDateKey(dueDate) {
@@ -28,16 +19,16 @@ export function calculateStudyStreak(activityDates = [], baseDate = new Date()) 
     let streakDays = 0;
     let checkDate = new Date(baseDate);
 
-    let currentDateStr = checkDate.toISOString().split('T')[0];
+    let currentDateStr = getLocalDateKey(checkDate);
     if (!activityDates.includes(currentDateStr)) {
         checkDate.setDate(checkDate.getDate() - 1);
-        currentDateStr = checkDate.toISOString().split('T')[0];
+        currentDateStr = getLocalDateKey(checkDate);
     }
 
     while (activityDates.includes(currentDateStr)) {
         streakDays++;
         checkDate.setDate(checkDate.getDate() - 1);
-        currentDateStr = checkDate.toISOString().split('T')[0];
+        currentDateStr = getLocalDateKey(checkDate);
     }
 
     return streakDays;

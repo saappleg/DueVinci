@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { execFileSync } from 'node:child_process';
 
 describe('AI Study Schedule & Workload Balancer', () => {
     let generateBalancedStudyPlan;
@@ -47,6 +48,33 @@ describe('AI Study Schedule & Workload Balancer', () => {
     });
 
     describe('generateBalancedStudyPlan', () => {
+        it('keeps a local evening Date on its local calendar day', () => {
+            const script = `
+                import { getLocalDateKey, smartParseDate } from './js/modules/utils.js';
+                import { generateBalancedStudyPlan } from './js/modules/studyPlan.js';
+                const localEvening = new Date(2026, 8, 15, 23, 59, 0);
+                console.log(JSON.stringify({
+                    key: getLocalDateKey(localEvening),
+                    planDate: generateBalancedStudyPlan([], [], localEvening, 1)[0].date,
+                    parsedSyllabusDate: smartParseDate('Sept 15, 2026 11:59 PM'),
+                    parsedFallbackDate: smartParseDate('2026-09-15 23:59')
+                }));
+            `;
+            const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+                cwd: process.cwd(),
+                env: { ...process.env, TZ: 'America/New_York' },
+                encoding: 'utf8'
+            });
+            const result = JSON.parse(output.trim().split('\n').at(-1));
+
+            expect(result).toEqual({
+                key: '2026-09-15',
+                planDate: '2026-09-15',
+                parsedSyllabusDate: '2026-09-15',
+                parsedFallbackDate: '2026-09-15'
+            });
+        });
+
         it('returns empty array when courses or assignments are missing', () => {
             expect(generateBalancedStudyPlan(null, null)).toEqual([]);
         });
@@ -81,7 +109,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('enforces proper unit lesson organization and strict sequential order (Lesson 1 -> Lesson 2 -> Lesson 3 -> Lesson 4)', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
@@ -125,7 +153,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('organizes multi-unit courses sequentially (Unit 1 before Unit 2)', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'c1', code: 'MATH 101', name: 'Calculus I', emoji: '📐', color: '#10b981' }
             ];
@@ -147,7 +175,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('generates multi-day study schedule blocks leading up to deadlines with allBlocks and recommendations', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'c1', code: 'CS 101', name: 'Intro to Computer Science', emoji: '💻', color: '#4f46e5' },
                 { id: 'c2', code: 'MATH 201', name: 'Linear Algebra', emoji: '📐', color: '#10b981' }
@@ -181,7 +209,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('prioritizes overdue tasks on Today and parses ISO timestamps cleanly', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
@@ -199,7 +227,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('distributes multi-lesson units evenly across days leading up to deadline instead of dumping everything on Day 0', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'c1', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
@@ -231,7 +259,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('rebalances independent classes away from an overloaded first day without crossing deadlines or rest days', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = Array.from({ length: 6 }, (_, index) => ({ id: `c${index}`, code: `C${index}`, name: `Class ${index}` }));
             const assignments = courses.map((course, index) => ({
                 id: `a${index}`, course_id: course.id, title: `Lesson 1: Task ${index}`, due_date: '2026-08-23', is_completed: false,
@@ -245,7 +273,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('only allows manual moves that preserve deadlines, rest days, and lesson sequence', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [{ id: 'c1', code: 'CS 101', name: 'Computer Science' }];
             const assignments = [
                 { id: 'l1', course_id: 'c1', unit_number: 1, title: 'Lesson 1: Foundations', due_date: '2026-08-24', is_completed: false },
@@ -262,7 +290,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('progresses strictly lesson by lesson through Unit 1 before starting Unit 2, and pairs different subjects together on each day', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' },
                 { id: 'math', code: 'MATH 101', name: 'Calculus', emoji: '📐', color: '#10b981' }
@@ -307,7 +335,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('correctly tags assignments with priority (Urgent, Normal, Low) and type (Exam, Review, Lesson)', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
@@ -345,7 +373,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('guarantees that all units and lessons are scheduled and finished on or before their due date', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z');
+            const baseDate = new Date(2026, 7, 20, 12);
             const courses = [
                 { id: 'cs', code: 'CS 101', name: 'Computer Science', emoji: '💻', color: '#4f46e5' }
             ];
@@ -384,7 +412,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
         });
 
         it('excludes chosen Rest Days from standard coursework while completing deliverables on time', () => {
-            const baseDate = new Date('2026-08-20T00:00:00Z'); // Thursday (Thu = Day 0, Fri = Day 1, Sat = Day 2, Sun = Day 3, Mon = Day 4)
+            const baseDate = new Date(2026, 7, 20, 12); // Thursday (Thu = Day 0, Fri = Day 1, Sat = Day 2, Sun = Day 3, Mon = Day 4)
             const courses = [
                 { id: 'bio', code: 'BIO 101', name: 'Biology', emoji: '🧬', color: '#10b981' }
             ];

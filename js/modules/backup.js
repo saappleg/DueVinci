@@ -1,6 +1,7 @@
 // --- DATA BACKUP & RESTORE MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
+import { getLocalDateKey } from './utils.js';
 
 export function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}) {
     return {
@@ -48,7 +49,7 @@ export async function exportUserDataJSON() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `duevinci-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `duevinci-backup-${getLocalDateKey()}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

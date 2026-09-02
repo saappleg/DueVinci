@@ -1,8 +1,8 @@
 // --- AI STUDY SCHEDULE & WORKLOAD BALANCER MODULE ---
-import { calculateDaysRemaining, getLocalDateKey } from './academics.js';
+import { calculateDaysRemaining } from './academics.js';
 import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
-import { escapeHtml, escapeInlineJs, fireConfetti } from './utils.js';
+import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
 
 let cachedStudyPlan = [];
 const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
@@ -454,10 +454,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         const datePart = startDate.split('T')[0];
         baseDate = new Date(datePart + 'T00:00:00');
     } else if (startDate instanceof Date) {
-        // Preserve the calendar date supplied by callers that use an ISO Date.
-        // The resulting local-midnight Date prevents daylight-saving drift while
-        // retaining the module's existing Date-input contract.
-        const datePart = startDate.toISOString().split('T')[0];
+        // Preserve the caller's local calendar date, then normalize to local midnight.
+        const datePart = getLocalDateKey(startDate);
         baseDate = new Date(datePart + 'T00:00:00');
     } else {
         baseDate = new Date();
