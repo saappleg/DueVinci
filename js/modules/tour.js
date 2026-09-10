@@ -9,7 +9,7 @@ export const WHATS_NEW_VERSION = '2.3.1';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';
-const IMPORTER_POLL_SUBMITTED_KEY = 'duevinci_importer_beta_poll_submitted';
+const IMPORTER_POLL_SUBMITTED_KEY = 'duevinci_importer_beta_poll_submitted_v2';
 const IMPORTER_BETA_DISMISSED_KEY = 'duevinci_importer_beta_dismissed_v1';
 
 function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
