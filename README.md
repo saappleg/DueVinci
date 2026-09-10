@@ -32,6 +32,7 @@
 
 - **AI syllabus import** uses a Supabase Edge Function and Google Gemini. It is optional; manually created courses, lessons, and due dates retain full planning functionality without it.
 - **Supabase sign-in and sync** support persistent accounts and cross-device data. The production database uses Row Level Security policies to isolate each account’s data.
+- **Browser coursework importer beta** is available at [saappleg/duevinci-coursework-importer](https://github.com/saappleg/duevinci-coursework-importer). It imports WGU pacing guides and Maestro weekly coursework without requiring a Canvas API token, then sends only the rows the student approves.
 
 ## Free Core Promise
 
@@ -100,7 +101,8 @@ DueVinci/
 │   ├── CONTRIBUTING.md          # Contribution guidelines
 │   ├── FEATURE_READINESS.md     # Dev capability and verification map
 │   ├── RELEASE_CHECKLIST.md     # Production release checks
-│   └── SECURITY.md              # Security policies & reporting
+│   ├── SECURITY.md              # Security policies & reporting
+│   └── COURSEWORK_IMPORTER_BETA.md # Browser importer beta and poll rollout
 ├── scripts/
 │   └── release-smoke.mjs        # Post-deploy production smoke test
 ├── supabase/                    # Migrations and Edge Functions
@@ -118,6 +120,8 @@ Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) fo
 
 For the Main release workflow and its optional authenticated smoke-test secrets,
 see [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
+
+The browser importer beta is documented in [COURSEWORK_IMPORTER_BETA.md](docs/COURSEWORK_IMPORTER_BETA.md).
 
 ---
 ## License 📄

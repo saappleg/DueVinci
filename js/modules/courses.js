@@ -10,6 +10,30 @@ export let hideUnassignedFolder = typeof localStorage !== 'undefined' && localSt
 export let currentAssignmentPage = 1;
 export let activeTermModalName = '';
 
+function isWeeklyCourse(course) {
+    return course?.pacing_type === 'weekly' || course?.lms_provider === 'browser_wgu' || course?.lms_provider === 'browser_maestro';
+}
+
+// Browser imports keep the source's week/lesson prefix so they remain
+// recognizable when the pacing columns are not available on an older deploy.
+// Treat those rows as lesson children for ordering and completion behavior.
+function isWeeklyImportedItem(item) {
+    const title = String(item?.title || '');
+    return /^\s*(?:week|wk|unit)\s*\d+\s*(?:·|•|:|-|↳)\s*(?:lesson\s*\d+|review|exam)\b/i.test(title)
+        || (['browser_wgu', 'browser_maestro'].includes(item?.lms_provider)
+            && /\b(?:lesson\s*\d+|review|exam)\b/i.test(title));
+}
+
+function courseWindowLabel(course) {
+    if (!course?.start_date && !course?.end_date) return '';
+    const format = (value) => {
+        if (!value) return 'Open';
+        const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+        return Number.isNaN(date.valueOf()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+    };
+    return `${format(course.start_date)} – ${format(course.end_date)}`;
+}
+
 async function getSyllabusParserError(error) {
     try {
         const body = await error?.context?.clone?.().json();
@@ -108,8 +132,10 @@ export async function loadDashboardStats() {
         let unitB = getUnitNum(b);
         if (unitA !== unitB) return unitA - unitB;
 
-        let isSubA = a.title.startsWith('↳');
-        let isSubB = b.title.startsWith('↳');
+        const courseA = courses.find(c => c.id === a.course_id);
+        const courseB = courses.find(c => c.id === b.course_id);
+        let isSubA = a.title.startsWith('↳') || (isWeeklyCourse(courseA) && isWeeklyImportedItem(a));
+        let isSubB = b.title.startsWith('↳') || (isWeeklyCourse(courseB) && isWeeklyImportedItem(b));
 
         if (!isSubA && isSubB) return -1;
         if (isSubA && !isSubB) return 1;
@@ -142,7 +168,7 @@ export async function loadDashboardStats() {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
-                const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Wk ${assign.unit_number}</span>` : '';
+                const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${isWeeklyCourse(course) ? 'Wk' : 'Unit'} ${assign.unit_number}</span>` : '';
                 
                 const priority = assign.priority || 'medium';
                 let priorityBadge = '';
@@ -358,6 +384,9 @@ export function renderAlphabeticals() {
         const opacity = course.is_completed ? 'opacity-50' : '';
         const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
 
+        const windowLabel = courseWindowLabel(course);
+        const pacingBadge = isWeeklyCourse(course) ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded font-bold">Weekly pacing</span>' : '';
+        const windowBadge = windowLabel ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${escapeHtml(windowLabel)}</span>` : '';
         listEl.innerHTML += `
             <div draggable="true" ondragstart="handleDragStart(event, '${course.id}')" onclick="openCourseModal('${course.id}')" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
                 <div class="flex items-center gap-4">
@@ -367,6 +396,7 @@ export function renderAlphabeticals() {
                             <h4 class="font-bold text-zinc-800 dark:text-zinc-200">${course.code}</h4>
                             ${termBadge}
                         </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-0.5">${pacingBadge}${windowBadge}</div>
                         <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Drag card to move term &bull; Click to open coursework</p>
                     </div>
                 </div>
@@ -546,10 +576,25 @@ export function openCourseModal(courseId) {
     const metaBox = document.getElementById('courseMetadataBox');
     if (metaBox) {
         let metaHtml = '';
+        if (isWeeklyCourse(course) || course.start_date || course.end_date) {
+            const pacingLabel = isWeeklyCourse(course) ? 'Weekly pacing' : 'Course window';
+            const sourceLabel = course.pacing_source === 'wgu_term_page' ? 'Matched from the WGU term page' : course.pacing_source === 'wgu_pacing_guide' ? 'Imported from a WGU pacing guide' : course.pacing_source === 'maestro_page' ? 'Imported from a Maestro weekly course' : 'Source dates';
+            metaHtml += `<div class="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"><div class="flex items-center justify-between gap-2"><strong class="text-xs text-emerald-700 dark:text-emerald-300">${pacingLabel}</strong><span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">${escapeHtml(sourceLabel)}</span></div><p class="mt-1 text-xs text-emerald-800 dark:text-emerald-200">${escapeHtml(courseWindowLabel(course) || 'No course window captured')}</p><p class="mt-1 text-[11px] text-emerald-700/80 dark:text-emerald-300/80">Each Week number is used as the workload group for this course.</p></div>`;
+        }
         if (course.description) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400 mb-1.5"><strong>Description:</strong> ${escapeHtml(course.description)}</p>`;
-        if (course.objectives) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400"><strong>Objectives:</strong> ${escapeHtml(course.objectives)}</p>`;
+        if (course.objectives) metaHtml += `<p class="text-xs text-zinc-600 dark:text-zinc-400"><strong>${isWeeklyCourse(course) ? 'Competencies' : 'Objectives'}:</strong> ${escapeHtml(course.objectives)}</p>`;
         metaBox.innerHTML = metaHtml ? `<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700">${metaHtml}</div>` : '<div class="mt-3 bg-zinc-100 dark:bg-brand-900 p-3 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs text-zinc-500">No course description or objectives provided yet. Upload a syllabus or edit below.</div>';
     }
+
+    const assignmentHeading = document.getElementById('coursework-heading');
+    if (assignmentHeading) assignmentHeading.textContent = isWeeklyCourse(course) ? 'Weekly pacing & coursework' : 'Weekly Units & Lessons';
+    const unitInput = document.getElementById('assignUnit');
+    if (unitInput) {
+        unitInput.placeholder = isWeeklyCourse(course) ? 'Week #' : 'Unit #';
+        unitInput.title = isWeeklyCourse(course) ? 'Week Number' : 'Unit Number';
+    }
+    const addButtonLabel = document.querySelector('#addAssignmentForm button span');
+    if (addButtonLabel) addButtonLabel.textContent = isWeeklyCourse(course) ? '+ Add Week / Coursework' : '+ Add Lesson / Coursework';
 
     const btn = document.getElementById('markCourseCompleteBtn');
     if (btn) {
@@ -1208,13 +1253,43 @@ export function changeAssignmentPage(courseId, page) {
 export async function loadAssignments(courseId, page = 1) {
     if (typeof document === 'undefined') return;
     const { data: assignments } = await supabaseClient.from('assignments').select('*').eq('course_id', courseId);
+    const course = localCourses.find((item) => item.id === courseId) || {};
+    const weeklyCourse = isWeeklyCourse(course);
     const listEl = document.getElementById('assignmentList');
+    const weekSummaryEl = document.getElementById('course-week-summary');
     if (!listEl) return;
     listEl.innerHTML = '';
 
     if (!assignments || !assignments.length) {
+        if (weekSummaryEl) {
+            weekSummaryEl.classList.add('hidden');
+            weekSummaryEl.replaceChildren();
+        }
         listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet. Use the form above to add weekly units and lessons.</p></div>';
         return;
+    }
+
+    if (weekSummaryEl) {
+        if (!weeklyCourse) {
+            weekSummaryEl.classList.add('hidden');
+            weekSummaryEl.replaceChildren();
+        } else {
+            const weeks = new Map();
+            assignments.forEach((assignment) => {
+                const week = parseInt(assignment.unit_number, 10) || Number(assignment.title.match(/(?:week|wk)\s*(\d+)/i)?.[1]) || 0;
+                if (!week) return;
+                const entry = weeks.get(week) || { total: 0, complete: 0, due: assignment.due_date };
+                entry.total += 1;
+                if (assignment.is_completed) entry.complete += 1;
+                if (assignment.due_date && (!entry.due || new Date(assignment.due_date) > new Date(entry.due))) entry.due = assignment.due_date;
+                weeks.set(week, entry);
+            });
+            weekSummaryEl.classList.toggle('hidden', !weeks.size);
+            weekSummaryEl.innerHTML = [...weeks.entries()].sort((a, b) => a[0] - b[0]).map(([week, entry]) => {
+                const target = entry.due ? (window.formatDate ? window.formatDate(entry.due, false) : String(entry.due).slice(0, 10)) : 'No target';
+                return `<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/20"><strong class="block text-[11px] text-emerald-800 dark:text-emerald-200">Week ${week}</strong><span class="block text-[10px] text-emerald-700/80 dark:text-emerald-300/80">${entry.complete}/${entry.total} complete · ${escapeHtml(target)}</span></div>`;
+            }).join('');
+        }
     }
 
     const getUnitNum = (item) => {
@@ -1235,8 +1310,8 @@ export async function loadAssignments(courseId, page = 1) {
         let unitB = getUnitNum(b);
         if (unitA !== unitB) return unitA - unitB;
 
-        let isSubA = a.title.startsWith('↳');
-        let isSubB = b.title.startsWith('↳');
+        let isSubA = a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a));
+        let isSubB = b.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(b));
 
         if (!isSubA && isSubB) return -1;
         if (isSubA && !isSubB) return 1;
@@ -1269,11 +1344,20 @@ export async function loadAssignments(courseId, page = 1) {
     } catch (e) {}
 
     paginatedAssignments.forEach(assign => {
-        const isSubItem = assign.title.startsWith('↳');
-        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">Unit ${assign.unit_number}</span>` : '';
+        const isSubItem = assign.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(assign));
+        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${weeklyCourse ? 'Week' : 'Unit'} ${assign.unit_number}</span>` : '';
         const canvasBadge = assign.lms_provider === 'canvas'
             ? '<span class="text-[10px] bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from Canvas">↻ Canvas</span>'
             : '';
+        const wguBadge = assign.lms_provider === 'browser_wgu'
+            ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from a WGU pacing guide">↻ WGU</span>'
+            : '';
+        const maestroBadge = assign.lms_provider === 'browser_maestro'
+            ? '<span class="text-[10px] bg-violet-500/10 text-violet-600 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from a Maestro weekly course">↻ Maestro</span>'
+            : '';
+        const displayTitle = weeklyCourse && isWeeklyImportedItem(assign)
+            ? assign.title.replace(/^\s*(?:week|wk|unit)\s*\d+\s*(?:·|•|:|-|↳)\s*/i, '')
+            : assign.title;
 
         // Determine current type (respect local overrides & explicit assignment type over regex heuristics)
         let currentType = localTypes[assign.id] || assign.task_type || assign.type;
@@ -1295,7 +1379,7 @@ export async function loadAssignments(courseId, page = 1) {
             const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
             checkboxHtml = `<button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
         } else {
-            const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && a.title.startsWith('↳'));
+            const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && (a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a))));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
             const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
             checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}" title="Automatically completed when all unit lessons are done"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
@@ -1334,7 +1418,7 @@ export async function loadAssignments(courseId, page = 1) {
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                     <div class="flex items-center gap-2 flex-1 min-w-[180px] group/title">
                         ${checkboxHtml}
-                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(assign.title)}</span>${canvasBadge}
+                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(displayTitle)}</span>${canvasBadge}${wguBadge}${maestroBadge}
                         <button type="button" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">

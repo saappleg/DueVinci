@@ -1,12 +1,15 @@
 // --- WALKTHROUGH & WHAT'S NEW CHANGELOG MODAL MODULE ---
 import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
+import { supabaseClient } from './config.js';
 
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
-// The 2.3 feature drop uses a versioned dismissal marker so students see each
-// release announcement once after the installed app updates.
-export const WHATS_NEW_VERSION = '2.3';
+// The 2.3.1 feature drop uses a versioned dismissal marker so students see
+// the browser-importer beta announcement once after the app updates.
+export const WHATS_NEW_VERSION = '2.3.1';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
+const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';
+const IMPORTER_POLL_SUBMITTED_KEY = 'duevinci_importer_beta_poll_submitted';
 
 function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
 
@@ -159,6 +162,32 @@ export function ensureWhatsNewModalExists() {
                         <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Unit-by-unit milestone spacing planner with customizable Rest Days scheduling, deadline-first sorting, and timestamp-aware workload balancing.</p>
                     </div>
                 </div>
+                <div class="flex gap-3 p-3 bg-violet-50 dark:bg-violet-950/20 rounded-xl border border-violet-200/70 dark:border-violet-900/50">
+                    <span class="text-2xl shrink-0">🧪</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Coursework Importer Beta</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Import WGU pacing guides and Maestro weekly units from the page you have open. Review the preview first, then help us improve the school-specific adapters.</p>
+                        <a href="${COURSEWORK_IMPORTER_REPO}" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block font-bold text-violet-700 hover:underline dark:text-violet-300">Join the beta and report feedback →</a>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200/70 dark:border-amber-900/50">
+                    <span class="text-2xl shrink-0">📊</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Which import path should we prioritize?</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Vote anonymously. We store your choice and a server timestamp—no account, email, IP address, or device identifier.</p>
+                        <fieldset id="importerPollOptions" class="mt-2 grid gap-1.5 text-zinc-700 dark:text-zinc-200">
+                            <legend class="sr-only">Choose your preferred import method</legend>
+                            <label class="flex items-center gap-2"><input type="radio" name="importerPreference" value="extension" class="accent-amber-600"> Browser extension</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="importerPreference" value="api" class="accent-amber-600"> Direct school API</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="importerPreference" value="gemini" class="accent-amber-600"> Gemini syllabus setup</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="importerPreference" value="unsure" class="accent-amber-600"> Not sure yet</label>
+                        </fieldset>
+                        <div class="mt-2 flex items-center gap-3">
+                            <button type="button" id="submitImporterPoll" class="rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-600">Vote anonymously</button>
+                            <span id="importerPollStatus" class="text-[11px] text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></span>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
                     <span class="text-2xl shrink-0">🛡️</span>
                     <div>
@@ -189,9 +218,44 @@ export function ensureWhatsNewModalExists() {
         </div>
     `;
     document.body.appendChild(div);
+    hydrateImporterPoll();
     div.addEventListener('click', (event) => {
         if (event.target === div) closeWhatsNewModal();
     });
+}
+
+function hydrateImporterPoll() {
+    const submitted = typeof localStorage !== 'undefined' && localStorage.getItem(IMPORTER_POLL_SUBMITTED_KEY) === 'true';
+    const button = document.getElementById('submitImporterPoll');
+    const status = document.getElementById('importerPollStatus');
+    if (!button || !status) return;
+    if (submitted) {
+        button.disabled = true;
+        button.classList.add('opacity-60', 'cursor-not-allowed');
+        status.textContent = 'Thanks—your anonymous vote was recorded.';
+        document.querySelectorAll('input[name="importerPreference"]').forEach((input) => { input.disabled = true; });
+        return;
+    }
+    button.addEventListener('click', submitImporterPoll);
+}
+
+async function submitImporterPoll() {
+    const selected = document.querySelector('input[name="importerPreference"]:checked')?.value;
+    const button = document.getElementById('submitImporterPoll');
+    const status = document.getElementById('importerPollStatus');
+    if (!selected || !button || !status) return;
+    button.disabled = true;
+    status.textContent = 'Submitting…';
+    const { error } = await supabaseClient.from('extension_beta_poll_votes').insert({ preference: selected });
+    if (error) {
+        button.disabled = false;
+        status.textContent = 'Vote could not be saved yet. Please try again later.';
+        return;
+    }
+    if (typeof localStorage !== 'undefined') localStorage.setItem(IMPORTER_POLL_SUBMITTED_KEY, 'true');
+    document.querySelectorAll('input[name="importerPreference"]').forEach((input) => { input.disabled = true; });
+    button.classList.add('opacity-60', 'cursor-not-allowed');
+    status.textContent = 'Thanks—your anonymous vote was recorded.';
 }
 
 export function openWhatsNewModal() {
@@ -222,4 +286,5 @@ if (typeof window !== 'undefined') {
     window.openWhatsNewModal = openWhatsNewModal;
     window.closeWhatsNewModal = closeWhatsNewModal;
     window.checkWhatsNewOnLaunch = checkWhatsNewOnLaunch;
+    window.submitImporterPoll = submitImporterPoll;
 }

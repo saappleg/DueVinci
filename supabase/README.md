@@ -37,6 +37,17 @@ Canvas tokens are stored in the server-only `canvas_connections` table and Canva
 
 Canvas sync imports selected courses and Canvas assignments that have due dates. LMS source IDs make repeat syncs update the same courses and assignments instead of creating duplicates.
 
+Browser imports can also preserve source course windows and weekly pacing. The
+`20260909090000_wgu_weekly_pacing.sql` migration adds `start_date`, `end_date`,
+`pacing_type`, and `pacing_source` to courses. WGU pacing-guide items use the
+existing assignment `unit_number` field as their week number, so the course
+view can group and label them as Week 1, Week 2, and so on.
+
+The `20260910031901_extension_beta_poll.sql` migration adds the anonymous
+importer preference poll. It grants only `INSERT` to `anon` and
+`authenticated`, stores no account or device identifier, and does not expose
+individual responses through the Data API.
+
 ## Dev Canvas mock
 
 Set `ENABLE_CANVAS_MOCK=true` only in the Dev project to show the local-only sample

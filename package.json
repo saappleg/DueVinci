@@ -1,6 +1,6 @@
 {
   "name": "duevinci",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Smart academic planner, syllabus AI parser, GPA tracker, SM-2 flashcards, and Pomodoro timer.",
   "private": true,
   "type": "module",
