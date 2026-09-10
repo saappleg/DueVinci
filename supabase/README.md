@@ -44,9 +44,11 @@ existing assignment `unit_number` field as their week number, so the course
 view can group and label them as Week 1, Week 2, and so on.
 
 The `20260910031901_extension_beta_poll.sql` migration adds the anonymous
-importer preference poll. It grants only `INSERT` to `anon` and
-`authenticated`, stores no account or device identifier, and does not expose
-individual responses through the Data API.
+importer preference poll. The follow-up
+`20260910032254_extension_beta_poll_lockdown.sql` migration makes the table
+explicitly write-only for `anon` and `authenticated`: visitors can submit a
+choice, but individual responses cannot be read through the Data API. The
+table stores no account or device identifier.
 
 ## Dev Canvas mock
 
