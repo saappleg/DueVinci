@@ -48,7 +48,9 @@ importer preference poll. The follow-up
 `20260910032254_extension_beta_poll_lockdown.sql` migration makes the table
 explicitly write-only for `anon` and `authenticated`: visitors can submit a
 choice, but individual responses cannot be read through the Data API. The
-table stores no account or device identifier.
+`20260910034000_extension_beta_poll_multi_select.sql` migration adds the
+`preferences` array so a visitor can select multiple paths. The table stores
+no account or device identifier.
 
 ## Dev Canvas mock
 

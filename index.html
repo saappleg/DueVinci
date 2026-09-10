@@ -160,6 +160,29 @@
                         <span>⚡</span> + Quick Add Task
                     </button>
                 </div>
+
+                <section id="importerPollCard" class="hidden mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20" aria-labelledby="importerPollHeading">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Help shape the importer</p>
+                            <h3 id="importerPollHeading" class="mt-1 text-base font-black text-zinc-900 dark:text-white">Which import paths would you use?</h3>
+                            <p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">Select all that interest you. Your anonymous vote helps us prioritize the next integration.</p>
+                        </div>
+                        <div class="w-full shrink-0 sm:max-w-xs">
+                            <fieldset id="importerPollOptions" class="grid gap-2 text-xs text-zinc-700 dark:text-zinc-200">
+                                <legend class="sr-only">Choose one or more preferred import methods</legend>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="importerPreference" value="extension" class="h-4 w-4 accent-amber-600"> Browser extension</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="importerPreference" value="api" class="h-4 w-4 accent-amber-600"> Direct school API</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="importerPreference" value="gemini" class="h-4 w-4 accent-amber-600"> Gemini syllabus setup</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="importerPreference" value="unsure" class="h-4 w-4 accent-amber-600"> Not sure yet</label>
+                            </fieldset>
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                <button type="button" id="submitImporterPoll" class="rounded-lg bg-amber-500 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-600">Vote anonymously</button>
+                                <span id="importerPollStatus" class="text-[11px] text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 
                 <div id="dashboardWidgets" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <section id="upNextWidget" data-dashboard-widget="up_next" class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 space-y-4">

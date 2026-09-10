@@ -15,7 +15,7 @@ import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutatio
 import { DueVinciSidebar } from './modules/components.js';
 import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar, getProfileEasterEgg, renderProfileEasterEgg, activateProfileEasterEgg } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
-import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch } from './modules/tour.js';
+import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, completeTodayTask, startTodayFocus } from './modules/today.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
@@ -414,10 +414,12 @@ if (typeof document !== 'undefined') {
         const currentPage = getCurrentPageName();
         if (currentPage === 'index' || currentPage === 'index.html' || currentPage === '') {
             renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+            hydrateImporterPoll();
         }
 
         setTimeout(() => {
             checkWhatsNewOnLaunch();
+            checkImporterBetaOnLaunch();
             updateTourButtonVisibility();
         }, 400);
     });
