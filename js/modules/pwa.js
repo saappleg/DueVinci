@@ -28,7 +28,9 @@ export function initPWA() {
         window.addEventListener('load', () => {
             const manifestHref = document.querySelector('link[rel="manifest"]')?.href || new URL('manifest.json', window.location.href).href;
             const serviceWorkerUrl = new URL('sw.js', manifestHref).href;
-            navigator.serviceWorker.register(serviceWorkerUrl).catch(err => {
+            // Always revalidate the worker script so a release can invalidate
+            // an installed app-shell cache without waiting for CDN max-age.
+            navigator.serviceWorker.register(serviceWorkerUrl, { updateViaCache: 'none' }).catch(err => {
                 console.log('SW registration error:', err);
             });
         });
