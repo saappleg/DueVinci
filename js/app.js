@@ -15,13 +15,13 @@ import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutatio
 import { DueVinciSidebar } from './modules/components.js';
 import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar, getProfileEasterEgg, renderProfileEasterEgg, activateProfileEasterEgg } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
-import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js';
+import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js?v=2.3.1-beta';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, completeTodayTask, startTodayFocus } from './modules/today.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
-import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js';
+import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js?v=2.3.1-beta';
 import { initializeErrorReporting } from './modules/errorReporting.js';
 import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, showSettingsMovedNotice, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
 import './modules/canvas.js'; // Canvas LMS Sync — optional add-on, zero impact on free core
