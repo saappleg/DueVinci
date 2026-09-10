@@ -265,8 +265,9 @@ export function ensureSettingsModalExists() {
                             <button type="button" onclick="switchSettingsTab('canvas')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-canvas">💳 Subscription</button>
                         </nav>
                     </div>
-                    <div class="hidden sm:block pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
+                    <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
                         <button type="button" onclick="openWhatsNewModal()" class="block text-indigo-600 dark:text-indigo-400 font-bold hover:underline">What's New ✨</button>
+                        <a href="https://github.com/saappleg/duevinci-coursework-importer" target="_blank" rel="noopener noreferrer" class="block text-violet-600 dark:text-violet-400 font-bold hover:underline">Coursework Importer Beta ↗</a>
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
