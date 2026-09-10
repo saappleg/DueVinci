@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.3.1] - 2026-09-10
 
 ### Added
-- Added the browser coursework importer beta announcement to the DueVinci What's New popup.
-- Added an anonymous importer preference poll for browser extension, direct API, Gemini syllabus setup, or undecided.
+- Added a separate dismissible browser coursework importer beta announcement popup.
+- Added a collapsible anonymous dashboard poll with multi-select choices for browser extension, direct API, Gemini syllabus setup, or undecided.
 - Added write-only Supabase storage with RLS for anonymous poll responses.
 - Added weekly WGU/Maestro course-window and linked-unit documentation.
 
