@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.0] - 2026-09-21
+
+### Added
+- Added `.ics` calendar import for Google Calendar, Apple Calendar, Outlook,
+  and other calendar applications, including recurring and multi-day events.
+- Added course pacing profiles for WGU, Maestro, and manual coursework plans.
+- Added sequence planning that keeps incomplete coursework in curriculum order.
+
+### Fixed
+- Fixed custom calendar event creation and added multi-day manual events.
+- Fixed rescheduling so assignment order is deterministic by unit and lesson.
+- Fixed dashboard Quick Add so current courses load before adding a task.
+
 ## [Unreleased] - 2026-08-23
 
 ### Changed

@@ -3,9 +3,9 @@ import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
 import { supabaseClient } from './config.js';
 
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
-// The 2.3.1 feature drop uses a versioned dismissal marker so students see
-// the browser-importer beta announcement once after the app updates.
-export const WHATS_NEW_VERSION = '2.3.1';
+// Each feature drop uses a versioned dismissal marker so students see the
+// latest release notes once after the app updates.
+export const WHATS_NEW_VERSION = '2.4.0';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';
@@ -156,6 +156,20 @@ export function ensureWhatsNewModalExists() {
                 <button type="button" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
             </div>
             <div class="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto text-xs">
+                <div class="flex gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl border border-indigo-200/70 dark:border-indigo-900/50">
+                    <span class="text-2xl shrink-0">🗓️</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Import Your Other Calendars</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with .ics import. Recurring and multi-day events are expanded automatically.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/70 dark:border-emerald-900/50">
+                    <span class="text-2xl shrink-0">📚</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Curriculum-Order Planning</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Rescheduling and sequence planning now keep lessons in unit and lesson order, with WGU, Maestro, and manual pacing profiles for each course.</p>
+                    </div>
+                </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
                     <span class="text-2xl shrink-0">📅</span>
                     <div>
