@@ -11,11 +11,13 @@ offline.
 | Assignments, grades, due dates, type, priority, and completion | `assignments` | Synced per account. `task_type`, `type`, and `priority` are in migration `20260823135000_assignment_metadata.sql`. |
 | Calendar events | `custom_events` | Synced per account. Manual one-day/multi-day events and reviewed `.ics` imports are supported; imports expand common recurrence rules, honor `EXDATE`, and skip matching title/date duplicates. |
 | Dashboard, grades, calendar, and study plan | Reads the course and assignment data above | No separate copy of academic data. |
-| Export/import backup | Supabase academic data plus device preferences | Export is a recovery/transfer tool, not a replacement for RLS-protected sync. |
+| Export/import backup | Supabase academic data plus device preferences and flashcard mastery | Plain JSON recovery/transfer tool, not encrypted and not a replacement for RLS-protected sync. |
+| Flashcard mastery | `flashcard_mastery` plus account-scoped localStorage | RLS-protected cloud row; authenticated writes atomically merge per-card review timestamps. Offline edits remain local and sync on reconnect or next authenticated launch. Backups include only the current account's local mastery and cloud rows. Unscoped progress from older app versions is not automatically attributed to an account. |
+| Tutor usage ledger | `tutor_usage_monthly` | Users can read their own aggregate counts; only service-role functions can reserve or release requests. Daily cleanup removes rows within 12 months of last activity. |
 | Support form and inbox | `support_tickets` | Submitted with the signed-in user ID; resolved/closed tickets are automatically deleted 90 days after resolution. |
 | Browser diagnostics | `app_error_events` | Captures client error reports server-side; events are automatically deleted after 90 days. |
 | Non-sensitive preferences | `user_preferences` plus local cache | Theme, timer, display, and similar preferences sync across signed-in devices. |
-| Account deletion | `delete-account` Edge Function | Deletes the Canvas connection then the authenticated user. Test only with a disposable account. |
+| Account deletion | Settings plus `delete-account` Edge Function | Removes core academic rows and Canvas credentials before deleting Auth; flashcard mastery and Tutor usage cascade with the user. Clears browser storage on the browser performing deletion; offline copies on other devices require clearing that device's browser storage. Test only with a disposable account. |
 | AI syllabus import | Shared `gemini-parser` Edge Function | Dev deliberately uses the active function supplied from the main integration; do not replace it during Dev work. |
 | Canvas connection and sync | Server-only `canvas_connections` and Canvas Edge Functions | Dev-only paid integration. Tokens are AES-GCM encrypted at rest and never returned to the browser. |
 | Subscription and billing | Stripe plus billing Edge Functions | Dev uses Stripe Test credentials and the Dev Supabase project only. |
@@ -23,7 +25,9 @@ offline.
 ## Local cache and synchronized preferences
 
 The browser keeps a per-user IndexedDB/localStorage cache for offline planner
-use. It is a cache—not a replacement for the RLS-protected cloud record.
+use. Flashcard mastery uses account-scoped localStorage keys and is queued for
+cloud merge on reconnect. This is a cache—not a replacement for the RLS-protected
+cloud record. Backups are plain JSON files and are not encrypted by DueVinci.
 Non-sensitive settings such as theme, timer preferences, rest days, and display
 choices synchronize through the RLS-protected `user_preferences` table. Live
 session state, installation-banner dismissal, and tour state can remain local.
@@ -51,14 +55,18 @@ while online.
 
 1. Sign in with two accounts and confirm each sees only its own academic data.
 2. Create, edit, complete, grade, and delete a course/assignment; confirm the
-   change appears after a refresh and on a second signed-in device.
+   change appears after a refresh and on a second signed-in device. Rate different
+   flashcards on two devices and confirm both card updates survive; verify a second
+   account on the same browser cannot see or export the first account's mastery.
 3. Add and remove a calendar event; export and re-import a backup using a
    disposable account. Test an `.ics` file with a recurrence, an `EXDATE`, a
    multi-day event, and a duplicate to confirm the review step behaves as expected.
 4. Exercise AI import with the shared `gemini-parser` function, if its API key
    is configured.
 5. Use the Dev Canvas mock to connect, select courses, and sync assignments.
-6. Test PWA install and offline reload as described above.
+6. Test PWA install and offline reload as described above. Review a flashcard
+   while offline, reconnect, and confirm the pending mastery merge completes
+   before relying on the second-device copy.
 7. Mark a test support ticket resolved and confirm it remains visible before the
    90-day retention window; check the Supabase Cron job for scheduled cleanup.
 8. Change a preference on one signed-in device and confirm it appears on a

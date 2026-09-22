@@ -1,6 +1,6 @@
 // --- AI FLASHCARDS, STUDENT NOTES QUIZ & SM-2 SPACED REPETITION ENGINE ---
 import { supabaseClient } from './config.js';
-import { fireConfetti, getLocalDateKey } from './utils.js';
+import { escapeHtml, fireConfetti, getLocalDateKey } from './utils.js';
 import { renderMarkdownToHtml } from './markdown.js';
 
 export let currentDeckCards = [];
@@ -237,13 +237,210 @@ export function generateQuizQuestions(course, assignments = [], notesText = '') 
 /**
  * Loads stored SM-2 flashcards mastery database from localStorage.
  */
-export function getSavedDeckMastery(courseId) {
-    if (typeof localStorage === 'undefined' || !courseId) return {};
-    const key = `duevinci_flashcards_mastery_${courseId}`;
+const MASTERY_STORAGE_PREFIX = 'duevinci_flashcards_mastery_';
+const masterySaveTimers = new Map();
+
+function currentLocalUserId() {
+    if (typeof localStorage === 'undefined') return null;
     try {
-        return JSON.parse(localStorage.getItem(key)) || {};
+        const user = JSON.parse(localStorage.getItem('duevinci_offline_user') || 'null');
+        return typeof user?.id === 'string' && user.id ? user.id : null;
+    } catch { return null; }
+}
+
+function masteryStorageKey(userId, courseId) {
+    return userId && courseId ? `${MASTERY_STORAGE_PREFIX}${userId}_${courseId}` : null;
+}
+
+function pendingMasteryKey(userId, courseId) {
+    return userId && courseId ? `${MASTERY_STORAGE_PREFIX}pending_${userId}_${courseId}` : null;
+}
+
+function normalizedDate(value, includeTime = false) {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return null;
+    return includeTime ? new Date(parsed).toISOString() : value.slice(0, 10);
+}
+
+export function sanitizeFlashcardMastery(mastery = {}) {
+    if (!mastery || typeof mastery !== 'object' || Array.isArray(mastery)) return {};
+    const sanitized = Object.create(null);
+    Object.entries(mastery).forEach(([cardId, value]) => {
+        if (!cardId || cardId.length > 200 || !value || typeof value !== 'object' || Array.isArray(value)) return;
+        const numberOr = (candidate, fallback, min, max, integer = false) => {
+            const number = Number(candidate);
+            if (!Number.isFinite(number)) return fallback;
+            const bounded = Math.max(min, Math.min(max, number));
+            return integer ? Math.round(bounded) : bounded;
+        };
+        const lastReviewedAt = normalizedDate(value.lastReviewedAt, true)
+            || normalizedDate(value.lastReviewed, true);
+        sanitized[cardId] = {
+            repetitions: numberOr(value.repetitions, 0, 0, 100000, true),
+            interval: numberOr(value.interval, 1, 1, 36500, true),
+            easinessFactor: numberOr(value.easinessFactor, 2.5, 1.3, 5),
+            nextReviewDate: normalizedDate(value.nextReviewDate),
+            lastReviewed: normalizedDate(value.lastReviewed),
+            lastReviewedAt,
+        };
+    });
+    return sanitized;
+}
+
+export function getSavedDeckMastery(courseId, userId = currentLocalUserId()) {
+    if (typeof localStorage === 'undefined' || !courseId || !userId) return {};
+    const key = masteryStorageKey(userId, courseId);
+    try {
+        return sanitizeFlashcardMastery(JSON.parse(localStorage.getItem(key) || '{}'));
     } catch {
         return {};
+    }
+}
+
+export function mergeFlashcardMastery(localMastery = {}, cloudMastery = {}) {
+    const merged = Object.assign(Object.create(null), sanitizeFlashcardMastery(cloudMastery));
+    Object.entries(sanitizeFlashcardMastery(localMastery)).forEach(([cardId, local]) => {
+        const remote = merged[cardId];
+        const localTime = Date.parse(local?.lastReviewedAt || local?.lastReviewed || '') || 0;
+        const remoteTime = Date.parse(remote?.lastReviewedAt || remote?.lastReviewed || '') || 0;
+        if (!remote || localTime >= remoteTime) merged[cardId] = local;
+    });
+    return merged;
+}
+
+function stableJson(value) {
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+}
+
+function storeDeckMasteryLocally(courseId, mastery, userId = currentLocalUserId()) {
+    if (typeof localStorage === 'undefined' || !courseId || !userId) return;
+    const key = masteryStorageKey(userId, courseId);
+    try {
+        localStorage.setItem(key, JSON.stringify(sanitizeFlashcardMastery(mastery)));
+    } catch (error) {
+        console.warn('Could not save flashcard review progress on this device:', error);
+    }
+}
+
+async function authenticatedUserId() {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+    try {
+        const { data, error } = await supabaseClient.auth.getUser();
+        return error ? null : data?.user?.id || null;
+    } catch {
+        return null;
+    }
+}
+
+async function saveDeckMasteryToCloud(userId, courseId, mastery) {
+    const authenticatedId = await authenticatedUserId();
+    if (!userId || authenticatedId !== userId) return false;
+    const sent = sanitizeFlashcardMastery(mastery);
+    const { data, error } = await supabaseClient.rpc('merge_flashcard_mastery', {
+        p_user_id: userId,
+        p_course_id: String(courseId),
+        p_mastery: sent,
+    });
+    if (error) throw error;
+    const current = getSavedDeckMastery(courseId, userId);
+    const reconciled = mergeFlashcardMastery(current, data || {});
+    storeDeckMasteryLocally(courseId, reconciled, userId);
+    if (stableJson(current) === stableJson(sent)) {
+        try { localStorage.removeItem(pendingMasteryKey(userId, courseId)); } catch { /* The cloud copy is saved. */ }
+    } else {
+        try { localStorage.setItem(pendingMasteryKey(userId, courseId), 'true'); } catch { /* A future deck load can retry. */ }
+    }
+    return true;
+}
+
+function scheduleDeckMasteryCloudSave(courseId, mastery) {
+    const userId = currentLocalUserId();
+    if (!userId) return;
+    try { localStorage.setItem(pendingMasteryKey(userId, courseId), 'true'); } catch { /* Keep the device copy even if sync metadata cannot be saved. */ }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const key = `${userId}:${courseId}`;
+    clearTimeout(masterySaveTimers.get(key));
+    masterySaveTimers.set(key, setTimeout(() => {
+        masterySaveTimers.delete(key);
+        saveDeckMasteryToCloud(userId, courseId, mastery).catch((error) => {
+            console.warn('Flashcard review progress will sync when the connection is available:', error?.message || error);
+        });
+    }, 400));
+}
+
+export async function loadDeckMastery(courseId) {
+    const localUserId = currentLocalUserId();
+    const userId = await authenticatedUserId();
+    if (localUserId && userId && localUserId !== userId) return {};
+    const local = getSavedDeckMastery(courseId, userId || localUserId);
+    if (!userId) return local;
+    try {
+        const { data, error } = await supabaseClient.from('flashcard_mastery')
+            .select('mastery').eq('course_id', String(courseId)).maybeSingle();
+        if (error) return local;
+        const cloud = sanitizeFlashcardMastery(data?.mastery || {});
+        const merged = mergeFlashcardMastery(local, cloud);
+        storeDeckMasteryLocally(courseId, merged, userId);
+        if (stableJson(merged) !== stableJson(cloud)) scheduleDeckMasteryCloudSave(courseId, merged);
+        else {
+            try { localStorage.removeItem(pendingMasteryKey(userId, courseId)); } catch { /* Cloud is current. */ }
+        }
+        return merged;
+    } catch {
+        return local;
+    }
+}
+
+export function collectLocalFlashcardMastery() {
+    const mastery = Object.create(null);
+    if (typeof localStorage === 'undefined') return mastery;
+    const userId = currentLocalUserId();
+    if (!userId) return mastery;
+    const prefix = `${MASTERY_STORAGE_PREFIX}${userId}_`;
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(prefix)) continue;
+        const courseId = key.slice(prefix.length);
+        try {
+            mastery[courseId] = sanitizeFlashcardMastery(JSON.parse(localStorage.getItem(key) || '{}'));
+        } catch { /* Skip malformed local entries and preserve the rest of the backup. */ }
+    }
+    return mastery;
+}
+
+export function restoreFlashcardMastery(masteryByCourse = {}) {
+    const userId = currentLocalUserId();
+    if (!userId || !masteryByCourse || typeof masteryByCourse !== 'object' || Array.isArray(masteryByCourse)) return;
+    Object.entries(masteryByCourse).forEach(([courseId, mastery]) => {
+        if (!courseId || courseId.length > 200 || !mastery || typeof mastery !== 'object' || Array.isArray(mastery)) return;
+        const safeMastery = sanitizeFlashcardMastery(mastery);
+        storeDeckMasteryLocally(courseId, safeMastery, userId);
+        scheduleDeckMasteryCloudSave(courseId, safeMastery);
+    });
+}
+
+export async function deleteDeckMastery(courseId) {
+    if (!courseId) return;
+    const userId = currentLocalUserId();
+    const key = `${userId}:${courseId}`;
+    clearTimeout(masterySaveTimers.get(key));
+    masterySaveTimers.delete(key);
+    try {
+        const storageKey = masteryStorageKey(userId, courseId);
+        if (typeof localStorage !== 'undefined' && storageKey) localStorage.removeItem(storageKey);
+        const pendingKey = pendingMasteryKey(userId, courseId);
+        if (typeof localStorage !== 'undefined' && pendingKey) localStorage.removeItem(pendingKey);
+    } catch { /* Cloud retention still follows the course/account deletion policy. */ }
+    try {
+        const { error } = await supabaseClient.from('flashcard_mastery').delete().eq('course_id', String(courseId));
+        if (error) console.warn('Could not remove cloud flashcard review progress:', error.message || error);
+    } catch (error) {
+        console.warn('Could not remove cloud flashcard review progress:', error?.message || error);
     }
 }
 
@@ -251,17 +448,58 @@ export function getSavedDeckMastery(courseId) {
  * Persists updated SM-2 flashcard state to localStorage.
  */
 export function saveCardMastery(courseId, cardId, updatedCard) {
-    if (typeof localStorage === 'undefined' || !courseId || !cardId) return;
-    const key = `duevinci_flashcards_mastery_${courseId}`;
-    const all = getSavedDeckMastery(courseId);
+    const userId = currentLocalUserId();
+    if (typeof localStorage === 'undefined' || !courseId || !cardId || !userId) return;
+    const all = getSavedDeckMastery(courseId, userId);
     all[cardId] = {
         repetitions: updatedCard.repetitions,
         interval: updatedCard.interval,
         easinessFactor: updatedCard.easinessFactor,
         nextReviewDate: updatedCard.nextReviewDate,
-        lastReviewed: updatedCard.lastReviewed
+        lastReviewed: updatedCard.lastReviewed,
+        lastReviewedAt: updatedCard.lastReviewedAt || new Date().toISOString()
     };
-    localStorage.setItem(key, JSON.stringify(all));
+    storeDeckMasteryLocally(courseId, all, userId);
+    scheduleDeckMasteryCloudSave(courseId, all);
+}
+
+export async function syncPendingFlashcardMastery() {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const userId = await authenticatedUserId();
+    if (!userId || currentLocalUserId() !== userId || typeof localStorage === 'undefined') return;
+    const prefix = `${MASTERY_STORAGE_PREFIX}pending_${userId}_`;
+    const pending = [];
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(prefix)) pending.push(key);
+    }
+    let remaining = 0;
+    for (const key of pending) {
+        const courseId = key.slice(prefix.length);
+        const mastery = getSavedDeckMastery(courseId, userId);
+        if (!Object.keys(mastery).length) {
+            try { localStorage.removeItem(key); } catch { /* Empty local rows need no upload. */ }
+            continue;
+        }
+        try {
+            if (!await saveDeckMasteryToCloud(userId, courseId, mastery)) remaining += 1;
+        } catch (error) {
+            remaining += 1;
+            console.warn('Flashcard sync will retry later:', error?.message || error);
+        }
+    }
+    return { processed: pending.length - remaining, remaining };
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+        syncPendingFlashcardMastery().catch((error) => console.warn('Flashcard sync will retry later:', error?.message || error));
+    });
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+        if (session?.user?.id) setTimeout(() => {
+            syncPendingFlashcardMastery().catch((error) => console.warn('Flashcard sync will retry later:', error?.message || error));
+        }, 0);
+    });
 }
 
 /**
@@ -274,7 +512,7 @@ export async function generateStudyDeck(courseId, submittedNotes = null) {
     if (!course) return;
 
     currentDeckCourseId = courseId;
-    const savedMastery = getSavedDeckMastery(courseId);
+    const savedMastery = await loadDeckMastery(courseId);
 
     let notes = submittedNotes !== null ? submittedNotes : (course.scratchpad || '');
     if (!notes && courseId) {
@@ -352,7 +590,7 @@ export function renderStudyQuizContainer(course, notesText = '') {
             <div id="notesInputSection" class="hidden p-4 bg-indigo-50/50 dark:bg-brand-900/60 rounded-xl border border-indigo-200 dark:border-brand-700 space-y-2">
                 <label class="block text-xs font-bold text-zinc-800 dark:text-zinc-200">Submit Lecture & Study Notes (Markdown & LaTeX Math Supported)</label>
                 <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Type notes, definitions (e.g. <code>Term: definition</code>), and math formulas (e.g. <code>$E = mc^2$</code> or <code>$$\\Delta x$$</code>).</p>
-                <textarea id="studyNotesInput" rows="5" class="w-full text-xs p-3 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono" placeholder="e.g.&#10;Mitochondria: Cellular powerhouse generating ATP via oxidative phosphorylation.&#10;Kinetic Energy: $KE = \\frac{1}{2}mv^2$ energy possessed by an object due to motion.">${notesText || ''}</textarea>
+                <textarea id="studyNotesInput" rows="5" class="w-full text-xs p-3 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono" placeholder="e.g.&#10;Mitochondria: Cellular powerhouse generating ATP via oxidative phosphorylation.&#10;Kinetic Energy: $KE = \\frac{1}{2}mv^2$ energy possessed by an object due to motion.">${escapeHtml(notesText || '')}</textarea>
                 <div class="flex justify-end gap-2">
                     <button type="button" onclick="applySubmittedNotes()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm">
                         ⚡ Generate Spaced Decks & Quizzes
@@ -417,9 +655,9 @@ export function rateFlashcardSM2(qualityRating) {
 export function getFlashcardsHtml() {
     if (currentDeckCards.length === 0) return '<div class="p-6 text-center text-xs text-zinc-400">No flashcards available. Submit notes above to generate.</div>';
     const card = currentDeckCards[currentCardIndex];
-    const reps = card.repetitions || 0;
-    const interval = card.interval || 1;
-    const masteryBadge = reps === 0 ? '🌱 New' : (reps < 3 ? `⚡ Learning (${interval}d)` : `🏆 Mastered (${interval}d)`);
+    const reps = Math.max(0, Math.round(Number(card.repetitions) || 0));
+    const interval = Math.max(1, Math.round(Number(card.interval) || 1));
+    const masteryBadge = reps === 0 ? '🌱 New' : (reps < 3 ? `⚡ Learning (${escapeHtml(interval)}d)` : `🏆 Mastered (${escapeHtml(interval)}d)`);
 
     const rawContent = isCardFlipped ? card.definition : card.term;
     const formattedContent = renderMarkdownToHtml(rawContent);
@@ -490,7 +728,7 @@ export function getQuizHtml() {
             </div>
 
             <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
-                <div class="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1.5">Note Topic: ${q.topic}</div>
+                <div class="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-1.5">Note Topic: ${escapeHtml(q.topic)}</div>
                 <h4 class="font-bold text-sm text-zinc-900 dark:text-white leading-relaxed">${renderMarkdownToHtml(q.question)}</h4>
             </div>
 
@@ -649,3 +887,4 @@ _scope.nextFlashcard = nextFlashcard;
 _scope.prevFlashcard = prevFlashcard;
 _scope.speakCurrentFlashcard = speakCurrentFlashcard;
 _scope.exportFlashcardsAsCSV = exportFlashcardsAsCSV;
+_scope.syncPendingFlashcardMastery = syncPendingFlashcardMastery;

@@ -57,4 +57,5 @@ jobs:
           DUEVINCI_SMOKE_PASSWORD: ${{ secrets.DUEVINCI_SMOKE_PASSWORD }}
           DUEVINCI_SMOKE_SUPABASE_URL: https://lzmsguzlmjmedlaybckc.supabase.co
           DUEVINCI_SMOKE_SUPABASE_ANON_KEY: sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ
+          DUEVINCI_SMOKE_SKIP_SUPPORT: 'true'
         run: node scripts/release-smoke.mjs

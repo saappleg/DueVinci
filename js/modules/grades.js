@@ -1,5 +1,6 @@
 // --- GRADES, GPA CALCULATION & "WHAT-IF" SIMULATOR MODULE ---
 import { supabaseClient } from './config.js';
+import { escapeHtml } from './utils.js';
 
 export let isSimulatingGrades = false;
 export let simulatedGradesMap = {};
@@ -27,10 +28,56 @@ export function simulateAssignmentGrade(assignId, gradeVal) {
     loadGradesPage(true);
 }
 
+function recalculateGradeSimulatorDisplay() {
+    const container = document.getElementById('gradesContainer');
+    if (!container) return;
+    const totalsByCourse = new Map();
+    container.querySelectorAll('[data-sim-grade-input]').forEach((input) => {
+        const row = input.closest('[data-grade-row]');
+        if (!row || row.querySelector('[data-grade-exclude]')?.checked) return;
+        const grade = input.value === '' ? null : Number(input.value);
+        if (grade === null || !Number.isFinite(grade)) return;
+        const courseId = input.dataset.courseId;
+        if (!totalsByCourse.has(courseId)) totalsByCourse.set(courseId, { total: 0, count: 0 });
+        const course = totalsByCourse.get(courseId);
+        course.total += grade;
+        course.count += 1;
+    });
+
+    let totalCourseAverages = 0;
+    let gradedCourses = 0;
+    container.querySelectorAll('[data-grade-course]').forEach((courseCard) => {
+        const courseId = courseCard.dataset.gradeCourse;
+        const course = totalsByCourse.get(courseId);
+        const average = course?.count ? (course.total / course.count).toFixed(1) : 'N/A';
+        const averageElement = courseCard.querySelector('[data-course-average]');
+        if (averageElement) averageElement.textContent = `Course Average: ${average}%`;
+        if (course?.count) {
+            totalCourseAverages += Number(average);
+            gradedCourses += 1;
+        }
+    });
+
+    const cumulativeEl = document.getElementById('cumulativeGpaVal');
+    if (cumulativeEl) {
+        if (gradedCourses === 0) {
+            cumulativeEl.textContent = 'N/A';
+        } else {
+            const scaleTarget = parseFloat((typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_gpa_scale')) || '4.0');
+            const gpa = ((totalCourseAverages / gradedCourses / 100) * scaleTarget).toFixed(2);
+            cumulativeEl.textContent = `${gpa} / ${scaleTarget.toFixed(1)}`;
+        }
+    }
+}
+
 export async function loadGradesPage(isFastRecalc = false) {
     if (typeof document === 'undefined') return;
     const container = document.getElementById('gradesContainer');
     if (!container) return;
+    if (isFastRecalc) {
+        recalculateGradeSimulatorDisplay();
+        return;
+    }
 
     const { data: courses } = await supabaseClient.from('courses').select('*');
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
@@ -107,17 +154,20 @@ export async function loadGradesPage(isFastRecalc = false) {
                     courseGraded++;
                 }
 
-                const inputHandler = isSimulatingGrades ? `oninput="simulateAssignmentGrade('${item.id}', this.value)"` : `onchange="updateAssignmentGrade('${item.id}', this.value)"`;
+                const assignmentId = escapeHtml(item.id);
+                const inputHandler = isSimulatingGrades
+                    ? 'oninput="simulateAssignmentGrade(this.dataset.assignmentId, this.value)"'
+                    : 'onchange="updateAssignmentGrade(this.dataset.assignmentId, this.value)"';
 
                 lessonsHtml += `
-                    <div class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border ${isSimulatedVal ? 'border-indigo-400 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
-                        <span class="font-bold truncate flex-1 ${isSimulatedVal ? 'text-indigo-600 dark:text-indigo-400' : ''}">${item.title}</span>
+                    <div data-grade-row class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border ${isSimulatedVal ? 'border-indigo-400 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
+                        <span class="font-bold truncate flex-1 ${isSimulatedVal ? 'text-indigo-600 dark:text-indigo-400' : ''}">${escapeHtml(item.title)}</span>
                         <div class="flex items-center gap-3">
                             <label class="flex items-center gap-1.5 text-[11px] text-zinc-400 cursor-pointer">
-                                <input type="checkbox" ${item.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa('${item.id}', this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
+                                <input type="checkbox" data-grade-exclude data-assignment-id="${assignmentId}" ${item.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa(this.dataset.assignmentId, this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
                             </label>
                             <div class="flex items-center gap-1">
-                                <input type="number" min="0" max="100" value="${activeGrade !== null && activeGrade !== undefined ? activeGrade : ''}" placeholder="--" ${inputHandler} class="w-16 text-center text-xs font-bold p-1 rounded border ${isSimulatedVal ? 'border-indigo-500 bg-indigo-50 dark:bg-brand-800 text-indigo-600 font-black' : 'dark:bg-brand-800 dark:border-brand-600'} focus:outline-none focus:border-indigo-500">
+                                <input type="number" min="0" max="100" data-sim-grade-input="${isSimulatingGrades ? 'true' : 'false'}" data-course-id="${escapeHtml(course.id)}" data-assignment-id="${assignmentId}" value="${escapeHtml(activeGrade !== null && activeGrade !== undefined ? activeGrade : '')}" placeholder="--" ${inputHandler} class="w-16 text-center text-xs font-bold p-1 rounded border ${isSimulatedVal ? 'border-indigo-500 bg-indigo-50 dark:bg-brand-800 text-indigo-600 font-black' : 'dark:bg-brand-800 dark:border-brand-600'} focus:outline-none focus:border-indigo-500">
                                 <span class="text-zinc-400">%</span>
                             </div>
                         </div>
@@ -126,7 +176,7 @@ export async function loadGradesPage(isFastRecalc = false) {
             });
             unitsHtml += `
                 <div class="mb-4">
-                    <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Unit ${uNum}</h5>
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Unit ${escapeHtml(uNum)}</h5>
                     <div class="space-y-2">${lessonsHtml}</div>
                 </div>
             `;
@@ -139,13 +189,13 @@ export async function loadGradesPage(isFastRecalc = false) {
         }
 
         container.innerHTML += `
-            <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm mb-4">
+            <div data-grade-course="${escapeHtml(course.id)}" class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm mb-4">
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-zinc-200 dark:border-brand-700">
                     <div class="flex items-center gap-3">
-                        <span class="text-2xl">${course.emoji || '📚'}</span>
-                        <h3 class="font-bold text-base text-zinc-800 dark:text-zinc-100">${course.code}</h3>
+                        <span class="text-2xl">${escapeHtml(course.emoji || '📚')}</span>
+                        <h3 class="font-bold text-base text-zinc-800 dark:text-zinc-100">${escapeHtml(course.code)}</h3>
                     </div>
-                    <span class="text-sm font-extrabold px-3 py-1 bg-indigo-500/10 text-indigo-500 rounded-lg">Course Average: ${courseAvg}%</span>
+                    <span data-course-average class="text-sm font-extrabold px-3 py-1 bg-indigo-500/10 text-indigo-500 rounded-lg">Course Average: ${courseAvg}%</span>
                 </div>
                 ${unitsHtml || '<p class="text-xs text-zinc-400">No graded coursework in this class yet.</p>'}
             </div>

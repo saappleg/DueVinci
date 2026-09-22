@@ -5,6 +5,8 @@
 // The free core (local courses, planner, SM-2, timers) is NEVER gated.
 
 import { IS_DEVELOPMENT, supabaseClient } from './config.js';
+import { escapeHtml, getBasePath } from './utils.js';
+import { getSubscriptionSnapshot, hasSubscriptionFeature } from './subscription.js';
 
 let _canvasSelectedIds = new Set();
 let _canvasCourses = [];
@@ -58,13 +60,14 @@ async function functionErrorMessage(error, fallback) {
 }
 
 function isActiveTrial(profile) {
-    return profile?.subscription_status === 'trialing'
-        && Boolean(profile.trial_end)
-        && new Date(profile.trial_end).getTime() > Date.now();
+    const trialEnd = profile?.trialEnd ?? profile?.trial_end;
+    return (profile?.status ?? profile?.subscription_status) === 'trialing'
+        && Boolean(trialEnd)
+        && new Date(trialEnd).getTime() > Date.now();
 }
 
 function hasCanvasAccess(profile) {
-    return profile?.subscription_status === 'active' || isActiveTrial(profile);
+    return hasSubscriptionFeature(profile, 'canvas_sync');
 }
 
 function renderCanvasOnboarding(profile) {
@@ -72,9 +75,9 @@ function renderCanvasOnboarding(profile) {
     const steps = document.getElementById('canvasOnboardingSteps');
     if (!area || !steps) return;
 
-    const connected = Boolean(profile?.canvas_domain);
-    const synced = Boolean(profile?.canvas_last_synced_at);
-    const accountLabel = /duevinci\.test/i.test(profile?.canvas_domain || '') ? 'Sample Canvas account' : 'Canvas account';
+    const connected = Boolean(profile?.canvasDomain);
+    const synced = Boolean(profile?.canvasLastSyncedAt);
+    const accountLabel = /duevinci\.test/i.test(profile?.canvasDomain || '') ? 'Sample Canvas account' : 'Canvas account';
     const status = (complete) => complete
         ? '<span class="text-emerald-600 dark:text-emerald-300 font-bold">✓ Done</span>'
         : '<span class="text-indigo-600 dark:text-indigo-300 font-bold">Next</span>';
@@ -93,43 +96,24 @@ function renderCanvasOnboarding(profile) {
             <li class="flex items-center justify-between gap-3"><span><strong>3.</strong> Import assignments and due dates</span>${status(synced)}</li>
         </ol>
         ${connected && !synced ? '<button type="button" onclick="openCanvasSyncModal()" class="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-500">Choose courses and import coursework</button>' : ''}
-        ${synced ? `<p class="mt-3 text-[11px] text-emerald-700 dark:text-emerald-300">Your first sync is complete${profile.canvas_last_synced_at ? ` — last synced ${new Date(profile.canvas_last_synced_at).toLocaleString()}` : ''}.</p>` : ''}`;
+        ${synced ? `<p class="mt-3 text-[11px] text-emerald-700 dark:text-emerald-300">Your first sync is complete${profile.canvasLastSyncedAt ? ` — last synced ${new Date(profile.canvasLastSyncedAt).toLocaleString()}` : ''}.</p>` : ''}`;
     area.classList.remove('hidden');
 }
 
 async function loadCanvasSubscriptionProfile(userId) {
-    const fieldsWithBillingDates = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at';
-    const baseFields = 'subscription_status, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, canvas_domain, canvas_last_synced_at';
-    const primary = await supabaseClient
-        .from('profiles')
-        .select(fieldsWithBillingDates)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-    // A Tutor page can remain open across a schema deploy. Keep the complete
-    // subscription UI usable while that page catches up; it just omits the
-    // renewal/end date until the newer columns are available.
-    if (!primary.error || !/subscription_(current_period_end|cancel_at|cancel_at_period_end)/i.test(primary.error.message || '')) {
-        return primary;
+    void userId;
+    try {
+        return { data: await getSubscriptionSnapshot({ forceRefresh: true }), error: null };
+    } catch (error) {
+        return { data: null, error };
     }
-
-    return supabaseClient
-        .from('profiles')
-        .select(baseFields)
-        .eq('user_id', userId)
-        .maybeSingle();
 }
 
 async function requireCanvasAccess() {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) throw new Error('Not signed in.');
 
-    const { data: profile, error } = await supabaseClient
-        .from('profiles')
-        .select('subscription_status, trial_end, canvas_domain')
-        .eq('user_id', user.id)
-        .maybeSingle();
-    if (error) throw error;
+    const profile = await getSubscriptionSnapshot();
     if (!hasCanvasAccess(profile)) {
         throw new Error('Canvas LMS Sync requires an active plan or an unexpired free trial.');
     }
@@ -169,6 +153,7 @@ export async function initCanvasSettingsTab() {
     const syncTriggerArea = document.getElementById('canvasSyncTriggerArea');
 
     if (!badge) return;
+    let profileSnapshot = null;
 
     // Reset UI
     badge.textContent = 'Loading…';
@@ -182,8 +167,9 @@ export async function initCanvasSettingsTab() {
         const { data: profile, error } = await loadCanvasSubscriptionProfile(user.id);
 
         if (error) throw error;
+        profileSnapshot = profile;
 
-        const storedStatus = profile?.subscription_status || 'inactive';
+        const storedStatus = profile?.status || 'inactive';
         const status = storedStatus === 'trialing' && !isActiveTrial(profile) ? 'inactive' : storedStatus;
 
         // Update badge
@@ -196,7 +182,7 @@ export async function initCanvasSettingsTab() {
         badge.className = `px-2 py-0.5 text-[11px] font-semibold rounded-full ${badgeStyles[status] || badgeStyles.inactive}`;
 
         if (status === 'inactive') {
-            if (profile?.trial_started_at) {
+            if (profile?.trialStartedAt) {
                 msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Canvas Sync and the Socratic Study Companion.';
                 checkoutArea?.classList.remove('hidden');
             } else {
@@ -204,37 +190,43 @@ export async function initCanvasSettingsTab() {
                 trialBtn?.classList.remove('hidden');
             }
         } else if (status === 'trialing') {
-            const daysLeft = profile.trial_end
-                ? Math.max(0, Math.ceil((new Date(profile.trial_end) - new Date()) / 86400000))
+            const daysLeft = profile.trialEnd
+                ? Math.max(0, Math.ceil((new Date(profile.trialEnd) - new Date()) / 86400000))
                 : '?';
             msg.textContent = `Your 30-day trial is active — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining.`;
             // Let trial users save a payment method once. When a Stripe
             // subscription is already scheduled, show that state instead of a
             // second Checkout button that could look like another free trial.
-            if (profile?.stripe_subscription_id) {
+            if (profile?.hasScheduledSubscription) {
                 msg.textContent += ' Your subscription is scheduled to start when the trial ends.';
             } else {
                 checkoutArea?.classList.remove('hidden');
             }
-            if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
+            if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
             // Show connector or sync trigger depending on credentials
-            _showConnectorOrSync(profile);
+            if (hasCanvasAccess(profile)) _showConnectorOrSync(profile);
         } else if (status === 'active') {
-            msg.textContent = 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.';
-            const endDate = profile.subscription_cancel_at || profile.subscription_current_period_end;
+            msg.textContent = hasCanvasAccess(profile)
+                ? 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.'
+                : 'Your subscription is active, but Canvas Sync is not included in this plan.';
+            const endDate = profile.cancelAt || profile.currentPeriodEnd;
             if (endDate) {
                 const formattedDate = new Date(endDate).toLocaleDateString(undefined, {
                     month: 'short', day: 'numeric', year: 'numeric'
                 });
-                msg.textContent += profile.subscription_cancel_at_period_end || profile.subscription_cancel_at
+                msg.textContent += profile.cancelAtPeriodEnd || profile.cancelAt
                     ? ` Your access ends on ${formattedDate}.`
                     : ` Your plan renews on ${formattedDate}.`;
             }
-            manageBillingBtn?.classList.remove('hidden');
-            _showConnectorOrSync(profile);
+            if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
+            if (hasCanvasAccess(profile)) _showConnectorOrSync(profile);
         } else if (status === 'past_due' || status === 'unpaid') {
-            msg.textContent = 'Your subscription payment needs attention. Update your payment method to keep Canvas Sync and the Socratic Study Companion enabled.';
-            if (profile?.stripe_customer_id) manageBillingBtn?.classList.remove('hidden');
+            msg.textContent = 'Your subscription is past due, so paid features are paused. Update payment details, or choose a plan if this subscription has already ended.';
+            if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
+            checkoutArea?.classList.remove('hidden');
+        } else if (status === 'incomplete' || status === 'paused') {
+            msg.textContent = 'Your subscription needs attention before paid features can be restored. Manage billing, or choose a plan if this subscription has already ended.';
+            if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
             checkoutArea?.classList.remove('hidden');
         } else if (status === 'canceled') {
             msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas Sync and the Socratic Study Companion again.';
@@ -246,7 +238,9 @@ export async function initCanvasSettingsTab() {
     } catch (err) {
         badge.textContent = 'Error';
         if (msg) msg.textContent = err.message || 'Unable to load subscription details.';
+        return null;
     }
+    return profileSnapshot;
 }
 
 function _showConnectorOrSync(profile) {
@@ -257,19 +251,19 @@ function _showConnectorOrSync(profile) {
 
     renderCanvasOnboarding(profile);
 
-    if (profile?.canvas_domain) {
+    if (profile?.canvasDomain) {
         // Already connected — show sync trigger
         syncTriggerArea?.classList.remove('hidden');
-        if (domainDisplay) domainDisplay.textContent = profile.canvas_domain;
+        if (domainDisplay) domainDisplay.textContent = profile.canvasDomain;
         if (lastSyncedDisplay) {
-            lastSyncedDisplay.textContent = profile.canvas_last_synced_at
-                ? `Last synced ${new Date(profile.canvas_last_synced_at).toLocaleString()}`
+            lastSyncedDisplay.textContent = profile.canvasLastSyncedAt
+                ? `Last synced ${new Date(profile.canvasLastSyncedAt).toLocaleString()}`
                 : 'Not synced yet';
         }
         // Pre-fill only the non-secret domain. The Canvas token stays server-side.
         const domainInput = document.getElementById('canvasDomainInput');
         const tokenInput  = document.getElementById('canvasTokenInput');
-        if (domainInput) domainInput.value = profile.canvas_domain;
+        if (domainInput) domainInput.value = profile.canvasDomain;
         if (tokenInput) tokenInput.value = '';
     } else {
         // Not connected yet — show connector form
@@ -298,9 +292,13 @@ export async function handleCanvasStartTrial() {
             initCanvasSettingsTab(),
             'Your trial was started, but we could not refresh its status. Please refresh the page.'
         );
+        await window.renderTodayWorkspace?.();
     } catch (err) {
+        const errorMessage = await functionErrorMessage(err, 'Failed to start trial. Please try again.');
+        await initCanvasSettingsTab();
         const msg = document.getElementById('canvasSubMsg');
-        if (msg) msg.textContent = err.message || 'Failed to start trial. Please try again.';
+        if (msg) msg.textContent = errorMessage;
+        await window.renderTodayWorkspace?.();
     } finally {
         // A successful refresh hides the button. If it remains visible, make it usable again.
         if (btn && !btn.classList.contains('hidden')) {
@@ -318,7 +316,7 @@ export async function handleCanvasCheckout(interval) {
     if (message) message.textContent = 'Opening secure checkout…';
 
     try {
-        const returnUrl = `${window.location.origin}${window.location.pathname}`;
+        const returnUrl = new URL(`${getBasePath()}index.html`, window.location.href).href;
         const { data, error } = await withTimeout(
             supabaseClient.functions.invoke('create-checkout-session', {
                 body: { interval, returnUrl }
@@ -345,7 +343,7 @@ export async function handleCanvasBillingPortal() {
     const message = document.getElementById('canvasSubMsg');
     if (btn) { btn.disabled = true; btn.textContent = 'Opening billing portal…'; }
     try {
-        const returnUrl = `${window.location.origin}${window.location.pathname}`;
+        const returnUrl = new URL(`${getBasePath()}index.html`, window.location.href).href;
         const { data, error } = await withTimeout(supabaseClient.functions.invoke('create-portal-session', { body: { returnUrl } }), 'Opening billing portal took too long. Please try again.');
         if (error) throw error;
         if (!data?.url) throw new Error(data?.error || 'Unable to open billing portal.');
@@ -354,6 +352,67 @@ export async function handleCanvasBillingPortal() {
         if (message) message.textContent = await functionErrorMessage(err, 'Unable to open billing portal.');
         if (btn) { btn.disabled = false; btn.textContent = 'Manage subscription'; }
     }
+}
+
+export async function handleCanvasCheckoutReturn() {
+    if (typeof window === 'undefined' || !window.location?.search) return;
+    const url = new URL(window.location.href);
+    const outcome = url.searchParams.get('canvas_checkout');
+    const returnedFromPortal = url.searchParams.get('billing_portal') === 'return';
+    if (!['success', 'canceled'].includes(outcome) && !returnedFromPortal) return;
+
+    // The session ID is intentionally discarded; the Stripe webhook remains
+    // the authority for subscription state and feature access.
+    url.searchParams.delete('canvas_checkout');
+    url.searchParams.delete('session_id');
+    url.searchParams.delete('billing_portal');
+    const query = url.searchParams.toString();
+    window.history.replaceState(window.history.state, '', `${url.pathname}${query ? `?${query}` : ''}${url.hash}`);
+
+    if (outcome === 'canceled') {
+        window.openSettingsModal?.();
+        window.switchSettingsTab?.('canvas', { refresh: false });
+        await initCanvasSettingsTab();
+        const message = document.getElementById('canvasSubMsg');
+        if (message) message.textContent = 'Checkout was canceled. No subscription changes were made.';
+        return;
+    }
+
+    window.openSettingsModal?.();
+    window.switchSettingsTab?.('canvas', { refresh: false });
+    if (returnedFromPortal) {
+        const message = document.getElementById('canvasSubMsg');
+        if (message) message.textContent = 'Refreshing your billing details…';
+        const snapshot = await initCanvasSettingsTab();
+        if (message && snapshot) {
+            const status = snapshot?.status || 'unknown';
+            message.textContent = hasSubscriptionFeature(snapshot, 'canvas_sync')
+                ? 'Billing details refreshed. Your paid features are active.'
+                : `Billing details refreshed. Current subscription status: ${status.replaceAll('_', ' ')}. Paid features are currently unavailable.`;
+        } else if (message) {
+            message.textContent = 'We could not confirm your billing details. Refresh this page to try again.';
+        }
+        await window.renderTodayWorkspace?.();
+        return;
+    }
+    const message = document.getElementById('canvasSubMsg');
+    if (message) message.textContent = 'Checkout complete. Confirming your subscription…';
+
+    let snapshot = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+        snapshot = await initCanvasSettingsTab();
+        if (hasSubscriptionFeature(snapshot, 'canvas_sync')) break;
+        if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    const currentMessage = document.getElementById('canvasSubMsg');
+    if (currentMessage) {
+        currentMessage.textContent = hasSubscriptionFeature(snapshot, 'canvas_sync')
+            ? snapshot?.status === 'trialing'
+                ? 'Your trial is active. Canvas Sync and the Socratic Study Companion are enabled.'
+                : 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.'
+            : 'Checkout is complete. Stripe is still confirming your subscription; refresh this page in a moment if Pro access does not appear.';
+    }
+    await window.renderTodayWorkspace?.();
 }
 
 // ─── Connector Handler ─────────────────────────────────────────────────────────
@@ -487,7 +546,7 @@ export async function openCanvasSyncModal() {
         if (error) throw error;
         if (!data?.courses) throw new Error(data?.error || 'Unable to load Canvas courses.');
         _canvasCourses = data.courses;
-        _canvasSelectedIds = new Set(_canvasCourses.map(c => c.id));
+        _canvasSelectedIds = new Set(_canvasCourses.map(c => String(c.id)));
 
         _renderCourseList();
     } catch (err) {
@@ -514,18 +573,26 @@ function _renderCourseList() {
             <button type="button" onclick="toggleCanvasSelectAll()" class="text-xs text-indigo-500 hover:text-indigo-400 font-medium" id="canvasSelectAllBtn">${selectAllLabel}</button>
         </div>
         <div class="space-y-2">
-            ${_canvasCourses.map(c => `
-                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${_canvasSelectedIds.has(c.id) ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700' : 'bg-zinc-50 dark:bg-brand-900 border-zinc-200 dark:border-brand-700 hover:bg-zinc-100 dark:hover:bg-brand-800'}">
-                    <input type="checkbox" ${_canvasSelectedIds.has(c.id) ? 'checked' : ''} onchange="toggleCanvasCourse(${c.id})" class="w-4 h-4 rounded text-indigo-600 bg-zinc-100 dark:bg-brand-700 border-zinc-300 dark:border-brand-600 focus:ring-indigo-500">
+            ${_canvasCourses.map(c => {
+                const id = String(c.id ?? '');
+                const selected = _canvasSelectedIds.has(id);
+                return `
+                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selected ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700' : 'bg-zinc-50 dark:bg-brand-900 border-zinc-200 dark:border-brand-700 hover:bg-zinc-100 dark:hover:bg-brand-800'}">
+                    <input type="checkbox" data-canvas-course-id="${escapeHtml(id)}" ${selected ? 'checked' : ''} class="w-4 h-4 rounded text-indigo-600 bg-zinc-100 dark:bg-brand-700 border-zinc-300 dark:border-brand-600 focus:ring-indigo-500">
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${c.name}</p>
+                        <p class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${escapeHtml(c.name)}</p>
                         <div class="flex gap-2 text-[11px] text-zinc-400 mt-0.5">
-                            ${c.course_code ? `<span>${c.course_code}</span>` : ''}
-                            ${c.term?.name ? `<span>•</span><span>${c.term.name}</span>` : ''}
+                            ${c.course_code ? `<span>${escapeHtml(c.course_code)}</span>` : ''}
+                            ${c.term?.name ? `<span>•</span><span>${escapeHtml(c.term.name)}</span>` : ''}
                         </div>
                     </div>
-                </label>`).join('')}
+                </label>`;
+            }).join('')}
         </div>`;
+
+    list.querySelectorAll('[data-canvas-course-id]').forEach((input) => {
+        input.addEventListener('change', () => toggleCanvasCourse(input.dataset.canvasCourseId));
+    });
 
     if (countEl) countEl.textContent = `${_canvasSelectedIds.size} course${_canvasSelectedIds.size === 1 ? '' : 's'} selected`;
 }
@@ -534,12 +601,13 @@ export function toggleCanvasSelectAll() {
     if (_canvasSelectedIds.size === _canvasCourses.length) {
         _canvasSelectedIds = new Set();
     } else {
-        _canvasSelectedIds = new Set(_canvasCourses.map(c => c.id));
+        _canvasSelectedIds = new Set(_canvasCourses.map(c => String(c.id)));
     }
     _renderCourseList();
 }
 
 export function toggleCanvasCourse(id) {
+    id = String(id);
     if (_canvasSelectedIds.has(id)) {
         _canvasSelectedIds.delete(id);
     } else {
@@ -591,6 +659,7 @@ if (typeof window !== 'undefined') {
     window.handleCanvasStartTrial = handleCanvasStartTrial;
     window.handleCanvasCheckout = handleCanvasCheckout;
     window.handleCanvasBillingPortal = handleCanvasBillingPortal;
+    window.handleCanvasCheckoutReturn = handleCanvasCheckoutReturn;
     window.handleCanvasConnect    = handleCanvasConnect;
     window.handleCanvasConnectMock = handleCanvasConnectMock;
     window.handleCanvasDisconnect = handleCanvasDisconnect;

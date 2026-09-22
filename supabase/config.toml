@@ -1,0 +1,16 @@
+# Local Supabase CLI project settings. Pass the target project explicitly when
+# applying migrations or deploying functions.
+project_id = "DueVinci-dev"
+
+[api]
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = false
+
+[functions.stripe-webhook]
+verify_jwt = false

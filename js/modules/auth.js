@@ -4,6 +4,7 @@ import { getCurrentPageName, getBasePath } from './utils.js';
 import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
 import { refreshProfileAvatar } from './profileAvatar.js';
 import { startReminderService, stopReminderService } from './reminders.js';
+import { clearSubscriptionSnapshot } from './subscription.js';
 
 export let currentUser = null;
 let lastProcessedSessionToken = undefined;
@@ -134,9 +135,16 @@ export async function signInWithGoogle() {
 }
 
 export async function logout() {
-    await supabaseClient.auth.signOut();
-    if (typeof window !== 'undefined' && window.location) {
-        window.location.href = 'index.html';
+    try {
+        clearSubscriptionSnapshot();
+        if (typeof localStorage !== 'undefined') localStorage.removeItem('duevinci_offline_user');
+        // A local sign-out works even when offline; the default global scope
+        // can fail its network request before clearing the persisted session.
+        await supabaseClient.auth.signOut({ scope: 'local' });
+    } finally {
+        currentUser = null;
+        if (typeof window !== 'undefined') window.currentUser = null;
+        if (typeof window !== 'undefined' && window.location) window.location.href = `${getBasePath()}index.html`;
     }
 }
 

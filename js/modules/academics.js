@@ -202,9 +202,10 @@ export async function renderAcademicsDashboardWidget(containerId) {
                     timeText = `in ${diffDays} Days`;
                     badgeColor = 'text-zinc-600 dark:text-zinc-300 font-medium';
                 }
+                const safeTitle = escapeHtml(cleanTitle);
                 return `
-                    <div class="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between gap-1 py-0.5 truncate" title="${cleanTitle}">
-                        <span class="truncate">🎯 ${cleanTitle}</span>
+                    <div class="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between gap-1 py-0.5 truncate" title="${safeTitle}">
+                        <span class="truncate">🎯 ${safeTitle}</span>
                         <span class="shrink-0 text-[11px] ${badgeColor}">${timeText}</span>
                     </div>
                 `;
@@ -336,9 +337,9 @@ export function renderResourceLinksSection(courseId, containerId) {
         const linkHtml = safeUrl
             ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-indigo-500 hover:underline truncate">${label}</a>`
             : `<span class="text-zinc-500 truncate">${label} <em>(invalid link)</em></span>`;
-        html += `<div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs">${linkHtml}<button onclick="removeResourceLink('${escapeInlineJs(courseId)}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button></div>`;
+        html += `<div class="flex items-center justify-between p-2 bg-zinc-100 dark:bg-brand-900 rounded-lg text-xs">${linkHtml}<button onclick="removeResourceLink('${escapeHtml(escapeInlineJs(courseId))}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-1">✕</button></div>`;
     });
-    html += `</div><div class="flex gap-2 mt-2"><input type="text" id="resTitle_${courseId}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><input type="url" id="resUrl_${courseId}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><button onclick="addResourceLink('${courseId}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button></div></div>`;
+    html += `</div><div class="flex gap-2 mt-2"><input type="text" id="resTitle_${escapeHtml(courseId)}" placeholder="Title" class="w-1/3 text-xs px-2 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><input type="url" id="resUrl_${escapeHtml(courseId)}" placeholder="https://..." class="flex-1 text-xs px-2.5 py-1.5 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500"><button onclick="addResourceLink('${escapeHtml(escapeInlineJs(courseId))}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">+ Add</button></div></div>`;
     container.innerHTML = html;
 }
 

@@ -4,6 +4,7 @@ import { currentUser } from './auth.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
 import { getUnitNumber, getLessonNumber } from './studyPlan.js';
+import { deleteDeckMastery } from './flashcards.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
@@ -15,6 +16,17 @@ let lastCourseModalTrigger = null;
 
 function isWeeklyCourse(course) {
     return course?.pacing_type === 'weekly' || course?.lms_provider === 'browser_wgu' || course?.lms_provider === 'browser_maestro';
+}
+
+function inlineArg(value) {
+    // Event attributes have both a JavaScript string context and an HTML
+    // attribute context. Apply both encodings before interpolation.
+    return escapeHtml(escapeInlineJs(value));
+}
+
+function safeCourseColor(value) {
+    const color = String(value || '');
+    return /^#[\da-f]{6}$/i.test(color) ? color : '#4f46e5';
 }
 
 export function getCoursePacingProfile(course = {}) {
@@ -231,6 +243,7 @@ export async function loadDashboardStats() {
                 if (!course) return;
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${isWeeklyCourse(course) ? 'Wk' : 'Unit'} ${assign.unit_number}</span>` : '';
+                const assignmentArg = inlineArg(assign.id);
                 
                 const priority = assign.priority || 'medium';
                 let priorityBadge = '';
@@ -243,7 +256,7 @@ export async function loadDashboardStats() {
                 upNextListEl.innerHTML += `
                     <div class="flex items-center justify-between p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 hover:border-indigo-500/40 transition">
                         <div class="flex items-center gap-3 min-w-0">
-                            <button onclick="toggleAssignment('${assign.id}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                            <button onclick="toggleAssignment('${assignmentArg}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
                             <div class="truncate">
                                 <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${escapeHtml(course.emoji)} ${unitBadge}${escapeHtml(assign.title)}</p>
                                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(course.code)} • Target: ${escapeHtml(formattedDate)}</p>
@@ -267,19 +280,20 @@ export async function loadDashboardStats() {
 
             const runnerPos = Math.min(Math.max(pct, 0), 94);
             const isWinner = pct === 100;
+            const courseColor = safeCourseColor(course.color);
 
             goalsListEl.innerHTML += `
                 <div class="space-y-1.5">
                     <div class="flex justify-between text-sm items-center">
                         <span class="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                            <span>${course.emoji}</span> ${course.code}
+                            <span>${escapeHtml(course.emoji || '📚')}</span> ${escapeHtml(course.code)}
                         </span>
-                        <span class="font-extrabold text-xs flex items-center gap-1" style="color: ${course.color}">
+                        <span class="font-extrabold text-xs flex items-center gap-1" style="color: ${courseColor}">
                             ${isWinner ? '<span class="animate-bounce">🏆</span>' : ''} ${pct}%
                         </span>
                     </div>
                     <div class="relative w-full bg-zinc-200 dark:bg-brand-700 rounded-full h-3.5 overflow-visible my-1 flex items-center">
-                        <div class="h-3.5 rounded-full transition-all duration-700 shadow-sm" style="width: ${pct}%; background-color: ${course.color}"></div>
+                        <div class="h-3.5 rounded-full transition-all duration-700 shadow-sm" style="width: ${pct}%; background-color: ${courseColor}"></div>
                         <div onclick="celebrateRunner(this, ${pct})" class="absolute top-1/2 -translate-y-1/2 transition-all duration-700 cursor-pointer select-none text-sm hover:scale-135 drop-shadow-sm z-10" style="left: calc(${runnerPos}% - 7px);" title="${isWinner ? 'Goal completed! Winner! 🏆 (Click to celebrate)' : 'Keep pushing! 🏃‍♂️ (Click me!)'}">
                             ${isWinner ? '🥇' : '🏃‍♂️'}
                         </div>
@@ -478,20 +492,21 @@ export function renderTermFolders() {
 
     termNames.forEach(termName => {
         const termCourses = termsMap[termName];
+        const termArg = inlineArg(termName);
         foldersGrid.innerHTML += `
-            <div role="button" tabindex="0" onclick="openTermModal('${termName}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTermModal('${termName}'); }"
+            <div role="button" tabindex="0" onclick="openTermModal('${termArg}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTermModal('${termArg}'); }"
                  ondragover="allowDrop(event)" 
-                 ondrop="handleDropToTerm(event, '${termName}')"
+                 ondrop="handleDropToTerm(event, '${termArg}')"
                  class="cursor-pointer group bg-white dark:bg-brand-800 p-5 rounded-xl border-2 border-dashed border-zinc-300 dark:border-brand-600 hover:border-indigo-500 dark:hover:border-indigo-400 transition shadow-sm flex flex-col justify-between min-h-[130px]">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2.5">
                         <span class="text-2xl">📁</span>
-                        <h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${termName}</h4>
+                        <h4 class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${escapeHtml(termName)}</h4>
                     </div>
                     <span class="text-xs bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold">${termCourses.length} class${termCourses.length === 1 ? '' : 'es'}</span>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-1.5">
-                    ${termCourses.slice(0, 4).map(c => `<span class="text-[11px] px-2 py-0.5 rounded font-medium" style="background-color: ${c.color}20; color: ${c.color}; border: 1px solid ${c.color}40;">${c.code}</span>`).join('')}
+                    ${termCourses.slice(0, 4).map(c => { const color = safeCourseColor(c.color); return `<span class="text-[11px] px-2 py-0.5 rounded font-medium" style="background-color: ${color}20; color: ${color}; border: 1px solid ${color}40;">${escapeHtml(c.code)}</span>`; }).join('')}
                     ${termCourses.length > 4 ? `<span class="text-[11px] text-zinc-400 px-1">+${termCourses.length - 4} more</span>` : ''}
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-2 text-right">Click to open &bull; Drag class here</p>
@@ -514,7 +529,9 @@ export function renderAlphabeticals() {
 
     sortedCourses.forEach(course => {
         const emoji = course.emoji || '📚';
-        const termBadge = course.term ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded font-bold">${course.term}</span>` : `<span class="text-xs bg-zinc-200 dark:bg-brand-700 text-zinc-500 px-2 py-0.5 rounded">Unassigned</span>`;
+        const termBadge = course.term ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded font-bold">${escapeHtml(course.term)}</span>` : `<span class="text-xs bg-zinc-200 dark:bg-brand-700 text-zinc-500 px-2 py-0.5 rounded">Unassigned</span>`;
+        const courseArg = inlineArg(course.id);
+        const courseColor = safeCourseColor(course.color);
         const opacity = course.is_completed ? 'opacity-50' : '';
         const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
 
@@ -522,12 +539,12 @@ export function renderAlphabeticals() {
         const pacingBadge = isWeeklyCourse(course) ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded font-bold">Weekly pacing</span>' : '';
         const windowBadge = windowLabel ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${escapeHtml(windowLabel)}</span>` : '';
         listEl.innerHTML += `
-            <div role="button" tabindex="0" draggable="true" ondragstart="handleDragStart(event, '${course.id}')" onclick="openCourseModal('${course.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourseModal('${course.id}'); }" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
+            <div role="button" tabindex="0" draggable="true" ondragstart="handleDragStart(event, '${courseArg}')" onclick="openCourseModal('${courseArg}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourseModal('${courseArg}'); }" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
                 <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${courseColor}20; color: ${courseColor}; border: 1px solid ${courseColor}40;">${escapeHtml(emoji)}</div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <h4 class="font-bold text-zinc-800 dark:text-zinc-200">${course.code}</h4>
+                            <h4 class="font-bold text-zinc-800 dark:text-zinc-200">${escapeHtml(course.code)}</h4>
                             ${termBadge}
                         </div>
                         <div class="flex flex-wrap items-center gap-2 mt-0.5">${pacingBadge}${windowBadge}</div>
@@ -633,12 +650,14 @@ export function openTermModal(termName) {
     } else {
         termCourses.forEach(course => {
             const emoji = course.emoji || '📚';
+            const courseArg = inlineArg(course.id);
+            const courseColor = safeCourseColor(course.color);
             listEl.innerHTML += `
-                <div onclick="closeTermModal(); openCourseModal('${course.id}')" class="cursor-pointer p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 transition flex items-center justify-between">
+                <div onclick="closeTermModal(); openCourseModal('${courseArg}')" class="cursor-pointer p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 transition flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0" style="background-color: ${courseColor}20; color: ${courseColor}; border: 1px solid ${courseColor}40;">${escapeHtml(emoji)}</div>
                         <div>
-                            <h4 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">${course.code}</h4>
+                            <h4 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">${escapeHtml(course.code)}</h4>
                             <p class="text-xs text-zinc-500">Click to view coursework &rarr;</p>
                         </div>
                     </div>
@@ -659,6 +678,7 @@ export async function deleteCurrentTermFolder() {
         if (confirm('Delete Unassigned folder and all unassigned classes inside it?')) {
             const termCourses = localCourses.filter(c => !c.term || c.term.trim() === '' || c.term.trim() === 'Unassigned');
             for (let c of termCourses) {
+                await deleteDeckMastery(c.id);
                 await supabaseClient.from('courses').delete().eq('id', c.id);
             }
             localCourses = localCourses.filter(c => c.term && c.term.trim() !== '' && c.term.trim() !== 'Unassigned');
@@ -822,25 +842,27 @@ export function switchCourseTab(tabName) {
 
 export function renderStaticCoursePanels(course) {
     let links = course.resources || [];
+    const courseArg = inlineArg(course.id);
+    const courseIdAttr = escapeHtml(course.id);
     const resPanel = document.getElementById('panel-resources');
     if (resPanel) {
         resPanel.innerHTML = `
             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">🔗 Resource & Note Links</h3>
-            <div id="linksList_${course.id}" class="space-y-2 mt-2">
+            <div id="linksList_${courseIdAttr}" class="space-y-2 mt-2">
                 ${links.map((l, idx) => {
                     const safeUrl = getSafeExternalUrl(l.url);
                     return `
                     <div class="flex items-center justify-between p-2.5 bg-zinc-50 dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs">
                         ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-indigo-500 hover:underline truncate">${escapeHtml(l.title)}</a>` : `<span class="text-zinc-500 truncate">${escapeHtml(l.title)} <em>(invalid link)</em></span>`}
-                        <button onclick="removeResourceLink('${escapeInlineJs(course.id)}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-2">✕</button>
+                        <button onclick="removeResourceLink('${courseArg}', ${idx})" class="text-zinc-400 hover:text-red-500 font-bold px-2">✕</button>
                     </div>
                 `;
                 }).join('')}
             </div>
             <div class="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
-                <input type="text" id="resTitle_${course.id}" placeholder="Resource Title" class="w-1/3 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
-                <input type="url" id="resUrl_${course.id}" placeholder="https://..." class="flex-1 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
-                <button onclick="addResourceLink('${course.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition">+ Add Link</button>
+                <input type="text" id="resTitle_${courseIdAttr}" placeholder="Resource Title" class="w-1/3 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <input type="url" id="resUrl_${courseIdAttr}" placeholder="https://..." class="flex-1 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <button onclick="addResourceLink('${courseArg}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition">+ Add Link</button>
             </div>
         `;
     }
@@ -851,10 +873,10 @@ export function renderStaticCoursePanels(course) {
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300">📝 Course Scratchpad & Study Notes</h3>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadCourseNotesAsMarkdown('${course.id}')" title="Download as .md file" class="px-2.5 py-1 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded text-xs font-bold transition">
+                    <button type="button" onclick="downloadCourseNotesAsMarkdown('${courseArg}')" title="Download as .md file" class="px-2.5 py-1 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 rounded text-xs font-bold transition">
                         📥 Download .md
                     </button>
-                    <button type="button" onclick="switchCourseTab('studyquiz'); generateStudyDeck('${course.id}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition shadow-sm">
+                    <button type="button" onclick="switchCourseTab('studyquiz'); generateStudyDeck('${courseArg}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold transition shadow-sm">
                         ⚡ Generate Test from Notes
                     </button>
                 </div>
@@ -863,11 +885,11 @@ export function renderStaticCoursePanels(course) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Editor</div>
-                    <textarea id="scratchpadTextarea_${course.id}" oninput="saveCourseScratchpad('${course.id}', this.value); updateScratchpadPreview('${course.id}', this.value)" rows="10" placeholder="Type lecture notes, definitions (e.g. Term: definition), or formulas ($E=mc^2$)..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono">${course.scratchpad || ''}</textarea>
+                    <textarea id="scratchpadTextarea_${escapeHtml(course.id)}" oninput="saveCourseScratchpad('${inlineArg(course.id)}', this.value); updateScratchpadPreview('${inlineArg(course.id)}', this.value)" rows="10" placeholder="Type lecture notes, definitions (e.g. Term: definition), or formulas ($E=mc^2$)..." class="w-full text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 leading-relaxed font-mono">${escapeHtml(course.scratchpad || '')}</textarea>
                 </div>
                 <div>
                     <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Live Markdown & Math Preview</div>
-                    <div id="scratchpadPreview_${course.id}" class="w-full h-[180px] sm:h-[190px] overflow-y-auto text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-700 bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                    <div id="scratchpadPreview_${courseIdAttr}" class="w-full h-[180px] sm:h-[190px] overflow-y-auto text-xs p-3 rounded-lg border border-zinc-200 dark:border-brand-700 bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 leading-relaxed">
                         ${window.renderMarkdownToHtml ? window.renderMarkdownToHtml(course.scratchpad || '*No notes yet. Type on the left to see live formatted math & markdown preview.*') : (course.scratchpad || 'No notes yet.')}
                     </div>
                 </div>
@@ -1295,7 +1317,9 @@ export async function planCourseworkInSequence(courseId) {
 
 export async function deleteCurrentCourse() {
     if (confirm('Delete this course and ALL its coursework?')) {
-        await supabaseClient.from('courses').delete().eq('id', document.getElementById('editCourseId').value);
+        const courseId = document.getElementById('editCourseId').value;
+        await deleteDeckMastery(courseId);
+        await supabaseClient.from('courses').delete().eq('id', courseId);
         closeCourseModal();
         loadCoursesPage();
     }
@@ -1563,6 +1587,7 @@ export async function loadAssignments(courseId, page = 1) {
 
     const startIndex = (page - 1) * pageSize;
     const paginatedAssignments = assignments.slice(startIndex, startIndex + pageSize);
+    const courseArg = inlineArg(courseId);
 
     let localTypes = {};
     let localPrios = {};
@@ -1574,8 +1599,13 @@ export async function loadAssignments(courseId, page = 1) {
     } catch (e) {}
 
     paginatedAssignments.forEach(assign => {
+        const assignmentId = String(assign.id ?? '');
+        const assignmentIdAttr = escapeHtml(assignmentId);
+        const assignmentArg = inlineArg(assignmentId);
+        const titleArg = inlineArg(assign.title || '');
+        const dueDateValue = escapeHtml(assign.due_date ? String(assign.due_date).split('T')[0] : '');
         const isSubItem = assign.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(assign));
-        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${weeklyCourse ? 'Week' : 'Unit'} ${assign.unit_number}</span>` : '';
+        const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${weeklyCourse ? 'Week' : 'Unit'} ${escapeHtml(assign.unit_number)}</span>` : '';
         const canvasBadge = assign.lms_provider === 'canvas'
             ? '<span class="text-[10px] bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from Canvas">↻ Canvas</span>'
             : '';
@@ -1607,7 +1637,7 @@ export async function loadAssignments(courseId, page = 1) {
         let checkboxHtml = '';
         if (isSubItem) {
             const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
-            checkboxHtml = `<button type="button" onclick="toggleAssignment('${assign.id}', ${assign.is_completed}, '${courseId}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
+            checkboxHtml = `<button type="button" onclick="toggleAssignment('${assignmentArg}', ${assign.is_completed}, '${courseArg}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
         } else {
             const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && (a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a))));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
@@ -1626,20 +1656,20 @@ export async function loadAssignments(courseId, page = 1) {
         if (!isSubItem && assign.unit_number) {
             subItemForm = `
                 <div class="mt-2 pt-2 border-t border-zinc-200/60 dark:border-brand-700/60 flex flex-wrap items-center gap-1.5">
-                    <input type="text" id="subInput-${assign.id}" placeholder="+ Add lesson (e.g. ↳ Lesson 1: Concept)..." class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-xs min-w-[140px]">
-                    <select id="subType-${assign.id}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Lesson Type">
+                    <input type="text" id="subInput-${assignmentIdAttr}" placeholder="+ Add lesson (e.g. ↳ Lesson 1: Concept)..." class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-xs min-w-[140px]">
+                    <select id="subType-${assignmentIdAttr}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Lesson Type">
                         <option value="lesson">📖 Lesson</option>
                         <option value="review">📝 Review</option>
                         <option value="exam">🎯 Exam</option>
                         <option value="lab">🔬 Lab</option>
                         <option value="assignment">💻 Assign</option>
                     </select>
-                    <select id="subPriority-${assign.id}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Priority">
+                    <select id="subPriority-${assignmentIdAttr}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Priority">
                         <option value="medium">⚡ Normal</option>
                         <option value="high">🔥 Urgent</option>
                         <option value="low">🌱 Low</option>
                     </select>
-                    <button type="button" onclick="addSubItem('${assign.id}', '${courseId}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-sm">+ Add</button>
+                    <button type="button" onclick="addSubItem('${assignmentArg}', '${courseArg}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-sm">+ Add</button>
                 </div>`;
         }
 
@@ -1648,11 +1678,11 @@ export async function loadAssignments(courseId, page = 1) {
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                     <div class="flex items-center gap-2 flex-1 min-w-[180px] group/title">
                         ${checkboxHtml}
-                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')">${unitBadge}${escapeHtml(displayTitle)}</span>${canvasBadge}${wguBadge}${maestroBadge}
-                        <button type="button" onclick="editAssignmentTitlePrompt('${escapeInlineJs(assign.id)}', '${escapeInlineJs(assign.title)}', '${escapeInlineJs(courseId)}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
+                        <span class="truncate ${tClass} cursor-pointer hover:underline" title="Click or tap ✏️ to rename" onclick="editAssignmentTitlePrompt('${assignmentArg}', '${titleArg}', '${courseArg}')">${unitBadge}${escapeHtml(displayTitle)}</span>${canvasBadge}${wguBadge}${maestroBadge}
+                        <button type="button" onclick="editAssignmentTitlePrompt('${assignmentArg}', '${titleArg}', '${courseArg}')" class="opacity-40 group-hover/title:opacity-100 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5 text-zinc-400 transition" title="Rename Coursework">✏️</button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
-                        <select onchange="updateAssignmentType('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer" title="Change Type">
+                        <select onchange="updateAssignmentType('${assignmentArg}', this.value, '${courseArg}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer" title="Change Type">
                             <option value="lesson" ${currentType === 'lesson' ? 'selected' : ''}>📖 Lesson</option>
                             <option value="review" ${currentType === 'review' ? 'selected' : ''}>📝 Review</option>
                             <option value="exam" ${currentType === 'exam' ? 'selected' : ''}>🎯 Exam</option>
@@ -1660,13 +1690,13 @@ export async function loadAssignments(courseId, page = 1) {
                             <option value="reading" ${currentType === 'reading' ? 'selected' : ''}>📚 Reading</option>
                             <option value="lab" ${currentType === 'lab' ? 'selected' : ''}>🔬 Lab</option>
                         </select>
-                        <select onchange="updateAssignmentPriority('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer ${currentPriority === 'high' ? 'text-rose-500 font-bold' : ''}" title="Change Priority">
+                        <select onchange="updateAssignmentPriority('${assignmentArg}', this.value, '${courseArg}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer ${currentPriority === 'high' ? 'text-rose-500 font-bold' : ''}" title="Change Priority">
                             <option value="high" ${currentPriority === 'high' ? 'selected' : ''}>🔥 Urgent</option>
                             <option value="medium" ${currentPriority === 'medium' ? 'selected' : ''}>⚡ Normal</option>
                             <option value="low" ${currentPriority === 'low' ? 'selected' : ''}>🌱 Low</option>
                         </select>
-                        <input type="date" value="${assign.due_date ? String(assign.due_date).split('T')[0] : ''}" onchange="updateAssignmentDate('${assign.id}', this.value, '${courseId}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-mono cursor-pointer">
-                        <button type="button" onclick="deleteAssignment('${assign.id}', '${courseId}')" class="text-zinc-400 hover:text-rose-500 p-1 transition" title="Delete Coursework Item">✕</button>
+                        <input type="date" value="${dueDateValue}" onchange="updateAssignmentDate('${assignmentArg}', this.value, '${courseArg}')" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded px-1.5 py-0.5 text-[11px] font-mono cursor-pointer">
+                        <button type="button" onclick="deleteAssignment('${assignmentArg}', '${courseArg}')" class="text-zinc-400 hover:text-rose-500 p-1 transition" title="Delete Coursework Item">✕</button>
                     </div>
                 </div>
                 ${subItemForm}
@@ -1675,9 +1705,9 @@ export async function loadAssignments(courseId, page = 1) {
 
     if (totalPages > 1) {
         let paginationHtml = '<div class="flex justify-between items-center mt-4 pt-3 border-t border-zinc-200 dark:border-brand-700 text-xs">';
-        paginationHtml += `<button type="button" onclick="changeAssignmentPage('${courseId}', ${page - 1})" ${page === 1 ? 'disabled class="opacity-40 font-bold px-2 py-1"' : 'class="font-bold text-indigo-500 hover:underline px-2 py-1"'}">&larr; Prev</button>`;
+        paginationHtml += `<button type="button" onclick="changeAssignmentPage('${courseArg}', ${page - 1})" ${page === 1 ? 'disabled class="opacity-40 font-bold px-2 py-1"' : 'class="font-bold text-indigo-500 hover:underline px-2 py-1"'}">&larr; Prev</button>`;
         paginationHtml += `<span class="text-zinc-400 font-medium">Page ${page} of ${totalPages}</span>`;
-        paginationHtml += `<button type="button" onclick="changeAssignmentPage('${courseId}', ${page + 1})" ${page === totalPages ? 'disabled class="opacity-40 font-bold px-2 py-1"' : 'class="font-bold text-indigo-500 hover:underline px-2 py-1"'}>Next &rarr;</button>`;
+        paginationHtml += `<button type="button" onclick="changeAssignmentPage('${courseArg}', ${page + 1})" ${page === totalPages ? 'disabled class="opacity-40 font-bold px-2 py-1"' : 'class="font-bold text-indigo-500 hover:underline px-2 py-1"'}>Next &rarr;</button>`;
         paginationHtml += '</div>';
         listEl.innerHTML += paginationHtml;
     }

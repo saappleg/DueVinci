@@ -15,16 +15,17 @@ import { getOfflineDb, cacheDataLocally, getLocalCachedData, queueOfflineMutatio
 import { DueVinciSidebar } from './modules/components.js';
 import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar, getProfileEasterEgg, renderProfileEasterEgg, activateProfileEasterEgg } from './modules/profileAvatar.js';
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
-import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js?v=2.5.0';
+import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js?v=2.6.0';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
-import { prioritizeTodayTasks, renderTodayWorkspace, completeTodayTask, startTodayFocus } from './modules/today.js';
+import { prioritizeTodayTasks, renderTodayWorkspace, renderAdaptiveDailyBrief, completeTodayTask, startTodayFocus } from './modules/today.js';
+import { applySubscriptionCatalog } from './modules/subscription.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
-import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js?v=2.5.0';
+import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js?v=2.6.0';
 import { initializeErrorReporting } from './modules/errorReporting.js';
 import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, showSettingsMovedNotice, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
-import './modules/canvas.js'; // Canvas LMS Sync — optional add-on, zero impact on free core
+import { handleCanvasCheckoutReturn } from './modules/canvas.js'; // Canvas LMS Sync — optional add-on, zero impact on free core
 
 // Re-export for external and test suite imports
 export {
@@ -187,6 +188,7 @@ export {
     refreshReminderSettings,
     prioritizeTodayTasks,
     renderTodayWorkspace,
+    renderAdaptiveDailyBrief,
     completeTodayTask,
     startTodayFocus,
     isTutorAccessActive,
@@ -361,6 +363,7 @@ _rootScope.checkWhatsNewOnLaunch = checkWhatsNewOnLaunch;
 _rootScope.requestReminderPermission = requestReminderPermission;
 _rootScope.saveReminderSettingsFromUI = window.saveReminderSettingsFromUI;
 _rootScope.renderTodayWorkspace = renderTodayWorkspace;
+_rootScope.renderAdaptiveDailyBrief = renderAdaptiveDailyBrief;
 _rootScope.completeTodayTask = completeTodayTask;
 _rootScope.startTodayFocus = startTodayFocus;
 _rootScope.loadTutorPage = loadTutorPage;
@@ -403,6 +406,8 @@ if (typeof document !== 'undefined') {
         initializeErrorReporting();
         initPasskeyUI();
         initCourseForm();
+        handleCanvasCheckoutReturn();
+        applySubscriptionCatalog(document);
 
         // Restore ambient noise if active
         const savedAmbient = localStorage.getItem('duevinci_ambient_noise');

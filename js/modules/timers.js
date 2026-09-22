@@ -1,5 +1,9 @@
 // --- POMODORO TIMER, SIDEBAR CONTROLS & MULTI-TIMER STATE MACHINE MODULE ---
-import { playTimerAlarm, fireConfetti, recordStudyActivity } from './utils.js';
+import { playTimerAlarm, fireConfetti, recordStudyActivity, escapeHtml, escapeInlineJs } from './utils.js';
+
+function timerArg(value) {
+    return escapeHtml(escapeInlineJs(value));
+}
 
 // --- SIDEBAR POMODORO TIMER STATE ---
 export let timerInterval = null;
@@ -72,9 +76,9 @@ export function updateFloatingTimer() {
                 <div class="text-[10px] uppercase font-bold text-zinc-400">Custom Timers (${runningCustomTimers.length})</div>
                 ${runningCustomTimers.map(t => `
                     <div class="flex justify-between items-center bg-zinc-800/90 px-2 py-1 rounded text-xs">
-                        <span class="font-bold truncate max-w-[100px]">${t.name}</span>
+                        <span class="font-bold truncate max-w-[100px]">${escapeHtml(t.name)}</span>
                         <span class="font-mono text-indigo-300 font-bold">${formatTimerTime(t.timeLeft)}</span>
-                        <button onclick="toggleMultiTimerRun('${t.id}')" class="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold">⏸</button>
+                        <button onclick="toggleMultiTimerRun('${timerArg(t.id)}')" class="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold">⏸</button>
                     </div>
                 `).join('')}
             </div>
@@ -386,16 +390,18 @@ export function renderTimersManager(container) {
         html += `<p class="text-[11px] text-zinc-400 text-center py-2">No custom timers yet. Add one above!</p>`;
     } else {
         activeTimers.forEach(t => {
+            const idAttr = escapeHtml(t.id);
+            const idArg = timerArg(t.id);
             html += `
                 <div class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border ${t.running ? 'border-indigo-500 ring-1 ring-indigo-500/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
                     <div class="min-w-0 flex-1 pr-1">
-                        <p class="font-bold text-zinc-800 dark:text-zinc-200 truncate ${t.running ? 'text-indigo-600 dark:text-indigo-400' : ''}">${t.name}</p>
-                        <p id="multiTimerDisplay_${t.id}" class="font-mono font-bold ${t.running ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-zinc-500'} text-xs">${formatTimerTime(t.timeLeft)}</p>
+                        <p class="font-bold text-zinc-800 dark:text-zinc-200 truncate ${t.running ? 'text-indigo-600 dark:text-indigo-400' : ''}">${escapeHtml(t.name)}</p>
+                        <p id="multiTimerDisplay_${idAttr}" class="font-mono font-bold ${t.running ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-zinc-500'} text-xs">${formatTimerTime(t.timeLeft)}</p>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
-                        <button type="button" id="multiTimerBtn_${t.id}" onclick="toggleMultiTimerRun('${t.id}')" class="w-6 h-6 rounded ${t.running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold flex items-center justify-center text-xs transition shadow-sm" title="${t.running ? 'Pause' : 'Start'}">${t.running ? '⏸' : '▶'}</button>
-                        <button type="button" onclick="resetMultiTimer('${t.id}')" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-bold px-1 text-xs transition" title="Reset">↺</button>
-                        <button type="button" onclick="deleteTimer('${t.id}')" class="text-zinc-400 hover:text-red-500 font-bold px-1 text-xs transition" title="Delete">✕</button>
+                        <button type="button" id="multiTimerBtn_${idAttr}" onclick="toggleMultiTimerRun('${idArg}')" class="w-6 h-6 rounded ${t.running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold flex items-center justify-center text-xs transition shadow-sm" title="${t.running ? 'Pause' : 'Start'}">${t.running ? '⏸' : '▶'}</button>
+                        <button type="button" onclick="resetMultiTimer('${idArg}')" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-bold px-1 text-xs transition" title="Reset">↺</button>
+                        <button type="button" onclick="deleteTimer('${idArg}')" class="text-zinc-400 hover:text-red-500 font-bold px-1 text-xs transition" title="Delete">✕</button>
                     </div>
                 </div>
             `;

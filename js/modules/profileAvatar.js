@@ -133,7 +133,7 @@ export async function saveProfileDisplayName(value, user) {
 
     const { error } = await supabaseClient
         .from('profiles')
-        .update({ display_name: displayName, updated_at: new Date().toISOString() })
+        .update({ display_name: displayName })
         .eq('user_id', user.id);
     if (error) throw error;
     setProfileIdentity(user, displayName);

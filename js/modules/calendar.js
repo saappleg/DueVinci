@@ -1,7 +1,7 @@
 // --- FULLCALENDAR & ICS EXPORT MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
-import { fireConfetti, getLocalDateKey } from './utils.js';
+import { fireConfetti, getLocalDateKey, escapeHtml } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 
 export let calendarInstance = null;
@@ -487,7 +487,7 @@ export async function openEventModal() {
         try {
             const { data: courses } = await supabaseClient.from('courses').select('id,code,emoji,color').order('code', { ascending: true });
             courseSelect.innerHTML = '<option value="">General / None</option>' + (courses || []).map((course) =>
-                `<option value="${String(course.id).replace(/"/g, '&quot;')}" data-color="${String(course.color || '').replace(/"/g, '&quot;')}">${course.emoji || '📚'} ${String(course.code || 'Untitled class').replace(/[<&>]/g, '')}</option>`
+                `<option value="${escapeHtml(course.id)}" data-color="${escapeHtml(course.color || '')}">${escapeHtml(course.emoji || '📚')} ${escapeHtml(course.code || 'Untitled class')}</option>`
             ).join('');
         } catch (error) {
             console.warn('Calendar course lookup notice:', error);

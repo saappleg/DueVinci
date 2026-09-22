@@ -3,11 +3,14 @@ import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
+import { applySubscriptionCatalog, clearSubscriptionSnapshot } from './subscription.js';
+import { clearOfflineUserData } from './offlineDb.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'daily_brief', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
 const DASHBOARD_WIDGET_ORDER_KEY = 'duevinci_dashboard_widget_order';
 const DASHBOARD_WIDGETS = [
     ['today_focus', 'Today’s focus'],
+    ['daily_brief', 'Pro Daily Brief'],
     ['up_next', 'Up Next'],
     ['goals', 'Goals & completion'],
     ['study_plan', 'Study plan'],
@@ -76,6 +79,7 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     localStorage.setItem(`duevinci_workspace_${feature}`, visible ? 'visible' : 'hidden');
     if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
     if (feature === 'today_focus') window.renderTodayWorkspace?.();
+    if (feature === 'daily_brief') window.renderTodayWorkspace?.();
     if (feature === 'up_next' || feature === 'goals') window.loadDashboardStats?.();
     if (feature === 'study_plan') window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
     if (feature === 'reminders') window.renderReminderDashboard?.();
@@ -210,6 +214,7 @@ export function injectAppearanceSettingsExtras() {
         ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
         ['academics', 'Academics widget', 'Hide dashboard analytics and progress summaries.'],
         ['today_focus', 'Today’s focus', 'Hide the dashboard focus recommendation.'],
+        ['daily_brief', 'Pro Daily Brief', 'Hide your paid daily workload and focus summary.'],
         ['up_next', 'Up Next', 'Hide the upcoming coursework card.'],
         ['goals', 'Goals & completion', 'Hide course progress summaries.'],
         ['study_plan', 'Study plan', 'Hide the dashboard study-plan workspace.'],
@@ -503,12 +508,8 @@ export function ensureSettingsModalExists() {
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Your existing DueVinci planning tools remain free forever. A subscription adds connected learning and guided study support.</p>
                             <div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/70 dark:bg-indigo-950/30">
                             <div class="text-xs font-bold text-indigo-800 dark:text-indigo-200">Included with every DueVinci Pro subscription</div>
-                                <ul class="mt-2 space-y-1 text-xs text-indigo-700 dark:text-indigo-300">
-                                    <li>✓ Canvas LMS connection and course syncing</li>
-                                    <li>✓ Assignment importing and due-date updates</li>
-                                    <li>✓ Socratic Study Companion with selected-course context and notes</li>
-                                </ul>
-                                <p class="mt-2 text-[11px] text-indigo-600 dark:text-indigo-300">These benefits are also available throughout the 30-day free trial.</p>
+                                <ul data-pro-feature-list class="mt-2 space-y-1 text-xs text-indigo-700 dark:text-indigo-300"></ul>
+                                <p class="mt-2 text-[11px] text-indigo-600 dark:text-indigo-300">These benefits are also available throughout the <span data-pro-trial-days>30</span>-day free trial.</p>
                             </div>
                         </div>
 
@@ -525,8 +526,8 @@ export function ensureSettingsModalExists() {
                         <div id="canvasCheckoutOptions" class="hidden space-y-2">
                                 <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Canvas Sync and the Socratic Study Companion enabled. Cancel anytime.</p>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
-                                    <button type="button" data-canvas-checkout onclick="handleCanvasCheckout('yearly')" class="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$45 / year</button>
+                                    <button type="button" data-canvas-checkout data-pro-monthly-price onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
+                                    <button type="button" data-canvas-checkout data-pro-yearly-price onclick="handleCanvasCheckout('yearly')" class="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$45 / year</button>
                                 </div>
                             </div>
                         </div>
@@ -664,6 +665,7 @@ export function ensureSettingsModalExists() {
 
 export function openSettingsModal() {
     ensureSettingsModalExists();
+    applySubscriptionCatalog(document);
     if (currentUser) {
         const emailInput = document.getElementById('profileEmail');
         if (emailInput) emailInput.value = currentUser.email;
@@ -738,7 +740,7 @@ export function showSettingsMovedNotice() {
     document.getElementById('settingsMovedDismiss')?.addEventListener('click', dismiss);
 }
 
-export function switchSettingsTab(tabName) {
+export function switchSettingsTab(tabName, options = {}) {
     const tabs = ['profile', 'appearance', 'study', 'backup', 'privacy', 'canvas'];
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
@@ -756,7 +758,7 @@ export function switchSettingsTab(tabName) {
         }
     });
     // When switching to Canvas tab, refresh its state
-    if (tabName === 'canvas') {
+    if (tabName === 'canvas' && options.refresh !== false) {
         if (typeof window.initCanvasSettingsTab === 'function') window.initCanvasSettingsTab();
     }
 }
@@ -1047,7 +1049,7 @@ export function sendDirectMailto() {
 }
 
 export async function confirmAccountDeletion() {
-    const confirmed = confirm("Are you sure you want to permanently delete your account and all academic data? This will immediately remove all your courses, assignments, grades, notes, and calendar events. This action CANNOT be undone.");
+    const confirmed = confirm("Are you sure you want to permanently delete your account and all academic data? This removes your courses, assignments, grades, notes, calendar events, flashcard progress, Tutor usage history, and billing access. This action CANNOT be undone.");
     if (!confirmed) return;
 
     const typed = prompt("To confirm permanent deletion of your account and all data, please type DELETE in capital letters:");
@@ -1057,29 +1059,42 @@ export async function confirmAccountDeletion() {
     }
 
     try {
+        const deletingUserId = currentUser?.id || null;
         if (currentUser && currentUser.id) {
-            // Canvas credentials live in a server-only table, so remove them via
-            // the authenticated Edge Function before deleting local coursework.
-            const { error: canvasDisconnectError } = await supabaseClient.functions.invoke('canvas-disconnect');
-            if (canvasDisconnectError) throw canvasDisconnectError;
-            await supabaseClient.from('assignments').delete().eq('user_id', currentUser.id);
-            await supabaseClient.from('courses').delete().eq('user_id', currentUser.id);
-            await supabaseClient.from('custom_events').delete().eq('user_id', currentUser.id);
             const { data: deleteAccountData, error: deleteAccountError } = await supabaseClient.functions.invoke('delete-account');
             if (deleteAccountError) throw deleteAccountError;
             if (!deleteAccountData?.success) throw new Error(deleteAccountData?.error || 'Unable to delete account.');
+
+            const cacheCleared = await clearOfflineUserData(deletingUserId);
+            clearSubscriptionSnapshot();
+            try { if (typeof localStorage !== 'undefined') localStorage.clear(); } catch { /* The server deletion has already completed. */ }
+            try { if (typeof sessionStorage !== 'undefined') sessionStorage.clear(); } catch { /* The server deletion has already completed. */ }
+            await supabaseClient.auth.signOut({ scope: 'local' }).catch(() => {});
+
+            if (!cacheCleared) {
+                alert('Your account was deleted, but this browser could not clear its offline cache. Clear this site’s browser data to remove the remaining local copy.');
+            } else {
+                alert('Your account and all associated data have been permanently deleted.');
+            }
+            if (typeof window !== 'undefined') window.location.href = 'index.html';
+            return;
         }
 
         if (typeof localStorage !== 'undefined') localStorage.clear();
         if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
 
-        await supabaseClient.auth.signOut();
+        await supabaseClient.auth.signOut({ scope: 'local' });
 
         alert("Your account and all associated data have been permanently deleted.");
         if (typeof window !== 'undefined') window.location.href = 'index.html';
     } catch (err) {
         console.error("Account deletion error:", err);
-        alert("An error occurred while deleting your data: " + err.message);
+        let detail = err?.message || 'Please try again.';
+        try {
+            const body = await err?.context?.json?.();
+            if (body?.error) detail = body.error;
+        } catch { /* Keep the SDK error message. */ }
+        alert(`Account deletion did not finish: ${detail} If the account is still available, you can retry deletion from Settings.`);
     }
 }
 

@@ -4,6 +4,10 @@ import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
 
+function inlineArg(value) {
+    return escapeHtml(escapeInlineJs(value));
+}
+
 let cachedStudyPlan = [];
 const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
 const PLAN_MOVE_SYNC_INTERVAL_MS = 30_000;
@@ -920,10 +924,11 @@ export async function openStudyPlanDayModal(dateStr) {
         }
     } else {
         tasksHtml = day.allBlocks.map((block, idx) => {
+            const durationMinutes = Math.max(1, Math.min(180, Number(block.durationMinutes) || 25));
             const moveTargets = getStudyPlanMoveTargets(block.taskId);
             const moveTargetsHtml = moveTargets.length
                 ? moveTargets.map((target) => `
-                    <button type="button" onclick="moveStudyPlanBlockAndOpenDay('${escapeInlineJs(block.taskId)}', '${target.date}')" class="text-left p-2.5 rounded-xl bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition">
+                    <button type="button" onclick="moveStudyPlanBlockAndOpenDay('${inlineArg(block.taskId)}', '${inlineArg(target.date)}')" class="text-left p-2.5 rounded-xl bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition">
                         <span class="block text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">${escapeHtml(target.label)}</span>
                         <span class="block text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${target.totalMinutes}m planned · ${target.sessionCount} session${target.sessionCount === 1 ? '' : 's'}</span>
                     </button>
@@ -933,14 +938,14 @@ export async function openStudyPlanDayModal(dateStr) {
             <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-2xl border border-zinc-200 dark:border-brand-700 space-y-3 transition hover:border-indigo-400 dark:hover:border-indigo-500">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-2xl shrink-0 p-2 bg-white dark:bg-brand-800 rounded-xl shadow-xs border border-zinc-200 dark:border-brand-700">${block.courseEmoji}</span>
+                        <span class="text-2xl shrink-0 p-2 bg-white dark:bg-brand-800 rounded-xl shadow-xs border border-zinc-200 dark:border-brand-700">${escapeHtml(block.courseEmoji)}</span>
                         <div class="min-w-0">
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-bold text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-brand-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-brand-700">${block.courseCode}</span>
-                                ${block.unitBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/70 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-brand-600">${block.unitBadgeText}</span>` : ''}
-                                <span class="font-bold text-[11px] px-2 py-0.5 rounded-md ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : (block.isReview ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/30')}">${block.typeBadgeText || '📖 Lesson'}</span>
+                                <span class="font-bold text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-brand-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-brand-700">${escapeHtml(block.courseCode)}</span>
+                                ${block.unitBadgeText ? `<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/70 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-brand-600">${escapeHtml(block.unitBadgeText)}</span>` : ''}
+                                <span class="font-bold text-[11px] px-2 py-0.5 rounded-md ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : (block.isReview ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/30')}">${escapeHtml(block.typeBadgeText || '📖 Lesson')}</span>
                                 ${block.priority === 'high' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">🔥 Urgent</span>' : (block.priority === 'low' ? '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">🌱 Low</span>' : '<span class="font-bold text-[11px] px-2 py-0.5 rounded-md bg-zinc-200/60 dark:bg-brand-700 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-brand-600">⚡ Normal</span>')}
-                                <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">• ${block.dueText}</span>
+                                <span class="text-[11px] font-bold ${block.daysUntilDue <= 1 ? 'text-rose-500 font-extrabold' : 'text-zinc-500 dark:text-zinc-400'}">• ${escapeHtml(block.dueText)}</span>
                             </div>
                             <h4 class="font-black text-sm text-zinc-900 dark:text-white truncate mt-1">${escapeHtml(block.title)}</h4>
                         </div>
@@ -956,17 +961,17 @@ export async function openStudyPlanDayModal(dateStr) {
                 <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 flex items-start gap-2.5 text-xs text-zinc-700 dark:text-zinc-300">
                     <span class="text-sm shrink-0">💡</span>
                     <div class="leading-relaxed">
-                        <strong class="font-extrabold text-zinc-900 dark:text-white">Recommended Strategy:</strong> ${block.recommendation}
+                        <strong class="font-extrabold text-zinc-900 dark:text-white">Recommended Strategy:</strong> ${escapeHtml(block.recommendation)}
                     </div>
                 </div>
 
                 <!-- Interactive Actions -->
                 <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                    <button type="button" onclick="startStudyPlanTimer(${block.durationMinutes}, '${escapeInlineJs(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
+                    <button type="button" onclick="startStudyPlanTimer(${durationMinutes}, '${inlineArg(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
                         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        Start ${block.durationMinutes}m Timer
+                        Start ${durationMinutes}m Timer
                     </button>
-                    <button type="button" onclick="toggleStudyPlanAssignment('${escapeInlineJs(block.taskId)}', ${block.isCompleted}, '${escapeInlineJs(block.courseId)}', '${dateStr}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition">
+                    <button type="button" onclick="toggleStudyPlanAssignment('${inlineArg(block.taskId)}', ${block.isCompleted}, '${inlineArg(block.courseId)}', '${inlineArg(dateStr)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-brand-700 dark:hover:bg-brand-600 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
                         Mark Done
                     </button>
@@ -974,7 +979,7 @@ export async function openStudyPlanDayModal(dateStr) {
                 <details class="rounded-xl border border-zinc-200 dark:border-brand-700 bg-white/70 dark:bg-brand-800/70">
                     <summary class="cursor-pointer select-none px-3 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">⇄ Move to another day</summary>
                     <div class="px-3 pb-3 space-y-2">
-                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Choose an eligible day. Its current workload is shown before you move this ${block.durationMinutes}m block.</p>
+                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Choose an eligible day. Its current workload is shown before you move this ${durationMinutes}m block.</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${moveTargetsHtml}</div>
                     </div>
                 </details>
@@ -1271,13 +1276,13 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         } else {
             day.blocks.forEach(b => {
                 blocksHtml += `
-                    <div draggable="true" ondragstart="startStudyPlanDrag(event, '${escapeInlineJs(b.taskId)}')" onclick="event.stopPropagation()" class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs cursor-grab active:cursor-grabbing" title="Drag to another eligible study day">
+                    <div draggable="true" ondragstart="startStudyPlanDrag(event, '${inlineArg(b.taskId)}')" onclick="event.stopPropagation()" class="flex items-center justify-between p-2 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 text-xs cursor-grab active:cursor-grabbing" title="Drag to another eligible study day">
                         <div class="flex items-center gap-2 min-w-0">
                             <span class="text-sm shrink-0">${escapeHtml(b.courseEmoji)}</span>
                             <div class="truncate flex items-center gap-1">
                                 <span class="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">${escapeHtml(b.courseCode)}</span>
-                                ${b.unitBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-brand-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-brand-700 shrink-0">${b.unitBadgeText}</span>` : ''}
-                                ${b.lessonBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">${b.lessonBadgeText}</span>` : ''}
+                                ${b.unitBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-brand-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-brand-700 shrink-0">${escapeHtml(b.unitBadgeText)}</span>` : ''}
+                                ${b.lessonBadgeText ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shrink-0">${escapeHtml(b.lessonBadgeText)}</span>` : ''}
                                 <span class="text-zinc-500 dark:text-zinc-400 font-medium truncate ml-0.5">${escapeHtml(b.title)}</span>
                             </div>
                         </div>

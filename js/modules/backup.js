@@ -2,8 +2,9 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { getLocalDateKey } from './utils.js';
+import { collectLocalFlashcardMastery, mergeFlashcardMastery, restoreFlashcardMastery } from './flashcards.js';
 
-export function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}) {
+export function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}, flashcardMastery = {}) {
     return {
         version: "1.0",
         app: "DueVinci",
@@ -13,7 +14,8 @@ export function buildBackupPayload(courses = [], assignments = [], customEvents 
             assignments: Array.isArray(assignments) ? assignments : [],
             customEvents: Array.isArray(customEvents) ? customEvents : [],
             timers: Array.isArray(timers) ? timers : [],
-            preferences: preferences && typeof preferences === 'object' ? preferences : {}
+            preferences: preferences && typeof preferences === 'object' ? preferences : {},
+            flashcardMastery: flashcardMastery && typeof flashcardMastery === 'object' && !Array.isArray(flashcardMastery) ? flashcardMastery : {}
         }
     };
 }
@@ -23,6 +25,10 @@ export function validateBackupPayload(json) {
     if (!json.data || typeof json.data !== 'object') return { valid: false, error: 'Missing data object' };
     if (!Array.isArray(json.data.courses)) return { valid: false, error: 'courses must be an array' };
     if (!Array.isArray(json.data.assignments)) return { valid: false, error: 'assignments must be an array' };
+    if (json.data.flashcardMastery !== undefined
+        && (!json.data.flashcardMastery || typeof json.data.flashcardMastery !== 'object' || Array.isArray(json.data.flashcardMastery))) {
+        return { valid: false, error: 'flashcardMastery must be an object' };
+    }
     return { valid: true };
 }
 
@@ -32,6 +38,16 @@ export async function exportUserDataJSON() {
         const { data: assignments } = await supabaseClient.from('assignments').select('*');
         const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
         const timers = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_timers'))) || [];
+        let flashcardMastery = collectLocalFlashcardMastery();
+        try {
+            const { data: cloudMastery, error } = await supabaseClient.from('flashcard_mastery').select('course_id, mastery');
+            if (!error) {
+                (cloudMastery || []).forEach((row) => {
+                    const courseId = String(row.course_id);
+                    flashcardMastery[courseId] = mergeFlashcardMastery(flashcardMastery[courseId] || {}, row.mastery || {});
+                });
+            }
+        } catch { /* Keep the local progress in an offline backup. */ }
 
         const prefs = {
             theme: typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null,
@@ -42,7 +58,7 @@ export async function exportUserDataJSON() {
             activityDates: typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('duevinci_activity_dates') || '[]') : []
         };
 
-        const payload = buildBackupPayload(courses || [], assignments || [], customEvents || [], timers, prefs);
+        const payload = buildBackupPayload(courses || [], assignments || [], customEvents || [], timers, prefs, flashcardMastery);
         const jsonStr = JSON.stringify(payload, null, 2);
 
         const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -128,6 +144,8 @@ export async function importUserDataJSON(fileInput) {
                 if (json.data.preferences.dateFormat) localStorage.setItem('duevinci_date_format', json.data.preferences.dateFormat);
                 if (json.data.preferences.activityDates) localStorage.setItem('duevinci_activity_dates', JSON.stringify(json.data.preferences.activityDates));
             }
+
+            restoreFlashcardMastery(json.data.flashcardMastery || {});
 
             // Sync restored courses and assignments to Supabase
             let user = currentUser;

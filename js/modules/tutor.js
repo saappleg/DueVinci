@@ -1,11 +1,25 @@
 import { supabaseClient } from './config.js';
 import { escapeHtml } from './utils.js';
+import { getSubscriptionSnapshot, hasSubscriptionFeature } from './subscription.js';
 
 let conversation = [];
 
 export function isTutorAccessActive(profile, now = Date.now()) {
+    if (profile?.features) return hasSubscriptionFeature(profile, 'socratic_tutor');
     return profile?.subscription_status === 'active'
         || (profile?.subscription_status === 'trialing' && !!profile.trial_end && new Date(profile.trial_end).getTime() > now);
+}
+
+function renderTutorUsage(usage) {
+    const status = document.getElementById('tutorUsageStatus');
+    if (!status || !usage) return;
+    status.textContent = `Tutor use: ${usage.usedThisMonth} of ${usage.monthlyLimit} this month · ${usage.usedToday} of ${usage.dailyLimit} today (UTC)`;
+}
+
+async function loadTutorUsage() {
+    const { data, error } = await supabaseClient.functions.invoke('tutor', { body: { action: 'usage' } });
+    if (error) throw error;
+    renderTutorUsage(data?.usage);
 }
 
 async function tutorErrorMessage(error) {
@@ -32,12 +46,12 @@ export async function loadTutorPage() {
     const courseSelect = document.getElementById('tutorCourse');
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return;
-    const [{ data: profile, error: profileError }, { data: courses, error: courseError }] = await Promise.all([
-        supabaseClient.from('profiles').select('subscription_status, trial_end').eq('user_id', user.id).maybeSingle(),
+    const [{ data: snapshot, error: subscriptionError }, { data: courses, error: courseError }] = await Promise.all([
+        getSubscriptionSnapshot({ forceRefresh: true }).then((data) => ({ data, error: null })).catch((error) => ({ data: null, error })),
         supabaseClient.from('courses').select('id, name, code').order('name'),
     ]);
-    if (profileError || courseError) return;
-    if (!isTutorAccessActive(profile)) {
+    if (courseError) return;
+    if (subscriptionError || !isTutorAccessActive(snapshot)) {
         locked?.classList.remove('hidden');
         workspace?.classList.add('hidden');
         return;
@@ -47,6 +61,7 @@ export async function loadTutorPage() {
     if (courseSelect) {
         courseSelect.innerHTML = '<option value="">General study help</option>' + (courses || []).map((course) => `<option value="${escapeHtml(course.id)}">${escapeHtml(course.code || course.name)}${course.code ? ` · ${escapeHtml(course.name)}` : ''}</option>`).join('');
     }
+    try { await loadTutorUsage(); } catch { renderTutorUsage(null); }
     if (!conversation.length) addMessage('model', 'Pick a course and tell me what you are working through. I’ll guide you with questions and small steps.');
 }
 
@@ -68,7 +83,12 @@ export async function submitTutorMessage() {
         if (!data?.reply) throw new Error(data?.error || 'Tutor unavailable.');
         conversation.push({ role: 'model', text: data.reply });
         addMessage('model', data.reply);
+        renderTutorUsage(data.usage);
     } catch (error) {
+        try {
+            const body = await error?.context?.clone?.().json();
+            renderTutorUsage(body?.usage);
+        } catch { /* The usage label updates after the next successful reply. */ }
         conversation.pop();
         addMessage('model', await tutorErrorMessage(error));
     } finally {

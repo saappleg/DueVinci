@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import Stripe from 'https://esm.sh/stripe@14?target=deno'
 import { corsHeaders, authenticatedUser, json } from '../_shared/canvas.ts'
+import { approvedReturnUrls } from '../_shared/return_url.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2025-03-31.basil', httpClient: Stripe.createFetchHttpClient() })
 
@@ -15,9 +16,11 @@ serve(async (req) => {
   try {
     const { admin, user } = await authenticatedUser(req)
     const { returnUrl } = await req.json()
-    const appUrl = Deno.env.get('APP_URL')!
-    const localReturnUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/index\.html)?\/?$/.test(returnUrl)
-    if (returnUrl !== appUrl && returnUrl !== `${appUrl}/index.html` && !(Deno.env.get('ALLOW_LOCALHOST_RETURN_URLS') === 'true' && localReturnUrl)) throw new Error('Invalid return URL')
+    const { indexUrl } = approvedReturnUrls(
+      returnUrl,
+      Deno.env.get('APP_URL') || '',
+      Deno.env.get('ALLOW_LOCALHOST_RETURN_URLS') === 'true',
+    )
     const { data: profile, error } = await admin.from('profiles').select('stripe_customer_id').eq('user_id', user.id).maybeSingle()
     if (error) throw error
     if (!profile?.stripe_customer_id) throw new Error('No billing account was found for this user.')
@@ -32,7 +35,9 @@ serve(async (req) => {
       if (clearCustomerErr) throw clearCustomerErr
       throw new Error('Your saved billing account belongs to a different Stripe environment. It was cleared; please choose a plan again.')
     }
-    const session = await stripe.billingPortal.sessions.create({ customer: profile.stripe_customer_id, return_url: returnUrl })
+    const portalReturnUrl = new URL(indexUrl)
+    portalReturnUrl.searchParams.set('billing_portal', 'return')
+    const session = await stripe.billingPortal.sessions.create({ customer: profile.stripe_customer_id, return_url: portalReturnUrl.toString() })
     return json({ url: session.url })
   } catch (error) { return json({ error: error.message }, 400) }
 })

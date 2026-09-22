@@ -1,6 +1,7 @@
 // --- LOCAL-FIRST DUE DATE & CALENDAR REMINDERS ---
 import { supabaseClient } from './config.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
+import { escapeHtml } from './utils.js';
 
 const ENABLED_KEY = 'duevinci_reminders_enabled';
 const OFFSETS_KEY = 'duevinci_reminder_offsets';
@@ -145,8 +146,8 @@ export async function renderReminderDashboard() {
             <div><h3 class="text-md font-bold text-zinc-800 dark:text-zinc-200">🔔 Upcoming Reminders</h3><p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${prefs.enabled ? 'Due dates and calendar plans, kept on this device.' : 'Reminders are paused in Settings.'}</p></div>
             <button type="button" onclick="openSettingsModal(); switchSettingsTab('study')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Manage</button>
         </div>
-        <p class="mb-3 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-200">${nextAction}</p>
-        ${items.length ? `<ul class="space-y-2">${items.map((item) => `<li class="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-brand-900 border border-zinc-200/70 dark:border-brand-700 px-3 py-2.5"><span class="min-w-0"><span class="block text-xs font-bold text-zinc-800 dark:text-white truncate">${item.title}</span><span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${item.kind} · ${item.detail}</span></span><span class="shrink-0 text-[11px] font-bold ${item.daysUntil === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}">${relativeDate(item.daysUntil)}</span></li>`).join('')}</ul>` : ''}
+        <p class="mb-3 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-200">${escapeHtml(nextAction)}</p>
+        ${items.length ? `<ul class="space-y-2">${items.map((item) => `<li class="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-brand-900 border border-zinc-200/70 dark:border-brand-700 px-3 py-2.5"><span class="min-w-0"><span class="block text-xs font-bold text-zinc-800 dark:text-white truncate">${escapeHtml(item.title)}</span><span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(item.kind)} · ${escapeHtml(item.detail)}</span></span><span class="shrink-0 text-[11px] font-bold ${item.daysUntil === 0 ? 'text-rose-500' : 'text-indigo-600 dark:text-indigo-400'}">${escapeHtml(relativeDate(item.daysUntil))}</span></li>`).join('')}</ul>` : ''}
     `;
     applyDashboardWidgetLayout();
 }
@@ -195,7 +196,7 @@ export async function saveReminderSettingsFromUI() {
     const offsets = String(document.getElementById('reminderSchedule')?.value || '0').split(',').map(Number);
     saveReminderPreferences({ enabled, offsets });
     if (window.currentUser?.id && navigator.onLine !== false) {
-        await supabaseClient.from('profiles').update({ reminders_enabled: enabled, reminder_offsets: offsets, updated_at: new Date().toISOString() }).eq('user_id', window.currentUser.id);
+        await supabaseClient.from('profiles').update({ reminders_enabled: enabled, reminder_offsets: offsets }).eq('user_id', window.currentUser.id);
     }
     const message = document.getElementById('reminderSettingsMsg');
     if (message) { message.textContent = enabled ? 'Reminder schedule saved on this device.' : 'Reminders are paused on this device.'; message.classList.remove('hidden'); }

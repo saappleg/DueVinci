@@ -32,7 +32,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This page outlines 
 - [x] **Interactive Master Calendar** – FullCalendar integration, deadline filtering, and `.ics` feed export for Apple/Google Calendar.
 - [x] **Offline-First PWA & IndexedDB Storage** – Full offline functionality, Service Worker caching, and desktop/mobile installation.
 - [x] **Command Palette (`Cmd+K`) & Easter Eggs** – Quick action navigator, WGU Night Owl flyover, and Da Vinci theme triggers.
-- [x] **Data Sovereignty & Portability** – Encrypted JSON backup/restore and zero vendor lock-in.
+- [x] **Data Sovereignty & Portability** – Plain JSON backup/restore and zero vendor lock-in.
 
 ---
 

@@ -52,7 +52,7 @@
             <div class="border-b border-zinc-200 dark:border-brand-700 pb-6">
                 <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider block mb-1">Privacy & Compliance</span>
                 <h1 class="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Privacy Policy & Data Retention</h1>
-                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: August 24, 2026</p>
+                <p class="text-zinc-500 dark:text-zinc-400 text-xs mt-1.5">Effective Date: February 20, 2026 • Last Updated: September 22, 2026</p>
             </div>
 
             <!-- Section 1 -->
@@ -80,14 +80,14 @@
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">B. Student Academic Content</h3>
                         <p class="leading-relaxed">
-                            We store the academic records you explicitly enter, including: course names, term folders, assignment titles, due dates, completion statuses, grade percentages, custom calendar events, and study notes/scratchpads.
+                            We store the academic records you explicitly enter, including: course names, term folders, assignment titles, due dates, completion statuses, grade percentages, custom calendar events, and study notes/scratchpads. Flashcard review progress (such as repetitions and next review dates) is stored on this device and synced to your account when you are online so it can follow you across devices.
                         </p>
                     </div>
 
                     <div class="p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-2">
                         <h3 class="font-bold text-zinc-900 dark:text-white text-sm">C. AI Processing Inputs</h3>
                         <p class="leading-relaxed">
-                            When you use syllabus parsing or the Socratic Study Companion, we send the minimum input needed to provide that feature through a secure server-side Supabase Edge Function to Google Gemini. This can include syllabus text or images, your Tutor question and recent session context, and—when you select a course—its description, objectives, notes, and a limited set of assignments. DueVinci does not use this content to train its own models. Google’s handling of API prompts and responses depends on the applicable Gemini service tier and terms; do not submit highly sensitive personal information to AI features.
+                            When you use syllabus parsing or the Socratic Study Companion, we send the minimum input needed to provide that feature through a secure server-side Supabase Edge Function to Google Gemini. This can include syllabus text or images, your Tutor question and recent session context, and—when you select a course—its description, objectives, notes, and a limited set of assignments. DueVinci does not store Tutor conversations, but stores account-level request counts to enforce usage limits. DueVinci does not use this content to train its own models. Google’s handling of API prompts and responses depends on the applicable Gemini service tier and terms; do not submit highly sensitive personal information to AI features.
                         </p>
                     </div>
 
@@ -113,6 +113,7 @@
                     <li>To compute cumulative GPA, course completion percentages, and 7-day workload distributions.</li>
                     <li>To authenticate your session securely across multiple devices.</li>
                     <li>To deliver syllabus parsing and the Socratic Study Companion through Google Gemini APIs.</li>
+                    <li>To calculate the Daily Brief from your own coursework and calendar records, and to meter Tutor requests against your plan allowance.</li>
                     <li>To connect and import the Canvas coursework you expressly authorize.</li>
                     <li>To administer trials, subscriptions, billing support, and browser reminders when you enable them.</li>
                     <li>To provide customer support when you reach out via our support channels.</li>
@@ -141,9 +142,9 @@
                                 <td class="p-3">Supabase (PostgreSQL with RLS)</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Coursework & Grades</td>
-                                <td class="p-3">Retained until deleted by user or account removed</td>
-                                <td class="p-3">Supabase DB + IndexedDB Offline Cache</td>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Coursework, Grades & Flashcard Mastery</td>
+                                <td class="p-3">Cloud copy until the course or account is deleted; each browser copy remains until app or browser storage is cleared</td>
+                                <td class="p-3">Supabase DB + account-scoped browser localStorage</td>
                             </tr>
                             <tr>
                                 <td class="p-3 font-medium text-zinc-900 dark:text-white">Uploaded Syllabus Files</td>
@@ -164,6 +165,11 @@
                                 <td class="p-3 font-medium text-zinc-900 dark:text-white">Subscription & Push Data</td>
                                 <td class="p-3">While needed to provide the service, subject to legal or provider retention obligations</td>
                                 <td class="p-3">Supabase profile records; Stripe and browser push providers</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-medium text-zinc-900 dark:text-white">Tutor Usage Counts</td>
+                                <td class="p-3">Deleted within 12 months of the last request or when the account is removed</td>
+                                <td class="p-3">Supabase (account-scoped usage table)</td>
                             </tr>
                             <tr>
                                 <td class="p-3 font-medium text-zinc-900 dark:text-white">Local Preferences</td>
@@ -194,7 +200,7 @@
                 <div class="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-700 dark:text-red-300 space-y-1">
                     <p class="font-bold">What account deletion does:</p>
                     <p class="leading-relaxed">
-                        When you confirm account deletion, DueVinci removes the account, primary academic records, stored Canvas connection, and profile photo, and signs the browser out. Browser caches are cleared by the app where possible. Limited records held by payment, email, AI, or infrastructure providers may remain subject to their own policies and applicable legal obligations.
+                        When you confirm account deletion, DueVinci cancels outstanding subscriptions, removes the account, primary academic records, support tickets, error reports, flashcard progress, Tutor usage counts, stored Canvas connection, and profile photo, and clears local app storage on the browser where deletion is requested. An offline copy on another device cannot be cleared remotely; clear DueVinci site data on that device as well. Limited records held by payment, email, AI, or infrastructure providers may remain subject to their own policies and applicable legal obligations.
                     </p>
                 </div>
             </div>

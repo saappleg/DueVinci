@@ -13,7 +13,14 @@ supabase db push --project-ref kinsxkeerxguqkyzrjfm
 ```sh
 supabase functions deploy start-trial --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyzrjfm
-supabase functions deploy create-portal-session canvas-connect canvas-courses canvas-sync canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy create-portal-session --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy subscription-status --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy tutor --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy delete-account --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-connect --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-courses --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-sync --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
 # Stripe does not send a Supabase JWT; stripe-webhook verifies Stripe's signed
 # payload itself, so it must be deployed without the gateway JWT requirement.
 supabase functions deploy stripe-webhook --no-verify-jwt --project-ref kinsxkeerxguqkyzrjfm
@@ -22,10 +29,42 @@ supabase functions deploy manage-support-tickets --project-ref kinsxkeerxguqkyzr
 supabase functions deploy report-client-error --project-ref kinsxkeerxguqkyzrjfm
 ```
 
-`start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`. Stripe billing functions require
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MONTHLY_PRICE_ID`,
-`STRIPE_YEARLY_PRICE_ID`, and `APP_URL`. Keep each environment's Test or Live Stripe
-credentials and price IDs separate.
+`start-trial` requires `SUPABASE_SERVICE_ROLE_KEY`; if an account already has Stripe
+identifiers, it also requires `STRIPE_SECRET_KEY` to reconcile the existing
+subscription. Stripe billing functions require `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_MONTHLY_PRICE_ID`, `STRIPE_YEARLY_PRICE_ID`, and
+`APP_URL`. Keep each environment's Test or Live Stripe credentials and price IDs
+separate.
+
+`delete-account` also requires `STRIPE_SECRET_KEY` for accounts with billing
+records. It cancels outstanding subscriptions, removes server-held account data,
+then deletes the Auth user. Cleanup steps are idempotent so a failed request can
+be retried while the account still exists. The browser clears its account-scoped
+IndexedDB and local flashcard cache after the endpoint confirms deletion.
+
+The `20260922184331_add_flashcard_mastery_and_tutor_usage.sql` migration adds
+account-scoped cloud flashcard mastery with atomic per-card merging, a private Tutor usage ledger, and the
+`daily_brief` feature mapping for the existing Pro plan. Apply database migrations
+before deploying the matching functions or frontend. Tutor usage defaults to
+8 requests/day and 40/month during trial, and 30/day and 250/month on a paid plan;
+`TUTOR_TRIAL_DAILY_REQUEST_LIMIT`, `TUTOR_TRIAL_MONTHLY_REQUEST_LIMIT`,
+`TUTOR_DAILY_REQUEST_LIMIT`, and `TUTOR_MONTHLY_REQUEST_LIMIT` can override them.
+Only the service role can reserve or release usage; users can read their own usage
+row. Tutor prompts that fail before reaching the model do not use quota; upstream
+failures trigger a quota release. The migration schedules a daily cleanup that
+removes Tutor usage rows within 12 months of last activity; account deletion
+removes all remaining rows through the user foreign key.
+The public offer shows the default Tutor quotas. If the quota secrets are changed,
+update `js/modules/subscription.js` before release so the offer and enforcement agree.
+
+The `20260922193000_billing_safety_and_checkout_locks.sql` migration restores
+owner-scoped reminder updates while keeping billing columns service-role-only.
+It also adds a private per-account checkout lock and active-session record so
+concurrent requests cannot open duplicate subscriptions.
+
+Checkout and billing-portal return URLs must match `APP_URL` at the root or its
+`index.html` path. Set `ALLOW_LOCALHOST_RETURN_URLS=true` only in a local development
+environment when testing Stripe redirects.
 
 Subscription access is feature-based: `subscription_plan_features` maps a plan
 key to its enabled features. Add future paid features by creating a plan key and
@@ -74,4 +113,5 @@ verified in Resend; the function only confirms delivery after Resend accepts it.
 Migration `20260823142000_privacy_retention.sql` schedules a daily Supabase Cron
 job named `duevinci-privacy-retention`. It deletes `app_error_events` after 90
 days and tickets marked `resolved` or `closed` 90 days after their
-`resolved_at` timestamp. The job must be present in both Dev and Production.
+`resolved_at` timestamp. Tutor usage has a separate daily cleanup job and is
+removed after 12 months. These jobs must be present in both Dev and Production.

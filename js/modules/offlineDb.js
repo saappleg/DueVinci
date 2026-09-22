@@ -49,6 +49,46 @@ export function getOfflineDb() {
     });
 }
 
+export async function clearOfflineUserData(userId) {
+    if (!userId) return true;
+    const fallbackKeys = DATA_STORES.map((storeName) => fallbackCacheKey(storeName, userId));
+    try { fallbackKeys.forEach((key) => localStorage.removeItem(key)); } catch { /* Continue clearing IndexedDB. */ }
+    try {
+        const masteryPrefixes = [
+            `duevinci_flashcards_mastery_${userId}_`,
+            `duevinci_flashcards_mastery_pending_${userId}_`,
+        ];
+        for (let index = localStorage.length - 1; index >= 0; index--) {
+            const key = localStorage.key(index);
+            if (key && masteryPrefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+        }
+    } catch { /* Continue clearing IndexedDB. */ }
+
+    let db;
+    try { db = await getOfflineDb(); } catch { return false; }
+    if (!db) return typeof indexedDB === 'undefined';
+
+    return new Promise((resolve) => {
+        let transaction;
+        try {
+            transaction = db.transaction(ALL_STORES, 'readwrite');
+            ALL_STORES.forEach((storeName) => {
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    (request.result || []).filter((item) => item.user_id === userId)
+                        .forEach((item) => store.delete(item.cache_key));
+                };
+                request.onerror = () => { try { transaction.abort(); } catch { /* Already closed. */ } };
+            });
+            transaction.oncomplete = () => resolve(true);
+            transaction.onerror = transaction.onabort = () => resolve(false);
+        } catch {
+            resolve(false);
+        }
+    });
+}
+
 function runTransaction(storeName, mode, operation) {
     return getOfflineDb().then((db) => new Promise((resolve) => {
         if (!db) return resolve(null);
@@ -273,14 +313,28 @@ export function initNetworkStatusListeners(client) {
     window.addEventListener('offline', () => showStatus(false));
     window.addEventListener('online', async () => {
         const user = await currentOfflineUser(client);
-        showStatus(true, user ? await processOfflineQueue(client, user.id) : null);
+        if (!user) { showStatus(true, null); return; }
+        const summary = await processOfflineQueue(client, user.id);
+        try {
+            const mastery = await window.syncPendingFlashcardMastery?.();
+            summary.remaining += mastery?.remaining || 0;
+        } catch (error) {
+            console.warn('Some study progress still needs syncing:', error?.message || error);
+            summary.remaining += 1;
+        }
+        showStatus(true, summary);
     });
     if (!isOnline()) showStatus(false);
     else {
         // A queued write can survive an app close. Replay it on the next
         // authenticated launch even if the browser's online event occurred
         // before this page was opened.
-        currentOfflineUser(client).then((user) => user && processOfflineQueue(client, user.id));
+        currentOfflineUser(client).then(async (user) => {
+            if (!user) return;
+            await processOfflineQueue(client, user.id);
+            try { await window.syncPendingFlashcardMastery?.(); }
+            catch (error) { console.warn('Flashcard mastery sync will retry later:', error?.message || error); }
+        });
     }
 }
 

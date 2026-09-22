@@ -5,7 +5,7 @@ import { supabaseClient } from './config.js';
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
 // Each feature drop uses a versioned dismissal marker so students see the
 // latest release notes once after the app updates.
-export const WHATS_NEW_VERSION = '2.5.0';
+export const WHATS_NEW_VERSION = '2.6.0';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';

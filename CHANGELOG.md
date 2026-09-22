@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.6.0] - 2026-09-22
+
+### Added
+- Added the Pro Daily Brief with deadline counts and a next-focus suggestion.
+- Added visible daily and monthly Socratic Tutor allowances with atomic server-side metering.
+- Synced flashcard review mastery across signed-in devices and included it in portable backups.
+- Added authenticated subscription snapshots, public Pro pricing, and Stripe checkout return handling.
+
+### Fixed
+- Escaped stored course, Canvas, assignment, note, resource, and study-plan content before rendering it.
+- Kept the grade simulator input focused while recalculating and prevented offline logout from restoring a cached identity.
+- Aligned paid feature display with server entitlements and clarified paused billing access.
+- Applied account and course deletion cleanup to flashcard mastery and Tutor usage records.
+- Restricted profile writes to reminder settings so clients cannot change billing or entitlement fields.
+
+### Security
+- Added owner-scoped flashcard mastery and Tutor usage tables, service-role-only quota reservations, and 12-month usage retention.
+- Restricted Stripe return URLs to the configured application origin and root route.
+
 ## [2.5.0] - 2026-09-21
 
 ### Added
