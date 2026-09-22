@@ -3,6 +3,7 @@ import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
+import { getUnitNumber, getLessonNumber } from './studyPlan.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
@@ -22,6 +23,66 @@ function isWeeklyImportedItem(item) {
     return /^\s*(?:week|wk|unit)\s*\d+\s*(?:·|•|:|-|↳)\s*(?:lesson\s*\d+|review|exam)\b/i.test(title)
         || (['browser_wgu', 'browser_maestro'].includes(item?.lms_provider)
             && /\b(?:lesson\s*\d+|review|exam)\b/i.test(title));
+}
+
+function isCurriculumChild(item, course) {
+    return String(item?.title || '').trim().startsWith('↳')
+        || (isWeeklyCourse(course) && isWeeklyImportedItem(item));
+}
+
+function getCourseworkLessonNumber(item, course) {
+    const lessonNumber = getLessonNumber(item);
+    if (lessonNumber !== 999) return lessonNumber;
+
+    // WGU/Maestro review and exam rows often carry only a week prefix. Keep
+    // that source sequence ahead of numbered lessons in the same week.
+    if (isWeeklyCourse(course) && isWeeklyImportedItem(item)) return getUnitNumber(item);
+    return 999;
+}
+
+/**
+ * Sorts coursework by the sequence a student should complete it in.
+ * Database result order is intentionally not used as a tie-breaker because
+ * Supabase does not guarantee row order without an explicit sort.
+ */
+export function compareCourseworkOrder(a, b, courses = []) {
+    const courseA = courses.find((course) => course.id === a?.course_id);
+    const courseB = courses.find((course) => course.id === b?.course_id);
+    const unitDiff = getUnitNumber(a) - getUnitNumber(b);
+    if (unitDiff !== 0) return unitDiff;
+
+    const childA = isCurriculumChild(a, courseA);
+    const childB = isCurriculumChild(b, courseB);
+    if (childA !== childB) return childA ? 1 : -1;
+
+    const lessonDiff = getCourseworkLessonNumber(a, courseA) - getCourseworkLessonNumber(b, courseB);
+    if (lessonDiff !== 0) return lessonDiff;
+
+    const priorityOrder = { high: 0, urgent: 0, medium: 1, normal: 1, low: 2 };
+    const priorityDiff = (priorityOrder[a?.priority || 'medium'] ?? 1)
+        - (priorityOrder[b?.priority || 'medium'] ?? 1);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const titleDiff = String(a?.title || '').localeCompare(String(b?.title || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (titleDiff !== 0) return titleDiff;
+
+    const dueDateDiff = String(a?.due_date || '').localeCompare(String(b?.due_date || ''));
+    if (dueDateDiff !== 0) return dueDateDiff;
+    return String(a?.id || '').localeCompare(String(b?.id || ''));
+}
+
+export function buildRescheduleUpdates(assignments = [], weekdays = [], courses = []) {
+    if (!Array.isArray(assignments) || !Array.isArray(weekdays) || weekdays.length === 0) return [];
+
+    const orderedAssignments = [...assignments].sort((a, b) => compareCourseworkOrder(a, b, courses));
+    const total = orderedAssignments.length;
+    return orderedAssignments.map((assignment, index) => {
+        const slotIdx = Math.min(Math.floor((index / total) * weekdays.length), weekdays.length - 1);
+        return { id: assignment.id, due_date: weekdays[slotIdx] };
+    });
 }
 
 function courseWindowLabel(course) {
@@ -113,41 +174,12 @@ export async function loadDashboardStats() {
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
     if (!courses || !assignments) return;
 
-    const getUnitNum = (item) => {
-        if (item.unit_number) return parseInt(item.unit_number) || 0;
-        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        return 0;
-    };
+    // Keep the course cache hydrated on the dashboard too. Quick Add is
+    // available here, even when the user has never opened the Courses page.
+    localCourses = courses;
+    if (typeof window !== 'undefined') window.localCourses = localCourses;
 
-    const getLessonNum = (item) => {
-        const match = item.title.match(/lesson\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        const numMatch = item.title.replace(/[^0-9]/g, '');
-        return numMatch ? parseInt(numMatch) : 999;
-    };
-
-    assignments.sort((a, b) => {
-        let unitA = getUnitNum(a);
-        let unitB = getUnitNum(b);
-        if (unitA !== unitB) return unitA - unitB;
-
-        const courseA = courses.find(c => c.id === a.course_id);
-        const courseB = courses.find(c => c.id === b.course_id);
-        let isSubA = a.title.startsWith('↳') || (isWeeklyCourse(courseA) && isWeeklyImportedItem(a));
-        let isSubB = b.title.startsWith('↳') || (isWeeklyCourse(courseB) && isWeeklyImportedItem(b));
-
-        if (!isSubA && isSubB) return -1;
-        if (isSubA && !isSubB) return 1;
-
-        if (isSubA && isSubB) {
-            let lessonA = getLessonNum(a);
-            let lessonB = getLessonNum(b);
-            if (lessonA !== lessonB) return lessonA - lessonB;
-        }
-
-        return new Date(a.due_date) - new Date(b.due_date);
-    });
+    assignments.sort((a, b) => compareCourseworkOrder(a, b, courses));
 
     const upNextListEl = document.getElementById('upNextList');
     if (upNextListEl) {
@@ -951,8 +983,9 @@ export async function parseLessonsImage(inputElement) {
 
 /**
  * Reschedules all incomplete past-due (or all incomplete) assignments for a course
- * to spread evenly across the current week (today → Friday), sorted by urgency.
- * High-priority items get the earliest slots; low-priority get the latest.
+ * to spread evenly across the current week (today → Friday), preserving
+ * curriculum order. Unit and lesson numbers are the source of truth; priority
+ * only breaks ties between otherwise equivalent items.
  */
 export async function rescheduleOverdueToThisWeek(courseId) {
     const today = new Date();
@@ -996,26 +1029,26 @@ export async function rescheduleOverdueToThisWeek(courseId) {
         return;
     }
 
-    // Sort by priority (high first) then by original due date ascending
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    overdue.sort((a, b) => {
-        const pa = priorityOrder[a.priority || 'medium'] ?? 1;
-        const pb = priorityOrder[b.priority || 'medium'] ?? 1;
-        if (pa !== pb) return pa - pb;
-        return (a.due_date || '').localeCompare(b.due_date || '');
-    });
+    const course = localCourses.find((item) => item.id === courseId);
+    // Distribute across the week slots in curriculum order.
+    const updates = buildRescheduleUpdates(overdue, weekdays, course ? [course] : []);
+    const total = updates.length;
 
-    // Distribute across the week slots
-    const total = overdue.length;
-    const updates = overdue.map((a, idx) => {
-        const slotIdx = Math.min(Math.floor((idx / total) * weekdays.length), weekdays.length - 1);
-        return { id: a.id, due_date: weekdays[slotIdx] };
-    });
-
-    // Batch update
-    await Promise.all(updates.map(u =>
-        supabaseClient.from('assignments').update({ due_date: u.due_date }).eq('id', u.id)
-    ));
+    // Batch update, but retain individual results so a partial failure is not
+    // reported as a successful reschedule.
+    const updateResults = await Promise.all(updates.map(async (update) => {
+        try {
+            const { error: updateError } = await supabaseClient
+                .from('assignments')
+                .update({ due_date: update.due_date })
+                .eq('id', update.id);
+            return { id: update.id, error: updateError || null };
+        } catch (updateError) {
+            return { id: update.id, error: updateError };
+        }
+    }));
+    const failedUpdates = updateResults.filter((result) => result.error);
+    const successfulUpdates = total - failedUpdates.length;
 
     loadAssignments(courseId, 1);
     loadDashboardStats();
@@ -1025,8 +1058,13 @@ export async function rescheduleOverdueToThisWeek(courseId) {
 
     const msg = document.getElementById('pdfStatusMsg');
     if (msg) {
-        msg.textContent = `✅ ${total} overdue lesson${total === 1 ? '' : 's'} rescheduled across this week by urgency.`;
-        msg.className = 'text-xs text-center mt-2 text-green-500';
+        if (failedUpdates.length > 0) {
+            msg.textContent = `⚠️ ${successfulUpdates} of ${total} overdue lesson${total === 1 ? '' : 's'} rescheduled. ${failedUpdates.length} could not be updated.`;
+            msg.className = 'text-xs text-center mt-2 text-amber-500';
+        } else {
+            msg.textContent = `✅ ${total} overdue lesson${total === 1 ? '' : 's'} rescheduled across this week in curriculum order.`;
+            msg.className = 'text-xs text-center mt-2 text-green-500';
+        }
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 5000);
     }
@@ -1292,38 +1330,7 @@ export async function loadAssignments(courseId, page = 1) {
         }
     }
 
-    const getUnitNum = (item) => {
-        if (item.unit_number) return parseInt(item.unit_number) || 0;
-        const match = item.title.match(/(?:unit|wk|week)\s*([0-9]+)/i);
-        return match ? parseInt(match[1]) || 0 : 0;
-    };
-
-    const getLessonNum = (item) => {
-        const match = item.title.match(/lesson\s*([0-9]+)/i);
-        if (match) return parseInt(match[1]) || 0;
-        const numMatch = item.title.replace(/[^0-9]/g, '');
-        return numMatch ? parseInt(numMatch) : 999;
-    };
-
-    assignments.sort((a, b) => {
-        let unitA = getUnitNum(a);
-        let unitB = getUnitNum(b);
-        if (unitA !== unitB) return unitA - unitB;
-
-        let isSubA = a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a));
-        let isSubB = b.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(b));
-
-        if (!isSubA && isSubB) return -1;
-        if (isSubA && !isSubB) return 1;
-
-        if (isSubA && isSubB) {
-            let lessonA = getLessonNum(a);
-            let lessonB = getLessonNum(b);
-            if (lessonA !== lessonB) return lessonA - lessonB;
-        }
-
-        return new Date(a.due_date) - new Date(b.due_date);
-    });
+    assignments.sort((a, b) => compareCourseworkOrder(a, b, [course]));
 
     const pageSize = 6;
     const totalPages = Math.ceil(assignments.length / pageSize);
@@ -1511,6 +1518,10 @@ export async function openQuickAddModal() {
                         <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Assignment or Exam Title</label>
                         <input type="text" id="quickAddTitle" required placeholder="e.g. Unit 3 Quiz or Practice Exam" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                     </div>
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Unit / Week # <span class="font-normal text-zinc-400">(optional)</span></label>
+                        <input type="number" id="quickAddUnit" min="1" step="1" inputmode="numeric" placeholder="e.g. 3" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
+                    </div>
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
@@ -1548,12 +1559,38 @@ export async function openQuickAddModal() {
         });
     }
 
+    // Dashboard users may open Quick Add before visiting Courses, so refresh
+    // the cache from Supabase instead of relying only on page navigation.
+    let courseLookupError = null;
+    try {
+        const { data: courses, error } = await supabaseClient
+            .from('courses')
+            .select('*')
+            .order('code', { ascending: true });
+        if (error) {
+            courseLookupError = error;
+        } else if (Array.isArray(courses)) {
+            localCourses = courses;
+            if (typeof window !== 'undefined') window.localCourses = localCourses;
+        }
+    } catch (error) {
+        courseLookupError = error;
+        console.warn('Quick Add course lookup notice:', error);
+    }
+
     const select = document.getElementById('quickAddCourseSelect');
     if (select) {
-        select.innerHTML = '<option value="">Select a class...</option>';
-        localCourses.forEach(c => {
-            select.innerHTML += `<option value="${c.id}">${c.emoji || '📚'} ${c.code}</option>`;
-        });
+        const cachedCourses = localCourses.length > 0 && courseLookupError ? localCourses : [];
+        const coursesForSelect = courseLookupError ? cachedCourses : localCourses;
+        const options = coursesForSelect.map((course) => {
+            const label = `${course.emoji || '📚'} ${course.code || course.name || 'Untitled class'}`;
+            return `<option value="${escapeHtml(String(course.id))}">${escapeHtml(label)}</option>`;
+        }).join('');
+        const emptyLabel = courseLookupError
+            ? 'Unable to load classes — try again'
+            : 'No classes found';
+        select.innerHTML = `<option value="">${options ? 'Select a class...' : emptyLabel}</option>${options}`;
+        select.disabled = coursesForSelect.length === 0;
     }
 
     const modalEl = document.getElementById('quickAddModal');
@@ -1569,6 +1606,7 @@ export async function submitQuickAddTask(event) {
     if (event) event.preventDefault();
     const courseId = document.getElementById('quickAddCourseSelect')?.value;
     const title = document.getElementById('quickAddTitle')?.value.trim();
+    const unitInput = document.getElementById('quickAddUnit')?.value;
     const dueDate = document.getElementById('quickAddDueDate')?.value;
     const priority = document.getElementById('quickAddPriority')?.value || 'medium';
     const taskType = document.getElementById('quickAddType')?.value || 'lesson';
@@ -1578,8 +1616,23 @@ export async function submitQuickAddTask(event) {
         return;
     }
 
-    const user = await getPlannerUser();
-    if (!user) return;
+    let user;
+    try {
+        user = await getPlannerUser();
+    } catch (error) {
+        alert(`Could not verify your account: ${error.message || 'Please try again.'}`);
+        return;
+    }
+    if (!user) {
+        alert('Please sign in before adding a task.');
+        return;
+    }
+
+    const parsedUnit = parseInt(unitInput, 10);
+    const inferredUnit = getUnitNumber(title);
+    const unitNumber = Number.isInteger(parsedUnit) && parsedUnit > 0
+        ? parsedUnit
+        : (inferredUnit > 0 ? inferredUnit : null);
 
     const newAssignment = {
         course_id: courseId,
@@ -1591,9 +1644,32 @@ export async function submitQuickAddTask(event) {
         priority: priority,
         is_completed: false
     };
+    if (unitNumber) newAssignment.unit_number = unitNumber;
 
-    await supabaseClient.from('assignments').insert([newAssignment]);
-    closeQuickAddModal();
+    const submitButton = document.getElementById('quickAddSubmitBtn');
+    if (submitButton?.disabled) return;
+    const originalSubmitLabel = submitButton?.textContent || '+ Add to Course Plan';
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Adding…';
+    }
+
+    try {
+        const { error } = await supabaseClient.from('assignments').insert([newAssignment]);
+        if (error) {
+            alert(`Could not add this task: ${error.message || 'Please try again.'}`);
+            return;
+        }
+        closeQuickAddModal();
+    } catch (error) {
+        alert(`Could not add this task: ${error.message || 'Please try again.'}`);
+        return;
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalSubmitLabel;
+        }
+    }
     
     // Refresh stats and study plan
     loadDashboardStats();
