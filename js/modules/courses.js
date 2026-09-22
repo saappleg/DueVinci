@@ -15,6 +15,26 @@ function isWeeklyCourse(course) {
     return course?.pacing_type === 'weekly' || course?.lms_provider === 'browser_wgu' || course?.lms_provider === 'browser_maestro';
 }
 
+export function getCoursePacingProfile(course = {}) {
+    if (course.lms_provider === 'browser_wgu' || String(course.pacing_source || '').startsWith('wgu_')) return 'wgu';
+    if (course.lms_provider === 'browser_maestro' || course.pacing_source === 'maestro_page') return 'maestro';
+    return 'manual';
+}
+
+export function getCoursePacingUpdates(course = {}, profile = 'manual') {
+    if (profile === 'wgu') {
+        return { pacing_type: 'weekly', lms_provider: 'browser_wgu', pacing_source: 'settings' };
+    }
+    if (profile === 'maestro') {
+        return { pacing_type: 'weekly', lms_provider: 'browser_maestro', pacing_source: 'settings' };
+    }
+
+    const provider = ['browser_wgu', 'browser_maestro'].includes(course.lms_provider)
+        ? null
+        : (course.lms_provider || null);
+    return { pacing_type: 'manual', lms_provider: provider, pacing_source: null };
+}
+
 // Browser imports keep the source's week/lesson prefix so they remain
 // recognizable when the pacing columns are not available on an older deploy.
 // Treat those rows as lesson children for ordering and completion behavior.
@@ -328,12 +348,78 @@ export async function submitCourseForm(event) {
     }
 }
 
+export async function submitEditCourseForm(event) {
+    if (event) event.preventDefault();
+
+    const courseId = document.getElementById('editCourseId')?.value;
+    const emoji = document.getElementById('editCourseEmoji')?.value.trim();
+    const code = document.getElementById('editCourseCode')?.value.trim();
+    const color = document.getElementById('editCourseColor')?.value;
+    const profile = document.getElementById('editCoursePacingType')?.value || 'manual';
+    const submitButton = event?.currentTarget?.querySelector('button[type="submit"]');
+    const message = document.getElementById('courseSettingsMessage');
+    const course = localCourses.find((item) => item.id === courseId);
+
+    if (!courseId || !emoji || !code || !color || !course) {
+        if (message) message.textContent = 'Please complete the course settings first.';
+        return;
+    }
+
+    let user;
+    try {
+        user = await getPlannerUser();
+    } catch (error) {
+        if (message) message.textContent = `Could not verify your account: ${error.message || 'Please try again.'}`;
+        return;
+    }
+    if (!user) {
+        if (message) message.textContent = 'Please sign in before updating this course.';
+        return;
+    }
+
+    if (submitButton) submitButton.disabled = true;
+    if (message) message.textContent = 'Saving course settings…';
+
+    const updates = {
+        emoji,
+        code,
+        color,
+        ...getCoursePacingUpdates(course, profile)
+    };
+
+    try {
+        const { error } = await supabaseClient.from('courses').update(updates).eq('id', courseId);
+        if (error) throw error;
+
+        Object.assign(course, updates);
+        openCourseModal(courseId);
+        const refreshedMessage = document.getElementById('courseSettingsMessage');
+        if (refreshedMessage) {
+            refreshedMessage.textContent = 'Course settings saved.';
+            refreshedMessage.className = 'text-xs text-center mt-2 text-green-500';
+            refreshedMessage.classList.remove('hidden');
+        }
+        loadCoursesPage();
+    } catch (error) {
+        console.error('Error updating course settings:', error);
+        if (message) message.textContent = `Could not save settings: ${error.message || 'Please try again.'}`;
+    } finally {
+        if (submitButton) submitButton.disabled = false;
+    }
+}
+
 export function initCourseForm() {
     const form = document.getElementById('courseForm');
     if (!form || form.dataset.bound === 'true') return;
 
     form.addEventListener('submit', submitCourseForm);
     form.dataset.bound = 'true';
+
+    const editForm = document.getElementById('editCourseForm');
+    if (editForm && editForm.dataset.bound !== 'true') {
+        editForm.addEventListener('submit', submitEditCourseForm);
+        editForm.dataset.bound = 'true';
+    }
 }
 
 export async function loadCoursesPage() {
@@ -599,6 +685,8 @@ export function openCourseModal(courseId) {
     document.getElementById('editCourseEmoji').value = course.emoji || '📚';
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
+    const pacingInput = document.getElementById('editCoursePacingType');
+    if (pacingInput) pacingInput.value = getCoursePacingProfile(course);
 
     const descInput = document.getElementById('editCourseDescription');
     if (descInput) descInput.value = course.description || '';
@@ -641,6 +729,11 @@ export function openCourseModal(courseId) {
     }
 
     document.getElementById('pdfStatusMsg')?.classList.add('hidden');
+    const settingsMessage = document.getElementById('courseSettingsMessage');
+    if (settingsMessage) {
+        settingsMessage.textContent = '';
+        settingsMessage.classList.add('hidden');
+    }
     const syllabusFileInput = document.getElementById('syllabusFile');
     if (syllabusFileInput) syllabusFileInput.value = '';
 
@@ -1067,6 +1160,79 @@ export async function rescheduleOverdueToThisWeek(courseId) {
         }
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 5000);
+    }
+}
+
+function addLocalDays(dateString, days) {
+    const date = new Date(`${dateString}T12:00:00`);
+    date.setDate(date.getDate() + days);
+    return getLocalDateKey(date);
+}
+
+export function buildSequencePlanUpdates(assignments = [], startDate, endDate, courses = []) {
+    if (!Array.isArray(assignments) || assignments.length === 0 || !startDate || !endDate) return [];
+
+    const orderedAssignments = [...assignments].sort((a, b) => compareCourseworkOrder(a, b, courses));
+    const plannedDates = spreadDatesAcrossRange(startDate, endDate, orderedAssignments.length);
+    return orderedAssignments.map((assignment, index) => ({
+        id: assignment.id,
+        due_date: plannedDates[index]
+    }));
+}
+
+export async function planCourseworkInSequence(courseId) {
+    const course = localCourses.find((item) => item.id === courseId) || { id: courseId };
+    const { data: assignments, error } = await supabaseClient
+        .from('assignments')
+        .select('*')
+        .eq('course_id', courseId);
+
+    if (error || !assignments) {
+        alert(`Could not load coursework: ${error?.message || 'Please try again.'}`);
+        return;
+    }
+    const incompleteAssignments = assignments.filter((assignment) => !assignment.is_completed);
+    if (incompleteAssignments.length === 0) {
+        alert('No incomplete coursework found to plan.');
+        return;
+    }
+
+    const today = getLocalDateKey(new Date());
+    const futureDates = [
+        course.end_date,
+        ...incompleteAssignments.map((assignment) => String(assignment.due_date || '').slice(0, 10))
+    ]
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
+        .sort();
+    const fallbackDays = Math.max(4, Math.ceil(incompleteAssignments.length / 5) * 5 - 1);
+    const endDate = futureDates.at(-1) || addLocalDays(today, fallbackDays);
+    const updates = buildSequencePlanUpdates(incompleteAssignments, today, endDate, [course]);
+
+    const results = await Promise.all(updates.map(async (update) => {
+        try {
+            const { error: updateError } = await supabaseClient
+                .from('assignments')
+                .update({ due_date: update.due_date })
+                .eq('id', update.id);
+            return updateError || null;
+        } catch (updateError) {
+            return updateError;
+        }
+    }));
+    const failures = results.filter(Boolean).length;
+    const status = document.getElementById('courseSettingsMessage') || document.getElementById('pdfStatusMsg');
+    if (status) {
+        status.textContent = failures
+            ? `⚠️ ${updates.length - failures} of ${updates.length} coursework items planned; ${failures} failed to update.`
+            : `✅ ${updates.length} coursework item${updates.length === 1 ? '' : 's'} planned in unit/lesson order.`;
+        status.className = `text-xs text-center mt-2 ${failures ? 'text-amber-500' : 'text-green-500'}`;
+        status.classList.remove('hidden');
+    }
+
+    loadAssignments(courseId, 1);
+    loadDashboardStats();
+    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
     }
 }
 
@@ -1707,6 +1873,11 @@ if (typeof window !== 'undefined') {
     window.openQuickAddModal = openQuickAddModal;
     window.closeQuickAddModal = closeQuickAddModal;
     window.submitQuickAddTask = submitQuickAddTask;
+    window.getCoursePacingProfile = getCoursePacingProfile;
+    window.getCoursePacingUpdates = getCoursePacingUpdates;
+    window.submitEditCourseForm = submitEditCourseForm;
+    window.buildSequencePlanUpdates = buildSequencePlanUpdates;
+    window.planCourseworkInSequence = planCourseworkInSequence;
     window.parseSyllabusPDF = parseSyllabusPDF;
     window.parseLessonsImage = parseLessonsImage;
     window.deleteCurrentCourse = deleteCurrentCourse;

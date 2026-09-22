@@ -153,8 +153,18 @@
                                     <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
                                     <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
                                 </div>
+                                <div>
+                                    <label for="editCoursePacingType" class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Course pacing profile</label>
+                                    <select id="editCoursePacingType" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
+                                        <option value="manual">Manual pacing</option>
+                                        <option value="wgu">WGU weekly pacing</option>
+                                        <option value="maestro">Maestro weekly pacing</option>
+                                    </select>
+                                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">Choose a profile to label units/weeks and guide sequence planning.</p>
+                                </div>
                                 <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
                             </form>
+                            <p id="courseSettingsMessage" role="status" aria-live="polite" class="text-xs text-center mt-2 hidden"></p>
                             <div id="courseMetadataBox"></div>
                         </div>
 
@@ -190,6 +200,15 @@
                                 class="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition shadow-sm"
                             >
                                 🗓 Reschedule Overdue
+                            </button>
+                            <button
+                                type="button"
+                                id="planSequenceBtn"
+                                onclick="planCourseworkInSequence(document.getElementById('editCourseId').value)"
+                                title="Plan all incomplete coursework in unit and lesson order"
+                                class="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition shadow-sm"
+                            >
+                                📚 Plan in sequence
                             </button>
                         </div>
                         <div id="course-week-summary" class="hidden mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3"></div>

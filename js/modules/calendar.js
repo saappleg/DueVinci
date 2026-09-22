@@ -6,6 +6,206 @@ import { generateBalancedStudyPlan } from './studyPlan.js';
 
 export let calendarInstance = null;
 
+async function getCalendarUser() {
+    if (currentUser?.id) return currentUser;
+    const { data } = await supabaseClient.auth.getSession();
+    return data?.session?.user || null;
+}
+
+function setImportStatus(message, tone = 'muted') {
+    if (typeof document === 'undefined') return;
+    const status = document.getElementById('calendarImportStatus');
+    if (!status) return;
+    const colors = {
+        muted: 'text-xs text-zinc-500 dark:text-zinc-400',
+        success: 'text-xs text-emerald-600 dark:text-emerald-400',
+        error: 'text-xs text-red-600 dark:text-red-400'
+    };
+    status.textContent = message;
+    status.className = `${colors[tone] || colors.muted} mt-1`;
+}
+
+export function unescapeICSValue(value = '') {
+    return String(value)
+        .replace(/\\n/gi, '\n')
+        .replace(/\\N/g, '\n')
+        .replace(/\\,/g, ',')
+        .replace(/\\;/g, ';')
+        .replace(/\\\\/g, '\\');
+}
+
+export function parseICSDate(value = '') {
+    const match = String(value).match(/(?:^|[^0-9])(\d{8})(?:T|$)/);
+    if (!match) return null;
+    const digits = match[1];
+    const date = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+    const parsed = new Date(`${date}T12:00:00`);
+    return Number.isNaN(parsed.valueOf()) ? null : date;
+}
+
+function addCalendarDays(dateString, amount) {
+    const date = new Date(`${dateString}T12:00:00`);
+    date.setDate(date.getDate() + amount);
+    return getLocalDateKey(date);
+}
+
+function unfoldICS(text = '') {
+    return String(text)
+        .replace(/\r\n[ \t]/g, '')
+        .replace(/\n[ \t]/g, '');
+}
+
+function parseICSProperty(line = '') {
+    const separator = line.indexOf(':');
+    if (separator < 0) return null;
+    const left = line.slice(0, separator);
+    const value = line.slice(separator + 1);
+    const [name, ...parameterParts] = left.split(';');
+    const params = {};
+    parameterParts.forEach((part) => {
+        const equals = part.indexOf('=');
+        if (equals > 0) params[part.slice(0, equals).toUpperCase()] = part.slice(equals + 1);
+    });
+    return { name: name.toUpperCase(), params, value };
+}
+
+function parseRecurrenceRule(rule = '') {
+    return String(rule).split(';').reduce((result, part) => {
+        const [key, value] = part.split('=');
+        if (key && value) result[key.toUpperCase()] = value.toUpperCase();
+        return result;
+    }, {});
+}
+
+export function expandICSRecurrence(startDate, rule, maxOccurrences = 366) {
+    if (!startDate) return [];
+    if (!rule) return [startDate];
+
+    const parts = parseRecurrenceRule(rule);
+    const frequency = parts.FREQ;
+    const interval = Math.max(1, Number.parseInt(parts.INTERVAL || '1', 10) || 1);
+    const count = Math.min(maxOccurrences, Math.max(1, Number.parseInt(parts.COUNT || String(maxOccurrences), 10) || maxOccurrences));
+    const until = parts.UNTIL ? parseICSDate(parts.UNTIL) : null;
+    if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(frequency)) return [startDate];
+
+    // Google and Apple commonly encode a multi-day weekly recurrence with
+    // BYDAY (for example, FREQ=WEEKLY;BYDAY=MO,WE). Preserve those weekdays
+    // instead of reducing the event to only its DTSTART weekday.
+    if (frequency === 'WEEKLY' && parts.BYDAY) {
+        const dayIndexes = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+        const weekStartIndex = dayIndexes[parts.WKST] ?? dayIndexes.MO;
+        const offsets = parts.BYDAY.split(',')
+            .map((day) => dayIndexes[day.slice(-2)])
+            .filter((day) => Number.isInteger(day))
+            .map((day) => (day - weekStartIndex + 7) % 7)
+            .sort((a, b) => a - b);
+        if (offsets.length > 0) {
+            const weekCursor = new Date(`${startDate}T12:00:00`);
+            weekCursor.setDate(weekCursor.getDate() - ((weekCursor.getDay() - weekStartIndex + 7) % 7));
+            const dates = [];
+            while (dates.length < count) {
+                for (const offset of offsets) {
+                    const candidate = new Date(weekCursor);
+                    candidate.setDate(candidate.getDate() + offset);
+                    const date = getLocalDateKey(candidate);
+                    if (date < startDate) continue;
+                    if (until && date > until) return dates;
+                    dates.push(date);
+                    if (dates.length >= count) return dates;
+                }
+                weekCursor.setDate(weekCursor.getDate() + (7 * interval));
+            }
+            return dates;
+        }
+    }
+
+    const dates = [];
+    let cursor = new Date(`${startDate}T12:00:00`);
+    for (let index = 0; index < count; index += 1) {
+        const date = getLocalDateKey(cursor);
+        if (until && date > until) break;
+        dates.push(date);
+        if (frequency === 'DAILY') cursor.setDate(cursor.getDate() + interval);
+        if (frequency === 'WEEKLY') cursor.setDate(cursor.getDate() + (7 * interval));
+        if (frequency === 'MONTHLY') cursor.setMonth(cursor.getMonth() + interval);
+        if (frequency === 'YEARLY') cursor.setFullYear(cursor.getFullYear() + interval);
+    }
+    return dates;
+}
+
+/**
+ * Converts a portable RFC 5545 calendar export into rows supported by the
+ * existing date-based custom_events table. Recurring and multi-day events are
+ * expanded into individual dated events so no schema migration is required.
+ */
+export function parseICSCalendar(icsText, { color = '#8b5cf6', maxOccurrences = 1000 } = {}) {
+    if (!icsText || typeof icsText !== 'string') return [];
+
+    const lines = unfoldICS(icsText).split(/\r?\n/);
+    const rows = [];
+    let event = null;
+    const pushEvent = () => {
+        if (!event) return;
+        const title = unescapeICSValue(event.SUMMARY?.value || '').trim();
+        const start = parseICSDate(event.DTSTART?.value);
+        if (!title || !start || rows.length >= maxOccurrences) return;
+
+        const recurrenceDates = expandICSRecurrence(start, event.RRULE?.value, maxOccurrences - rows.length);
+        const end = event.DTEND ? parseICSDate(event.DTEND.value) : null;
+        const endIsDateOnly = event.DTEND?.params?.VALUE === 'DATE' || /^\d{8}$/.test(event.DTEND?.value || '');
+        const duration = end && end > start
+            ? Math.max(0, Math.round((new Date(`${end}T12:00:00`) - new Date(`${start}T12:00:00`)) / 86400000) - (endIsDateOnly ? 1 : 0))
+            : 0;
+
+        recurrenceDates.forEach((occurrence) => {
+            for (let offset = 0; offset <= duration && rows.length < maxOccurrences; offset += 1) {
+                rows.push({ title, event_date: addCalendarDays(occurrence, offset), color });
+            }
+        });
+    };
+
+    lines.forEach((line) => {
+        const upper = line.toUpperCase();
+        if (upper === 'BEGIN:VEVENT') {
+            event = {};
+            return;
+        }
+        if (upper === 'END:VEVENT') {
+            pushEvent();
+            event = null;
+            return;
+        }
+        if (!event) return;
+        const property = parseICSProperty(line);
+        if (property && ['SUMMARY', 'DTSTART', 'DTEND', 'RRULE'].includes(property.name)) {
+            event[property.name] = property;
+        }
+    });
+    return rows;
+}
+
+export function buildCustomEventPayload({ userId, title, eventDate, color = '#8b5cf6' } = {}) {
+    const cleanTitle = String(title || '').trim();
+    const cleanDate = String(eventDate || '').slice(0, 10);
+    if (!userId) throw new Error('Please sign in before adding calendar events.');
+    if (!cleanTitle) throw new Error('Event title is required.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new Error('A valid event date is required.');
+    return { user_id: userId, title: cleanTitle, event_date: cleanDate, color: color || '#8b5cf6' };
+}
+
+export function buildCustomEventRows({ userId, title, startDate, endDate, color = '#8b5cf6' } = {}) {
+    const firstDate = String(startDate || '').slice(0, 10);
+    const lastDate = String(endDate || firstDate).slice(0, 10);
+    if (!lastDate || lastDate < firstDate) throw new Error('End date must be on or after the start date.');
+    const rows = [];
+    let cursor = firstDate;
+    while (cursor <= lastDate && rows.length < 366) {
+        rows.push(buildCustomEventPayload({ userId, title, eventDate: cursor, color }));
+        cursor = addCalendarDays(cursor, 1);
+    }
+    return rows;
+}
+
 /**
  * Generates an RFC 5545 compliant VCALENDAR (.ics) string from event objects.
  */
@@ -31,7 +231,9 @@ export function generateICSString(events = [], calendarName = "DueVinci Master S
         ics += `UID:${uid}\r\n`;
         ics += `DTSTAMP:${nowStr}\r\n`;
         ics += `DTSTART;VALUE=DATE:${dateFormatted}\r\n`;
-        ics += `DTEND;VALUE=DATE:${dateFormatted}\r\n`;
+        // RFC 5545 all-day DTEND values are exclusive, so a one-day event
+        // ends on the following date when another calendar imports it.
+        ics += `DTEND;VALUE=DATE:${addCalendarDays(rawDate, 1).replace(/-/g, '')}\r\n`;
         ics += `SUMMARY:${title}\r\n`;
         ics += `DESCRIPTION:${desc}\r\n`;
         ics += "STATUS:CONFIRMED\r\n";
@@ -125,9 +327,20 @@ export async function loadCalendarCourses() {
     }
 }
 
-export function openEventModal() {
+export async function openEventModal() {
     if (typeof document === 'undefined') return;
     document.getElementById('eventModal')?.classList.remove('hidden');
+    const courseSelect = document.getElementById('eventCourseSelect');
+    if (courseSelect) {
+        try {
+            const { data: courses } = await supabaseClient.from('courses').select('id,code,emoji,color').order('code', { ascending: true });
+            courseSelect.innerHTML = '<option value="">General / None</option>' + (courses || []).map((course) =>
+                `<option value="${String(course.id).replace(/"/g, '&quot;')}" data-color="${String(course.color || '').replace(/"/g, '&quot;')}">${course.emoji || '📚'} ${String(course.code || 'Untitled class').replace(/[<&>]/g, '')}</option>`
+            ).join('');
+        } catch (error) {
+            console.warn('Calendar course lookup notice:', error);
+        }
+    }
 }
 
 export function closeEventModal() {
@@ -156,6 +369,74 @@ export function exportToICS() {
     document.body.removeChild(link);
 }
 
+export async function importICSFile(input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const user = await getCalendarUser();
+    if (!user) {
+        setImportStatus('Please sign in before importing a calendar.', 'error');
+        input.value = '';
+        return;
+    }
+
+    input.disabled = true;
+    setImportStatus(`Reading ${file.name || 'calendar'}…`);
+    try {
+        const icsText = typeof file.text === 'function'
+            ? await file.text()
+            : new TextDecoder().decode(await file.arrayBuffer());
+        const parsedEvents = parseICSCalendar(icsText);
+        if (parsedEvents.length === 0) throw new Error('No dated events were found in this .ics file.');
+
+        const rows = parsedEvents.map((event) => ({ ...event, user_id: user.id }));
+        const { error } = await supabaseClient.from('custom_events').insert(rows);
+        if (error) throw error;
+
+        setImportStatus(`Imported ${rows.length} event${rows.length === 1 ? '' : 's'} from ${file.name || 'calendar'}.`, 'success');
+        input.value = '';
+        await loadCalendarCourses();
+    } catch (error) {
+        console.error('Calendar import error:', error);
+        setImportStatus(error.message || 'Could not import this calendar file.', 'error');
+        input.value = '';
+    } finally {
+        input.disabled = false;
+    }
+}
+
+export async function saveCustomEvent(event) {
+    if (event) event.preventDefault();
+    const form = event?.currentTarget || document.getElementById('customEventForm');
+    const submitButton = form?.querySelector('button[type="submit"]');
+    const status = document.getElementById('customEventStatus');
+    const title = document.getElementById('eventTitle')?.value;
+    const startDate = document.getElementById('eventStartDate')?.value;
+    const endDate = document.getElementById('eventEndDate')?.value || startDate;
+    const selectedCourse = document.getElementById('eventCourseSelect')?.selectedOptions?.[0];
+    const color = selectedCourse?.dataset?.color || '#8b5cf6';
+
+    if (submitButton) submitButton.disabled = true;
+    if (status) status.textContent = 'Saving…';
+    try {
+        const user = await getCalendarUser();
+        if (!user) throw new Error('Please sign in before adding calendar events.');
+        const rows = buildCustomEventRows({ userId: user.id, title, startDate, endDate, color });
+        const { error } = await supabaseClient.from('custom_events').insert(rows);
+        if (error) throw error;
+
+        if (status) status.textContent = '';
+        form?.reset();
+        closeEventModal();
+        await loadCalendarCourses();
+    } catch (error) {
+        console.error('Custom calendar event error:', error);
+        if (status) status.textContent = error.message || 'Could not save this event.';
+    } finally {
+        if (submitButton) submitButton.disabled = false;
+    }
+}
+
 // Bind to window & globalThis for testing and HTML inline handlers
 const _scope = typeof window !== 'undefined' ? window : globalThis;
 _scope.generateICSString = generateICSString;
@@ -165,23 +446,15 @@ _scope.openEventModal = openEventModal;
 _scope.closeEventModal = closeEventModal;
 _scope.deleteCustomEvent = deleteCustomEvent;
 _scope.exportToICS = exportToICS;
+_scope.importICSFile = importICSFile;
+_scope.parseICSCalendar = parseICSCalendar;
+_scope.saveCustomEvent = saveCustomEvent;
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         const customEventForm = document.getElementById('customEventForm');
         if (customEventForm) {
-            customEventForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                await supabaseClient.from('custom_events').insert([{
-                    user_id: currentUser?.id,
-                    title: document.getElementById('evTitle').value,
-                    event_date: document.getElementById('evDate').value,
-                    color: document.getElementById('evColor').value
-                }]);
-                document.getElementById('evTitle').value = '';
-                closeEventModal();
-                loadCalendarCourses();
-            });
+            customEventForm.addEventListener('submit', saveCustomEvent);
         }
     });
 }

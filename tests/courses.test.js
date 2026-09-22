@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildRescheduleUpdates, compareCourseworkOrder } from '../js/modules/courses.js';
+import {
+    buildRescheduleUpdates,
+    buildSequencePlanUpdates,
+    compareCourseworkOrder,
+    getCoursePacingProfile,
+    getCoursePacingUpdates
+} from '../js/modules/courses.js';
 
 describe('Coursework ordering', () => {
     it('keeps curriculum order ahead of priority and database row order', () => {
@@ -48,6 +54,30 @@ describe('Coursework ordering', () => {
                 ['lesson-1', '2026-09-21'],
                 ['lesson-2', '2026-09-22'],
                 ['lesson-3', '2026-09-23']
+        ]);
+    });
+
+    it('maps WGU, Maestro, and manual pacing profiles to existing course fields', () => {
+        expect(getCoursePacingProfile({ lms_provider: 'browser_wgu' })).toBe('wgu');
+        expect(getCoursePacingProfile({ lms_provider: 'browser_maestro' })).toBe('maestro');
+        expect(getCoursePacingProfile({ pacing_source: 'wgu_pacing_guide' })).toBe('wgu');
+        expect(getCoursePacingProfile({})).toBe('manual');
+        expect(getCoursePacingUpdates({}, 'wgu')).toEqual({ pacing_type: 'weekly', lms_provider: 'browser_wgu', pacing_source: 'settings' });
+        expect(getCoursePacingUpdates({}, 'maestro')).toEqual({ pacing_type: 'weekly', lms_provider: 'browser_maestro', pacing_source: 'settings' });
+        expect(getCoursePacingUpdates({ lms_provider: 'canvas' }, 'manual')).toEqual({ pacing_type: 'manual', lms_provider: 'canvas', pacing_source: null });
+    });
+
+    it('plans incomplete coursework in curriculum order across the selected date range', () => {
+        const assignments = [
+            { id: 'lesson-2', course_id: 'course-1', unit_number: 1, title: '↳ Lesson 2: Logic' },
+            { id: 'unit-2', course_id: 'course-1', unit_number: 2, title: 'Unit 2: Review' },
+            { id: 'lesson-1', course_id: 'course-1', unit_number: 1, title: '↳ Lesson 1: Syntax' }
+        ];
+        expect(buildSequencePlanUpdates(assignments, '2026-09-21', '2026-09-23').map((item) => [item.id, item.due_date]))
+            .toEqual([
+                ['lesson-1', '2026-09-21'],
+                ['lesson-2', '2026-09-22'],
+                ['unit-2', '2026-09-23']
             ]);
     });
 });
