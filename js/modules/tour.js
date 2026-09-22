@@ -5,12 +5,57 @@ import { supabaseClient } from './config.js';
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
 // Each feature drop uses a versioned dismissal marker so students see the
 // latest release notes once after the app updates.
-export const WHATS_NEW_VERSION = '2.4.0';
+export const WHATS_NEW_VERSION = '2.5.0';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';
 const IMPORTER_POLL_SUBMITTED_KEY = 'duevinci_importer_beta_poll_submitted_v2';
 const IMPORTER_BETA_DISMISSED_KEY = 'duevinci_importer_beta_dismissed_v2';
+const tourModalReturnFocus = new WeakMap();
+
+function showTourModal(modal, closeModal) {
+    if (!modal) return;
+    if (modal.classList.contains('hidden')) tourModalReturnFocus.set(modal, document.activeElement);
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    if (modal.dataset.a11yBound !== 'true') {
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = [...modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => !element.disabled && element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+        modal.dataset.a11yBound = 'true';
+    }
+    const focusTarget = modal.querySelector('[data-modal-close], button, a[href]');
+    if (focusTarget) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusTarget.focus());
+        else focusTarget.focus();
+    }
+}
+
+function hideTourModal(modal) {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    const trigger = tourModalReturnFocus.get(modal);
+    if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    tourModalReturnFocus.delete(modal);
+}
 
 function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
 
@@ -143,24 +188,25 @@ export function ensureWhatsNewModalExists() {
     const div = document.createElement('div');
     div.id = 'whatsNewModal';
     div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/70 backdrop-blur-sm hidden p-4';
+    div.setAttribute('aria-hidden', 'true');
     div.innerHTML = `
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div role="dialog" aria-modal="true" aria-labelledby="whatsNewTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div class="p-6 pb-4 border-b border-zinc-100 dark:border-brand-700 flex items-center justify-between bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent">
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">✨</span>
                     <div>
-                        <h3 class="font-black text-lg text-zinc-900 dark:text-white">What's New in DueVinci</h3>
+                        <h3 id="whatsNewTitle" class="font-black text-lg text-zinc-900 dark:text-white">What's New in DueVinci</h3>
                         <p class="text-xs text-indigo-600 dark:text-indigo-400 font-bold">Version ${WHATS_NEW_VERSION} Feature Drop</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
+                <button type="button" data-modal-close aria-label="Close What's New" onclick="closeWhatsNewModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg">✕</button>
             </div>
             <div class="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto text-xs">
                 <div class="flex gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl border border-indigo-200/70 dark:border-indigo-900/50">
                     <span class="text-2xl shrink-0">🗓️</span>
                     <div>
                         <div class="font-bold text-zinc-900 dark:text-white text-sm">Import Your Other Calendars</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with .ics import. Recurring and multi-day events are expanded automatically.</p>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with a reviewable .ics import. Recurring and multi-day events are expanded, exceptions are honored, and duplicates are skipped.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/70 dark:border-emerald-900/50">
@@ -192,6 +238,13 @@ export function ensureWhatsNewModalExists() {
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
+                    <span class="text-2xl shrink-0">♿</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Smoother, Safer Modals</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Keyboard focus, escape-to-close, mobile-friendly Quick Add, and clearer status messages make everyday planning easier.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
                     <span class="text-2xl shrink-0">📊</span>
                     <div>
                         <div class="font-bold text-zinc-900 dark:text-white text-sm">7-Day Workload Radar & GPA Simulator</div>
@@ -217,17 +270,18 @@ export function ensureImporterBetaModalExists() {
     const div = document.createElement('div');
     div.id = 'importerBetaModal';
     div.className = 'fixed inset-0 z-[65] flex items-center justify-center bg-zinc-900/70 backdrop-blur-sm hidden p-4';
+    div.setAttribute('aria-hidden', 'true');
     div.innerHTML = `
-        <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-2xl dark:border-violet-900/60 dark:bg-brand-800">
+        <div role="dialog" aria-modal="true" aria-labelledby="importerBetaTitle" class="w-full max-w-lg overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-2xl dark:border-violet-900/60 dark:bg-brand-800">
             <div class="flex items-start justify-between border-b border-violet-100 bg-gradient-to-r from-violet-500/15 via-indigo-500/10 to-transparent p-6 dark:border-brand-700">
                 <div class="flex items-start gap-3">
                     <span class="text-3xl">🧪</span>
                     <div>
                         <p class="text-xs font-black uppercase tracking-wider text-violet-700 dark:text-violet-300">Beta invitation</p>
-                        <h3 class="mt-1 text-xl font-black text-zinc-900 dark:text-white">Import coursework from WGU or Maestro</h3>
+                        <h3 id="importerBetaTitle" class="mt-1 text-xl font-black text-zinc-900 dark:text-white">Import coursework from WGU or Maestro</h3>
                     </div>
                 </div>
-                <button type="button" onclick="closeImporterBetaModal()" aria-label="Close importer beta announcement" class="text-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white">✕</button>
+                <button type="button" data-modal-close aria-label="Close importer beta announcement" onclick="closeImporterBetaModal()" class="text-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white">✕</button>
             </div>
             <div class="space-y-4 p-6 text-sm text-zinc-600 dark:text-zinc-300">
                 <p>Try the Chrome beta to bring in pacing guides, weekly units, lessons, syllabus details, and course dates from the school page you already have open.</p>
@@ -246,12 +300,12 @@ export function ensureImporterBetaModalExists() {
 
 export function openImporterBetaModal() {
     ensureImporterBetaModalExists();
-    document.getElementById('importerBetaModal')?.classList.remove('hidden');
+    showTourModal(document.getElementById('importerBetaModal'), closeImporterBetaModal);
 }
 
 export function closeImporterBetaModal() {
     if (typeof localStorage !== 'undefined') localStorage.setItem(IMPORTER_BETA_DISMISSED_KEY, 'true');
-    document.getElementById('importerBetaModal')?.classList.add('hidden');
+    hideTourModal(document.getElementById('importerBetaModal'));
 }
 
 export function checkImporterBetaOnLaunch() {
@@ -301,13 +355,13 @@ async function submitImporterPoll() {
 export function openWhatsNewModal() {
     ensureWhatsNewModalExists();
     const m = document.getElementById('whatsNewModal');
-    if (m) m.classList.remove('hidden');
+    showTourModal(m, closeWhatsNewModal);
 }
 
 export function closeWhatsNewModal() {
     if (typeof localStorage !== 'undefined') localStorage.setItem(WHATS_NEW_SEEN_KEY, WHATS_NEW_SEEN_VALUE);
     const m = document.getElementById('whatsNewModal');
-    if (m) m.classList.add('hidden');
+    hideTourModal(m);
 }
 
 export function checkWhatsNewOnLaunch() {

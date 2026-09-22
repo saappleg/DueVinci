@@ -1,0 +1,16 @@
+# DueVinci
+
+DueVinci is a privacy-minded academic planner for organizing classes, lessons,
+assignments, study plans, grades, focus sessions, and calendars.
+
+## Public pages
+
+- [DueVinci dashboard](https://duevinci.tech/)
+- [Privacy policy](https://duevinci.tech/legal/privacy.html)
+- [Terms of use](https://duevinci.tech/legal/terms.html)
+- [Calendar and schedule documentation](https://duevinci.tech/wiki/Calendar-%26-Schedule-Sync.html)
+
+The permanent free core includes manual planning, calendar events, `.ics`
+import/export, grades, timers, study planning, and data portability. Optional
+DueVinci Pro features include connected learning integrations and guided study
+support.

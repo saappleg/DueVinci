@@ -36,7 +36,7 @@
     <script src="../assets/vendor/tesseract.js"></script>
     <script src="../assets/vendor/canvas-confetti.js"></script>
     <script src="../assets/vendor/supabase-js.js"></script>
-    <script type="module" src="../js/app.js?v=2.4.0"></script>
+    <script type="module" src="../js/app.js?v=2.5.0"></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -85,10 +85,13 @@
                 
                 <div class="space-y-8">
                     <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 space-y-2" id="courseFormContainer">
-                        <form id="courseForm" class="flex-1 flex gap-3 items-center">
+                        <form id="courseForm" class="flex-1 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                            <label for="courseEmoji" class="sr-only">Course icon</label>
                             <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
+                            <label for="courseCode" class="sr-only">Course code</label>
                             <input type="text" id="courseCode" placeholder="Add a new class (e.g. BE101)" required class="flex-1 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
                             <div class="relative w-10 h-10 rounded-lg border border-zinc-300 dark:border-brand-600 overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-brand-900">
+                                <label for="courseColor" class="sr-only">Course color</label>
                                 <input type="color" id="courseColor" value="#4f46e5" class="absolute -inset-2 w-16 h-16 cursor-pointer bg-transparent">
                             </div>
                             <button type="submit" class="bg-white dark:bg-zinc-100 text-zinc-900 h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-zinc-200 transition shrink-0 shadow-sm">
@@ -119,44 +122,47 @@
     </div>
 
     <!-- Course Settings Modal -->
-    <div id="courseModal" onclick="if (event.target === this) closeCourseModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div id="courseModal" aria-hidden="true" onclick="if (event.target === this) closeCourseModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="modalCourseTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
             <div class="p-6 border-b border-zinc-200 dark:border-brand-700 flex justify-between items-center bg-zinc-50 dark:bg-brand-900/50 shrink-0">
                 <h2 class="text-xl font-bold dark:text-white flex items-center gap-2" id="modalCourseTitle"><span>📚</span> Course Settings</h2>
                 <div class="flex items-center gap-3">
                     <button type="button" id="markCourseCompleteBtn" class="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 px-3 py-1.5 rounded font-bold transition">✔ Mark Complete</button>
-                    <button type="button" onclick="closeCourseModal()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-white text-xl">✕</button>
+                    <button type="button" aria-label="Close Course Settings" onclick="closeCourseModal()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-white text-xl">✕</button>
                 </div>
             </div>
 
-            <div class="flex border-b border-zinc-200 dark:border-brand-700 px-6 pt-3 gap-6 shrink-0 bg-white dark:bg-brand-800">
-                <button type="button" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
-                <button type="button" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
-                <button type="button" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Scratchpad</button>
-                <button type="button" onclick="switchCourseTab('studyquiz')" id="tabBtn-studyquiz" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Study & Quiz 🎴</button>
+            <div class="flex overflow-x-auto border-b border-zinc-200 dark:border-brand-700 px-6 pt-3 gap-6 shrink-0 bg-white dark:bg-brand-800" role="tablist" aria-label="Course settings sections">
+                <button type="button" role="tab" aria-selected="true" aria-controls="panel-overview" onclick="switchCourseTab('overview')" id="tabBtn-overview" class="text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition">Overview & Syllabus</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="panel-resources" onclick="switchCourseTab('resources')" id="tabBtn-resources" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition">Resources & Links</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="panel-scratchpad" onclick="switchCourseTab('scratchpad')" id="tabBtn-scratchpad" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition">Scratchpad</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="panel-studyquiz" onclick="switchCourseTab('studyquiz')" id="tabBtn-studyquiz" class="text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition">Study & Quiz 🎴</button>
             </div>
 
             <div class="p-6 overflow-y-auto flex-1">
                 
-                <div id="panel-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div id="panel-overview" role="tabpanel" aria-labelledby="tabBtn-overview" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-6">
                         <div>
                             <h3 class="text-sm font-bold text-zinc-800 dark:text-zinc-300 mb-3">Course Info</h3>
                             <form id="editCourseForm" class="space-y-3">
                                 <input type="hidden" id="editCourseId">
-                                <div class="flex items-center gap-2">
-                                    <input type="text" id="editCourseEmoji" maxlength="2" required class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <label for="editCourseEmoji" class="sr-only">Course icon</label>
+                                    <input type="text" id="editCourseEmoji" maxlength="2" required aria-label="Course icon" class="w-14 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500">
+                                    <label for="editCourseCode" class="sr-only">Course code</label>
                                     <input type="text" id="editCourseCode" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
                                 </div>
                                 <div class="flex items-center justify-between border border-zinc-200 dark:border-brand-700 rounded-lg p-2 dark:bg-brand-900">
-                                    <label class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color Tag:</label>
-                                    <input type="color" id="editCourseColor" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+                                    <label for="editCourseColor" class="text-sm font-medium text-zinc-600 dark:text-zinc-400 pl-1">Color tag:</label>
+                                    <input type="color" id="editCourseColor" aria-label="Course color tag" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
                                 </div>
                                 <div>
                                     <label for="editCoursePacingType" class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Course pacing profile</label>
                                     <select id="editCoursePacingType" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500">
                                         <option value="manual">Manual pacing</option>
+                                        <option value="weekly">Weekly pacing</option>
                                         <option value="wgu">WGU weekly pacing</option>
                                         <option value="maestro">Maestro weekly pacing</option>
                                     </select>
@@ -213,11 +219,14 @@
                         </div>
                         <div id="course-week-summary" class="hidden mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
                         <form id="addAssignmentForm" onsubmit="submitAddAssignment(event)" class="space-y-2.5 mb-4 bg-zinc-50 dark:bg-brand-900 p-3.5 rounded-xl border border-zinc-200 dark:border-brand-700">
-                            <div class="flex gap-2">
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <label for="assignTitle" class="sr-only">Assignment or lesson title</label>
                                 <input type="text" id="assignTitle" placeholder="e.g. Unit 1: Foundations or Midterm Exam" required class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 min-w-0 font-medium">
+                                <label for="assignUnit" class="sr-only">Unit number</label>
                                 <input type="number" id="assignUnit" placeholder="Unit #" class="w-16 border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-2 text-xs text-center focus:outline-none focus:border-indigo-500" title="Unit Number">
                             </div>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <label for="assignType" class="sr-only">Lesson or task type</label>
                                 <select id="assignType" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer" title="Lesson / Task Type">
                                     <option value="lesson">📖 Lesson</option>
                                     <option value="review">📝 Review</option>
@@ -226,11 +235,13 @@
                                     <option value="reading">📚 Reading</option>
                                     <option value="lab">🔬 Lab</option>
                                 </select>
+                                <label for="assignPriority" class="sr-only">Priority level</label>
                                 <select id="assignPriority" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer" title="Priority Level">
                                     <option value="medium">⚡ Normal</option>
                                     <option value="high">🔥 Urgent</option>
                                     <option value="low">🌱 Low</option>
                                 </select>
+                                <label for="assignDate" class="sr-only">Due date</label>
                                 <input type="date" id="assignDate" required class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
                             </div>
                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5">
@@ -241,9 +252,9 @@
                     </div>
                 </div>
 
-                <div id="panel-resources" class="hidden space-y-4"></div>
-                <div id="panel-scratchpad" class="hidden space-y-4"></div>
-                <div id="panel-studyquiz" class="hidden space-y-4">
+                <div id="panel-resources" role="tabpanel" aria-labelledby="tabBtn-resources" class="hidden space-y-4"></div>
+                <div id="panel-scratchpad" role="tabpanel" aria-labelledby="tabBtn-scratchpad" class="hidden space-y-4"></div>
+                <div id="panel-studyquiz" role="tabpanel" aria-labelledby="tabBtn-studyquiz" class="hidden space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
                         <div>
                             <h4 class="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">

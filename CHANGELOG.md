@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.0] - 2026-09-21
+
+### Added
+- Added reviewable `.ics` imports with duplicate detection and common `EXDATE` support.
+- Added keyboard-accessible, mobile-friendly event, course, and Quick Add modals.
+
+### Fixed
+- Preserved existing weekly course pacing when editing course settings.
+- Rejected impossible calendar dates and stopped silently truncating multi-month manual events.
+- Added visible course-setting and Quick Add error status messages.
+
+### Changed
+- Clarified the permanent free core and renamed the paid bundle to DueVinci Pro.
+- Updated the roadmap and What's New panel with the calendar import and accessibility improvements.
+
 ## [2.4.0] - 2026-09-21
 
 ### Added

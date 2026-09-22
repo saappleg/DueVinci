@@ -9,7 +9,7 @@ offline.
 | Authentication and account identity | Supabase Auth and `profiles` | Account-scoped by RLS. |
 | Courses, terms, notes, resources, and completion | `courses` | Synced per account. |
 | Assignments, grades, due dates, type, priority, and completion | `assignments` | Synced per account. `task_type`, `type`, and `priority` are in migration `20260823135000_assignment_metadata.sql`. |
-| Calendar events | `custom_events` | Synced per account. |
+| Calendar events | `custom_events` | Synced per account. Manual one-day/multi-day events and reviewed `.ics` imports are supported; imports expand common recurrence rules, honor `EXDATE`, and skip matching title/date duplicates. |
 | Dashboard, grades, calendar, and study plan | Reads the course and assignment data above | No separate copy of academic data. |
 | Export/import backup | Supabase academic data plus device preferences | Export is a recovery/transfer tool, not a replacement for RLS-protected sync. |
 | Support form and inbox | `support_tickets` | Submitted with the signed-in user ID; resolved/closed tickets are automatically deleted 90 days after resolution. |
@@ -53,7 +53,8 @@ while online.
 2. Create, edit, complete, grade, and delete a course/assignment; confirm the
    change appears after a refresh and on a second signed-in device.
 3. Add and remove a calendar event; export and re-import a backup using a
-   disposable account.
+   disposable account. Test an `.ics` file with a recurrence, an `EXDATE`, a
+   multi-day event, and a duplicate to confirm the review step behaves as expected.
 4. Exercise AI import with the shared `gemini-parser` function, if its API key
    is configured.
 5. Use the Dev Canvas mock to connect, select courses, and sync assignments.

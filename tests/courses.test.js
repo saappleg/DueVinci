@@ -61,9 +61,11 @@ describe('Coursework ordering', () => {
         expect(getCoursePacingProfile({ lms_provider: 'browser_wgu' })).toBe('wgu');
         expect(getCoursePacingProfile({ lms_provider: 'browser_maestro' })).toBe('maestro');
         expect(getCoursePacingProfile({ pacing_source: 'wgu_pacing_guide' })).toBe('wgu');
+        expect(getCoursePacingProfile({ pacing_type: 'weekly' })).toBe('weekly');
         expect(getCoursePacingProfile({})).toBe('manual');
         expect(getCoursePacingUpdates({}, 'wgu')).toEqual({ pacing_type: 'weekly', lms_provider: 'browser_wgu', pacing_source: 'settings' });
         expect(getCoursePacingUpdates({}, 'maestro')).toEqual({ pacing_type: 'weekly', lms_provider: 'browser_maestro', pacing_source: 'settings' });
+        expect(getCoursePacingUpdates({ lms_provider: 'canvas', pacing_source: 'canvas_import' }, 'weekly')).toEqual({ pacing_type: 'weekly', lms_provider: 'canvas', pacing_source: 'canvas_import' });
         expect(getCoursePacingUpdates({ lms_provider: 'canvas' }, 'manual')).toEqual({ pacing_type: 'manual', lms_provider: 'canvas', pacing_source: null });
     });
 

@@ -15,6 +15,52 @@ const DASHBOARD_WIDGETS = [
     ['weekly_review', 'Weekly review'],
 ];
 
+const modalReturnFocus = new WeakMap();
+
+function showAccessibleModal(modal, closeModal) {
+    if (!modal) return;
+    if (modal.classList.contains('hidden')) modalReturnFocus.set(modal, document.activeElement);
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    if (modal.dataset.a11yBound !== 'true') {
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = [...modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => !element.disabled && element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+        modal.dataset.a11yBound = 'true';
+    }
+    const closeButton = modal.querySelector('[data-modal-close]');
+    if (closeButton) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => closeButton.focus());
+        else closeButton.focus();
+    }
+}
+
+function hideAccessibleModal(modal) {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    const trigger = modalReturnFocus.get(modal);
+    if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    modalReturnFocus.delete(modal);
+}
+
 export function isWorkspaceFeatureVisible(feature) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
     if (feature === 'academics') return localStorage.getItem('duevinci_hide_academics') !== 'true';
@@ -252,7 +298,7 @@ export function ensureSettingsModalExists() {
         div.id = 'settingsModal';
         div.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-[460px] max-h-[92vh] sm:max-h-[90vh]">
+            <div role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-[460px] max-h-[92vh] sm:max-h-[90vh]">
                 <div class="w-full sm:w-48 bg-zinc-50 dark:bg-brand-900 border-b sm:border-b-0 sm:border-r border-zinc-200 dark:border-brand-700 p-3 sm:p-4 shrink-0 flex flex-col justify-between">
                     <div>
                         <h3 class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
@@ -273,12 +319,12 @@ export function ensureSettingsModalExists() {
                     </div>
                 </div>
                 <div class="flex-1 p-4 sm:p-6 relative overflow-y-auto max-h-[72vh] sm:max-h-[90vh]">
-                    <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                    <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
                     
                     <!-- Tab: Profile -->
                     <div id="content-profile" class="block space-y-6">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Profile & Security</h2>
+                            <h2 id="settingsModalTitle" class="text-xl font-bold dark:text-white mb-1">Profile & Security</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
@@ -453,10 +499,10 @@ export function ensureSettingsModalExists() {
                     <!-- Tab: Subscription -->
                     <div id="content-canvas" class="hidden space-y-5">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Subscription</h2>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">DueVinci Pro</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Your existing DueVinci planning tools remain free forever. A subscription adds connected learning and guided study support.</p>
                             <div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/70 dark:bg-indigo-950/30">
-                                <div class="text-xs font-bold text-indigo-800 dark:text-indigo-200">Included with every subscription</div>
+                            <div class="text-xs font-bold text-indigo-800 dark:text-indigo-200">Included with every DueVinci Pro subscription</div>
                                 <ul class="mt-2 space-y-1 text-xs text-indigo-700 dark:text-indigo-300">
                                     <li>✓ Canvas LMS connection and course syncing</li>
                                     <li>✓ Assignment importing and due-date updates</li>
@@ -653,13 +699,13 @@ export function openSettingsModal() {
     if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
 
     const modal = document.getElementById('settingsModal');
-    if (modal) modal.classList.remove('hidden');
+    showAccessibleModal(modal, closeSettingsModal);
     applyDashboardWidgetLayout();
 }
 
 export function closeSettingsModal() {
     const m = document.getElementById('settingsModal');
-    if (m) m.classList.add('hidden');
+    hideAccessibleModal(m);
     const msg = document.getElementById('settingsMsg');
     if (msg) msg.classList.add('hidden');
 }
@@ -722,8 +768,9 @@ export function ensureSupportModalExists() {
         div = document.createElement('div');
         div.id = 'supportModal';
         div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden p-4';
+        div.setAttribute('aria-hidden', 'true');
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[480px] max-h-[90vh]">
+            <div role="dialog" aria-modal="true" aria-labelledby="supportModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[480px] max-h-[90vh]">
                 <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center gap-2 mb-4 px-2">
@@ -742,11 +789,11 @@ export function ensureSupportModalExists() {
                     </div>
                 </div>
                 <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
-                    <button type="button" onclick="closeSupportModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                    <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
                     
                     <div id="support-content-contact" class="block space-y-4">
                         <div>
-                            <h2 class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>
+                            <h2 id="supportModalTitle" class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Have a question or need assistance? Send a message directly to Steven.</p>
                         </div>
                         <form id="supportForm" onsubmit="submitSupportMessage(event)" class="space-y-3">
@@ -867,12 +914,12 @@ export function openSupportModal() {
         if (emailInput && !emailInput.value) emailInput.value = currentUser.email;
     }
     const modal = document.getElementById('supportModal');
-    if (modal) modal.classList.remove('hidden');
+    showAccessibleModal(modal, closeSupportModal);
 }
 
 export function closeSupportModal() {
     const modal = document.getElementById('supportModal');
-    if (modal) modal.classList.add('hidden');
+    hideAccessibleModal(modal);
     const msg = document.getElementById('supportFeedbackMsg');
     if (msg) msg.classList.add('hidden');
 }

@@ -10,6 +10,8 @@ export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(loca
 export let hideUnassignedFolder = typeof localStorage !== 'undefined' && localStorage.getItem('hideUnassigned') === 'true';
 export let currentAssignmentPage = 1;
 export let activeTermModalName = '';
+let lastQuickAddTrigger = null;
+let lastCourseModalTrigger = null;
 
 function isWeeklyCourse(course) {
     return course?.pacing_type === 'weekly' || course?.lms_provider === 'browser_wgu' || course?.lms_provider === 'browser_maestro';
@@ -18,6 +20,7 @@ function isWeeklyCourse(course) {
 export function getCoursePacingProfile(course = {}) {
     if (course.lms_provider === 'browser_wgu' || String(course.pacing_source || '').startsWith('wgu_')) return 'wgu';
     if (course.lms_provider === 'browser_maestro' || course.pacing_source === 'maestro_page') return 'maestro';
+    if (course.pacing_type === 'weekly') return 'weekly';
     return 'manual';
 }
 
@@ -27,6 +30,13 @@ export function getCoursePacingUpdates(course = {}, profile = 'manual') {
     }
     if (profile === 'maestro') {
         return { pacing_type: 'weekly', lms_provider: 'browser_maestro', pacing_source: 'settings' };
+    }
+    if (profile === 'weekly') {
+        return {
+            pacing_type: 'weekly',
+            lms_provider: course.lms_provider || null,
+            pacing_source: course.pacing_source || 'settings'
+        };
     }
 
     const provider = ['browser_wgu', 'browser_maestro'].includes(course.lms_provider)
@@ -359,9 +369,15 @@ export async function submitEditCourseForm(event) {
     const submitButton = event?.currentTarget?.querySelector('button[type="submit"]');
     const message = document.getElementById('courseSettingsMessage');
     const course = localCourses.find((item) => item.id === courseId);
+    const showMessage = (text, tone = 'error') => {
+        if (!message) return;
+        message.textContent = text;
+        message.className = `text-xs text-center mt-2 ${tone === 'success' ? 'text-green-500' : 'text-red-500'}`;
+        message.classList.remove('hidden');
+    };
 
     if (!courseId || !emoji || !code || !color || !course) {
-        if (message) message.textContent = 'Please complete the course settings first.';
+        showMessage('Please complete the course settings first.');
         return;
     }
 
@@ -369,16 +385,16 @@ export async function submitEditCourseForm(event) {
     try {
         user = await getPlannerUser();
     } catch (error) {
-        if (message) message.textContent = `Could not verify your account: ${error.message || 'Please try again.'}`;
+        showMessage(`Could not verify your account: ${error.message || 'Please try again.'}`);
         return;
     }
     if (!user) {
-        if (message) message.textContent = 'Please sign in before updating this course.';
+        showMessage('Please sign in before updating this course.');
         return;
     }
 
     if (submitButton) submitButton.disabled = true;
-    if (message) message.textContent = 'Saving course settings…';
+    showMessage('Saving course settings…', 'success');
 
     const updates = {
         emoji,
@@ -402,7 +418,7 @@ export async function submitEditCourseForm(event) {
         loadCoursesPage();
     } catch (error) {
         console.error('Error updating course settings:', error);
-        if (message) message.textContent = `Could not save settings: ${error.message || 'Please try again.'}`;
+        showMessage(`Could not save settings: ${error.message || 'Please try again.'}`);
     } finally {
         if (submitButton) submitButton.disabled = false;
     }
@@ -463,7 +479,7 @@ export function renderTermFolders() {
     termNames.forEach(termName => {
         const termCourses = termsMap[termName];
         foldersGrid.innerHTML += `
-            <div onclick="openTermModal('${termName}')" 
+            <div role="button" tabindex="0" onclick="openTermModal('${termName}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTermModal('${termName}'); }"
                  ondragover="allowDrop(event)" 
                  ondrop="handleDropToTerm(event, '${termName}')"
                  class="cursor-pointer group bg-white dark:bg-brand-800 p-5 rounded-xl border-2 border-dashed border-zinc-300 dark:border-brand-600 hover:border-indigo-500 dark:hover:border-indigo-400 transition shadow-sm flex flex-col justify-between min-h-[130px]">
@@ -506,7 +522,7 @@ export function renderAlphabeticals() {
         const pacingBadge = isWeeklyCourse(course) ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded font-bold">Weekly pacing</span>' : '';
         const windowBadge = windowLabel ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${escapeHtml(windowLabel)}</span>` : '';
         listEl.innerHTML += `
-            <div draggable="true" ondragstart="handleDragStart(event, '${course.id}')" onclick="openCourseModal('${course.id}')" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
+            <div role="button" tabindex="0" draggable="true" ondragstart="handleDragStart(event, '${course.id}')" onclick="openCourseModal('${course.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourseModal('${course.id}'); }" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${course.color}20; color: ${course.color}; border: 1px solid ${course.color}40;">${emoji}</div>
                     <div>
@@ -740,22 +756,63 @@ export function openCourseModal(courseId) {
     switchCourseTab('overview');
     renderStaticCoursePanels(course);
 
-    document.getElementById('courseModal')?.classList.remove('hidden');
+    const modal = document.getElementById('courseModal');
+    if (modal) {
+        if (modal.classList.contains('hidden')) lastCourseModalTrigger = document.activeElement;
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        if (modal.dataset.a11yBound !== 'true') {
+            modal.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeCourseModal();
+                    return;
+                }
+                if (event.key !== 'Tab') return;
+                const focusable = [...modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])')]
+                    .filter((element) => !element.disabled && element.offsetParent !== null);
+                if (!focusable.length) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            });
+            modal.dataset.a11yBound = 'true';
+        }
+        const focusCloseButton = () => modal.querySelector('button[aria-label="Close Course Settings"]')?.focus();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusCloseButton);
+        else focusCloseButton();
+    }
     currentAssignmentPage = 1;
     loadAssignments(course.id, currentAssignmentPage);
 }
 
 export function closeCourseModal() {
     const m = document.getElementById('courseModal');
-    if (m) m.classList.add('hidden');
+    if (m) {
+        m.classList.add('hidden');
+        m.setAttribute('aria-hidden', 'true');
+    }
+    if (lastCourseModalTrigger && typeof lastCourseModalTrigger.focus === 'function') lastCourseModalTrigger.focus();
+    lastCourseModalTrigger = null;
 }
 
 export function switchCourseTab(tabName) {
     ['overview', 'resources', 'scratchpad', 'studyquiz'].forEach(t => {
         const panel = document.getElementById(`panel-${t}`);
         const btn = document.getElementById(`tabBtn-${t}`);
-        if (panel) panel.classList.toggle('hidden', t !== tabName);
+        if (panel) {
+            panel.classList.toggle('hidden', t !== tabName);
+            panel.setAttribute('role', 'tabpanel');
+            panel.setAttribute('aria-labelledby', `tabBtn-${t}`);
+        }
         if (btn) {
+            btn.setAttribute('aria-selected', t === tabName ? 'true' : 'false');
             btn.className = t === tabName 
                 ? 'text-xs font-bold pb-3 border-b-2 border-indigo-500 text-indigo-500 transition' 
                 : 'text-xs font-bold pb-3 border-b-2 border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition';
@@ -1649,8 +1706,10 @@ export function filterDashboardUpNext(priority = 'all') {
             if (btn) {
                 if (p === priority) {
                     btn.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-sm transition";
+                    btn.setAttribute('aria-pressed', 'true');
                 } else {
                     btn.className = "px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition";
+                    btn.setAttribute('aria-pressed', 'false');
                 }
             }
         });
@@ -1664,33 +1723,34 @@ export async function openQuickAddModal() {
         const div = document.createElement('div');
         div.id = 'quickAddModal';
         div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden p-4';
+        div.setAttribute('aria-hidden', 'true');
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="quickAddDialogTitle" class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-md p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-brand-700">
                     <div class="flex items-center gap-2">
                         <span class="text-xl">⚡</span>
-                        <h3 class="text-base font-bold text-zinc-900 dark:text-white">Quick Add Assignment</h3>
+                        <h3 id="quickAddDialogTitle" class="text-base font-bold text-zinc-900 dark:text-white">Quick Add Assignment</h3>
                     </div>
-                    <button type="button" onclick="closeQuickAddModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-lg font-bold">✕</button>
+                    <button type="button" aria-label="Close Quick Add Assignment" onclick="closeQuickAddModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-lg font-bold">✕</button>
                 </div>
                 <form id="quickAddForm" onsubmit="submitQuickAddTask(event)" class="space-y-3">
                     <div>
-                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Class / Course</label>
+                        <label for="quickAddCourseSelect" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Class / Course</label>
                         <select id="quickAddCourseSelect" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
                             <option value="">Select a class...</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Assignment or Exam Title</label>
+                        <label for="quickAddTitle" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Assignment or Exam Title</label>
                         <input type="text" id="quickAddTitle" required placeholder="e.g. Unit 3 Quiz or Practice Exam" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Unit / Week # <span class="font-normal text-zinc-400">(optional)</span></label>
+                        <label for="quickAddUnit" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Unit / Week # <span class="font-normal text-zinc-400">(optional)</span></label>
                         <input type="number" id="quickAddUnit" min="1" step="1" inputmode="numeric" placeholder="e.g. 3" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                     </div>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
-                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
+                            <label for="quickAddType" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
                             <select id="quickAddType" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
                                 <option value="lesson">📖 Lesson</option>
                                 <option value="review">📝 Review</option>
@@ -1701,7 +1761,7 @@ export async function openQuickAddModal() {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Priority</label>
+                            <label for="quickAddPriority" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Priority</label>
                             <select id="quickAddPriority" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
                                 <option value="medium">⚡ Normal</option>
                                 <option value="high">🔥 Urgent</option>
@@ -1709,19 +1769,40 @@ export async function openQuickAddModal() {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Due Date</label>
+                            <label for="quickAddDueDate" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Due Date</label>
                             <input type="date" id="quickAddDueDate" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
                     <div class="pt-2">
                         <button type="submit" id="quickAddSubmitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-sm">+ Add to Course Plan</button>
                     </div>
+                    <p id="quickAddStatus" role="status" aria-live="polite" class="hidden text-xs text-red-500"></p>
                 </form>
             </div>
         `;
         document.body.appendChild(div);
         div.addEventListener('click', (event) => {
             if (event.target === div) closeQuickAddModal();
+        });
+        div.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeQuickAddModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = [...div.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => !element.disabled && element.offsetParent !== null);
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
         });
     }
 
@@ -1760,12 +1841,33 @@ export async function openQuickAddModal() {
     }
 
     const modalEl = document.getElementById('quickAddModal');
-    if (modalEl) modalEl.classList.remove('hidden');
+    if (modalEl) {
+        if (modalEl.classList.contains('hidden')) lastQuickAddTrigger = document.activeElement;
+        modalEl.classList.remove('hidden');
+        modalEl.setAttribute('aria-hidden', 'false');
+        document.getElementById('quickAddStatus')?.classList.add('hidden');
+        const focusCourseSelect = () => document.getElementById('quickAddCourseSelect')?.focus();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusCourseSelect);
+        else focusCourseSelect();
+    }
 }
 
 export function closeQuickAddModal() {
     const modalEl = document.getElementById('quickAddModal');
-    if (modalEl) modalEl.classList.add('hidden');
+    if (modalEl) {
+        modalEl.classList.add('hidden');
+        modalEl.setAttribute('aria-hidden', 'true');
+    }
+    if (lastQuickAddTrigger && typeof lastQuickAddTrigger.focus === 'function') lastQuickAddTrigger.focus();
+    lastQuickAddTrigger = null;
+}
+
+function setQuickAddStatus(message, tone = 'error') {
+    const status = document.getElementById('quickAddStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.className = `text-xs ${tone === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`;
+    status.classList.remove('hidden');
 }
 
 export async function submitQuickAddTask(event) {
@@ -1778,7 +1880,7 @@ export async function submitQuickAddTask(event) {
     const taskType = document.getElementById('quickAddType')?.value || 'lesson';
 
     if (!courseId || !title || !dueDate) {
-        alert('Please fill out all required fields.');
+        setQuickAddStatus('Choose a class, enter a title, and select a due date.');
         return;
     }
 
@@ -1786,11 +1888,11 @@ export async function submitQuickAddTask(event) {
     try {
         user = await getPlannerUser();
     } catch (error) {
-        alert(`Could not verify your account: ${error.message || 'Please try again.'}`);
+        setQuickAddStatus(`Could not verify your account: ${error.message || 'Please try again.'}`);
         return;
     }
     if (!user) {
-        alert('Please sign in before adding a task.');
+        setQuickAddStatus('Please sign in before adding a task.');
         return;
     }
 
@@ -1823,12 +1925,12 @@ export async function submitQuickAddTask(event) {
     try {
         const { error } = await supabaseClient.from('assignments').insert([newAssignment]);
         if (error) {
-            alert(`Could not add this task: ${error.message || 'Please try again.'}`);
+            setQuickAddStatus(`Could not add this task: ${error.message || 'Please try again.'}`);
             return;
         }
         closeQuickAddModal();
     } catch (error) {
-        alert(`Could not add this task: ${error.message || 'Please try again.'}`);
+        setQuickAddStatus(`Could not add this task: ${error.message || 'Please try again.'}`);
         return;
     } finally {
         if (submitButton) {

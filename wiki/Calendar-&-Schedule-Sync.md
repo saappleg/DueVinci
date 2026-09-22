@@ -13,13 +13,22 @@ DueVinci includes an interactive **Academic Calendar** (`js/modules/calendar.js`
 
 ---
 
-## 📥 RFC 5545 iCalendar (.ics) Export & Sync
+## 📥 RFC 5545 iCalendar (.ics) Import & Export
 
-DueVinci allows one-click export of all coursework deadlines to standard `.ics` files, allowing synchronization with:
+DueVinci allows one-click export of all coursework deadlines and import of calendar files from:
 - **Apple Calendar** (macOS / iOS)
 - **Google Calendar**
 - **Microsoft Outlook**
 - **Notion Calendar / Cron**
+
+Imports are reviewed before saving. DueVinci expands recurring and multi-day events,
+honors common `EXDATE` exceptions, skips matching title/date duplicates, and keeps
+the free planner usable without provider credentials. Manual events support one-day
+or multi-day date ranges and can use a class color.
+
+Live background synchronization with Google, Microsoft, or Apple accounts is a
+separate DueVinci Pro roadmap item. It requires provider OAuth credentials and
+scopes; an exported `.ics` file is not two-way synchronization.
 
 ```mermaid
 flowchart LR
@@ -28,6 +37,8 @@ flowchart LR
     ICSFile --> GCal[Google Calendar]
     ICSFile --> AppleCal[Apple Calendar]
     ICSFile --> Outlook[Microsoft Outlook]
+    GCalExport[Google / Apple / Outlook export] --> ICSImport[DueVinci .ics review + dedupe]
+    ICSImport --> DueVinci
 ```
 
 ### Generated iCalendar Format Example

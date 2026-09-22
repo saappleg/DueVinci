@@ -5,6 +5,7 @@ import { fireConfetti, getLocalDateKey } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 
 export let calendarInstance = null;
+let lastEventModalTrigger = null;
 
 async function getCalendarUser() {
     if (currentUser?.id) return currentUser;
@@ -38,15 +39,43 @@ export function parseICSDate(value = '') {
     const match = String(value).match(/(?:^|[^0-9])(\d{8})(?:T|$)/);
     if (!match) return null;
     const digits = match[1];
+    const year = Number(digits.slice(0, 4));
+    const month = Number(digits.slice(4, 6));
+    const day = Number(digits.slice(6, 8));
     const date = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
     const parsed = new Date(`${date}T12:00:00`);
-    return Number.isNaN(parsed.valueOf()) ? null : date;
+    // The Date constructor normalizes impossible dates (2026-02-31 becomes
+    // a March date). Reject those values instead of importing the wrong day.
+    if (Number.isNaN(parsed.valueOf())
+        || parsed.getFullYear() !== year
+        || parsed.getMonth() + 1 !== month
+        || parsed.getDate() !== day) return null;
+    return date;
 }
 
 function addCalendarDays(dateString, amount) {
     const date = new Date(`${dateString}T12:00:00`);
     date.setDate(date.getDate() + amount);
     return getLocalDateKey(date);
+}
+
+function isValidISODate(value = '') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return false;
+    const parsed = new Date(`${value}T12:00:00`);
+    return !Number.isNaN(parsed.valueOf())
+        && parsed.getFullYear() === Number(String(value).slice(0, 4))
+        && parsed.getMonth() + 1 === Number(String(value).slice(5, 7))
+        && parsed.getDate() === Number(String(value).slice(8, 10));
+}
+
+function addCalendarMonths(date, amount) {
+    const originalDay = date.getDate();
+    const next = new Date(date);
+    next.setDate(1);
+    next.setMonth(next.getMonth() + amount);
+    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    next.setDate(Math.min(originalDay, lastDay));
+    return next;
 }
 
 function unfoldICS(text = '') {
@@ -75,6 +104,53 @@ function parseRecurrenceRule(rule = '') {
         if (key && value) result[key.toUpperCase()] = value.toUpperCase();
         return result;
     }, {});
+}
+
+function monthlyRuleDates(monthCursor, parts, startDate) {
+    const year = monthCursor.getFullYear();
+    const month = monthCursor.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dates = new Set();
+    const dayIndexes = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+    if (parts.BYMONTHDAY) {
+        String(parts.BYMONTHDAY).split(',').forEach((rawDay) => {
+            const day = Number.parseInt(rawDay, 10);
+            if (!Number.isInteger(day) || day === 0) return;
+            const actualDay = day > 0 ? day : lastDay + day + 1;
+            if (actualDay >= 1 && actualDay <= lastDay) {
+                dates.add(getLocalDateKey(new Date(year, month, actualDay, 12)));
+            }
+        });
+    }
+
+    if (parts.BYDAY) {
+        String(parts.BYDAY).split(',').forEach((token) => {
+            const match = token.match(/^(-?\d+)?(SU|MO|TU|WE|TH|FR|SA)$/);
+            if (!match) return;
+            const weekday = dayIndexes[match[2]];
+            const ordinal = match[1] ? Number.parseInt(match[1], 10) : null;
+            if (ordinal) {
+                if (ordinal > 0) {
+                    const first = new Date(year, month, 1, 12);
+                    const day = 1 + ((weekday - first.getDay() + 7) % 7) + ((ordinal - 1) * 7);
+                    if (day <= lastDay) dates.add(getLocalDateKey(new Date(year, month, day, 12)));
+                } else {
+                    const last = new Date(year, month, lastDay, 12);
+                    const day = lastDay - ((last.getDay() - weekday + 7) % 7) + ((ordinal + 1) * 7);
+                    if (day >= 1) dates.add(getLocalDateKey(new Date(year, month, day, 12)));
+                }
+            } else {
+                for (let day = 1; day <= lastDay; day += 1) {
+                    if (new Date(year, month, day, 12).getDay() === weekday) {
+                        dates.add(getLocalDateKey(new Date(year, month, day, 12)));
+                    }
+                }
+            }
+        });
+    }
+
+    return [...dates].filter((date) => date >= startDate).sort();
 }
 
 export function expandICSRecurrence(startDate, rule, maxOccurrences = 366) {
@@ -119,16 +195,46 @@ export function expandICSRecurrence(startDate, rule, maxOccurrences = 366) {
         }
     }
 
+    if (frequency === 'MONTHLY' && (parts.BYMONTHDAY || parts.BYDAY)) {
+        const dates = [];
+        let monthCursor = new Date(`${startDate}T12:00:00`);
+        monthCursor.setDate(1);
+        while (dates.length < count) {
+            for (const date of monthlyRuleDates(monthCursor, parts, startDate)) {
+                if (until && date > until) return dates;
+                dates.push(date);
+                if (dates.length >= count) return dates;
+            }
+            monthCursor = addCalendarMonths(monthCursor, interval);
+        }
+        return dates;
+    }
+
     const dates = [];
-    let cursor = new Date(`${startDate}T12:00:00`);
+    const anchor = new Date(`${startDate}T12:00:00`);
+    const anchorDay = anchor.getDate();
+    const anchorMonth = anchor.getMonth();
+    const anchorYear = anchor.getFullYear();
+    let cursor = new Date(anchor);
     for (let index = 0; index < count; index += 1) {
+        if (index > 0 && frequency === 'MONTHLY') {
+            cursor = new Date(anchor);
+            cursor.setDate(1);
+            cursor.setMonth(anchorMonth + (index * interval));
+            cursor.setDate(Math.min(anchorDay, new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()));
+        }
+        if (index > 0 && frequency === 'YEARLY') {
+            cursor = new Date(anchor);
+            cursor.setDate(1);
+            cursor.setFullYear(anchorYear + (index * interval));
+            cursor.setMonth(anchorMonth);
+            cursor.setDate(Math.min(anchorDay, new Date(cursor.getFullYear(), anchorMonth + 1, 0).getDate()));
+        }
         const date = getLocalDateKey(cursor);
         if (until && date > until) break;
         dates.push(date);
         if (frequency === 'DAILY') cursor.setDate(cursor.getDate() + interval);
         if (frequency === 'WEEKLY') cursor.setDate(cursor.getDate() + (7 * interval));
-        if (frequency === 'MONTHLY') cursor.setMonth(cursor.getMonth() + interval);
-        if (frequency === 'YEARLY') cursor.setFullYear(cursor.getFullYear() + interval);
     }
     return dates;
 }
@@ -151,6 +257,10 @@ export function parseICSCalendar(icsText, { color = '#8b5cf6', maxOccurrences = 
         if (!title || !start || rows.length >= maxOccurrences) return;
 
         const recurrenceDates = expandICSRecurrence(start, event.RRULE?.value, maxOccurrences - rows.length);
+        const excludedDates = new Set((event.EXDATE || [])
+            .flatMap((property) => String(property.value || '').split(','))
+            .map((value) => parseICSDate(value))
+            .filter(Boolean));
         const end = event.DTEND ? parseICSDate(event.DTEND.value) : null;
         const endIsDateOnly = event.DTEND?.params?.VALUE === 'DATE' || /^\d{8}$/.test(event.DTEND?.value || '');
         const duration = end && end > start
@@ -158,6 +268,7 @@ export function parseICSCalendar(icsText, { color = '#8b5cf6', maxOccurrences = 
             : 0;
 
         recurrenceDates.forEach((occurrence) => {
+            if (excludedDates.has(occurrence)) return;
             for (let offset = 0; offset <= duration && rows.length < maxOccurrences; offset += 1) {
                 rows.push({ title, event_date: addCalendarDays(occurrence, offset), color });
             }
@@ -177,8 +288,12 @@ export function parseICSCalendar(icsText, { color = '#8b5cf6', maxOccurrences = 
         }
         if (!event) return;
         const property = parseICSProperty(line);
-        if (property && ['SUMMARY', 'DTSTART', 'DTEND', 'RRULE'].includes(property.name)) {
-            event[property.name] = property;
+        if (property && ['SUMMARY', 'DTSTART', 'DTEND', 'RRULE', 'EXDATE'].includes(property.name)) {
+            if (property.name === 'EXDATE') {
+                event.EXDATE = [...(event.EXDATE || []), property];
+            } else {
+                event[property.name] = property;
+            }
         }
     });
     return rows;
@@ -190,16 +305,22 @@ export function buildCustomEventPayload({ userId, title, eventDate, color = '#8b
     if (!userId) throw new Error('Please sign in before adding calendar events.');
     if (!cleanTitle) throw new Error('Event title is required.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new Error('A valid event date is required.');
+    if (!isValidISODate(cleanDate)) {
+        throw new Error('A valid event date is required.');
+    }
     return { user_id: userId, title: cleanTitle, event_date: cleanDate, color: color || '#8b5cf6' };
 }
 
 export function buildCustomEventRows({ userId, title, startDate, endDate, color = '#8b5cf6' } = {}) {
     const firstDate = String(startDate || '').slice(0, 10);
     const lastDate = String(endDate || firstDate).slice(0, 10);
-    if (!lastDate || lastDate < firstDate) throw new Error('End date must be on or after the start date.');
+    if (!isValidISODate(firstDate) || !isValidISODate(lastDate) || lastDate < firstDate) {
+        throw new Error('End date must be on or after the start date.');
+    }
     const rows = [];
     let cursor = firstDate;
-    while (cursor <= lastDate && rows.length < 366) {
+    while (cursor <= lastDate) {
+        if (rows.length >= 366) throw new Error('Calendar events can span at most 366 days.');
         rows.push(buildCustomEventPayload({ userId, title, eventDate: cursor, color }));
         cursor = addCalendarDays(cursor, 1);
     }
@@ -329,7 +450,38 @@ export async function loadCalendarCourses() {
 
 export async function openEventModal() {
     if (typeof document === 'undefined') return;
-    document.getElementById('eventModal')?.classList.remove('hidden');
+    const modal = document.getElementById('eventModal');
+    if (modal) {
+        if (modal.classList.contains('hidden')) lastEventModalTrigger = document.activeElement;
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        if (modal.dataset.a11yBound !== 'true') {
+            modal.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeEventModal();
+                    return;
+                }
+                if (event.key !== 'Tab') return;
+                const focusable = [...modal.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+                    .filter((element) => !element.disabled && element.offsetParent !== null);
+                if (!focusable.length) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            });
+            modal.dataset.a11yBound = 'true';
+        }
+        const focusEventTitle = () => document.getElementById('eventTitle')?.focus();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusEventTitle);
+        else focusEventTitle();
+    }
     const courseSelect = document.getElementById('eventCourseSelect');
     if (courseSelect) {
         try {
@@ -345,7 +497,11 @@ export async function openEventModal() {
 
 export function closeEventModal() {
     if (typeof document === 'undefined') return;
-    document.getElementById('eventModal')?.classList.add('hidden');
+    const modal = document.getElementById('eventModal');
+    modal?.classList.add('hidden');
+    modal?.setAttribute('aria-hidden', 'true');
+    if (lastEventModalTrigger && typeof lastEventModalTrigger.focus === 'function') lastEventModalTrigger.focus();
+    lastEventModalTrigger = null;
 }
 
 export async function deleteCustomEvent(id) {
@@ -389,11 +545,41 @@ export async function importICSFile(input) {
         const parsedEvents = parseICSCalendar(icsText);
         if (parsedEvents.length === 0) throw new Error('No dated events were found in this .ics file.');
 
-        const rows = parsedEvents.map((event) => ({ ...event, user_id: user.id }));
+        const seen = new Set();
+        const uniqueRows = parsedEvents.filter((event) => {
+            const key = `${String(event.title || '').trim().toLocaleLowerCase()}\u0000${event.event_date}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+        const { data: existingEvents, error: existingError } = await supabaseClient
+            .from('custom_events')
+            .select('title,event_date')
+            .eq('user_id', user.id);
+        if (existingError) throw existingError;
+        const existingKeys = new Set((existingEvents || []).map((event) =>
+            `${String(event.title || '').trim().toLocaleLowerCase()}\u0000${event.event_date}`));
+        const rows = uniqueRows
+            .filter((event) => !existingKeys.has(`${String(event.title || '').trim().toLocaleLowerCase()}\u0000${event.event_date}`))
+            .map((event) => ({ ...event, user_id: user.id }));
+        const skipped = parsedEvents.length - rows.length;
+        const preview = rows.slice(0, 8).map((event) => `• ${event.event_date} — ${event.title}`).join('\n');
+        const more = rows.length > 8 ? `\n• +${rows.length - 8} more` : '';
+        const decision = window.confirm(`Review ${file.name || 'calendar'} before importing:\n\nNew events: ${rows.length}\nSkipped duplicates: ${skipped}${preview ? `\n\n${preview}${more}` : ''}\n\nImport these events?`);
+        if (!decision) {
+            setImportStatus('Calendar import canceled.', 'muted');
+            input.value = '';
+            return;
+        }
+        if (rows.length === 0) {
+            setImportStatus(`No new events found. Skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}.`, 'muted');
+            input.value = '';
+            return;
+        }
         const { error } = await supabaseClient.from('custom_events').insert(rows);
         if (error) throw error;
 
-        setImportStatus(`Imported ${rows.length} event${rows.length === 1 ? '' : 's'} from ${file.name || 'calendar'}.`, 'success');
+        setImportStatus(`Imported ${rows.length} new event${rows.length === 1 ? '' : 's'}${skipped ? `; skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}` : ''}.`, 'success');
         input.value = '';
         await loadCalendarCourses();
     } catch (error) {

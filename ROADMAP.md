@@ -40,12 +40,17 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 ## 🎯 Current Initiatives & Near-Term Releases
 
 ### Phase 2: Socratic AI & Intelligent Study Workflows (v1.3 – v2.0) 🚧
-- [ ] **Socratic AI Study Companion (`/tutor`)** 🚧
+- [x] **Socratic AI Study Companion (`/tutor`)** ✅
   - Context-aware study partner that quizzes you on course concepts rather than just giving answers.
   - Step-by-step problem solver for STEM formulas and coding concepts.
-- [ ] **LMS Direct Import & Sync (Canvas / Blackboard / Moodle)** 📋
-  - One-click syllabus and assignment import via ICS calendar feeds and Canvas API token integration.
-  - Automated sync for newly posted assignments and grade adjustments.
+- [x] **Canvas LMS Direct Import** ✅
+  - Paid, server-side Canvas connection with encrypted token storage and approved-course assignment import.
+- [x] **Portable Calendar Import & Export** ✅
+  - Free `.ics` import/export for Google Calendar, Apple Calendar, Outlook, and other RFC 5545-compatible tools.
+- [ ] **Connected Calendar Sync (Google / Microsoft / Apple)** 🚧
+  - Pro read-only sync, conflict detection, refresh history, and background updates after provider OAuth credentials and scopes are configured.
+- [ ] **LMS Refresh & Grade Alerts (Canvas / Blackboard / Moodle)** 📋
+  - Pro automation for new assignments, changed due dates, and grade updates.
 - [ ] **Rich Media Flashcards** 📋
   - Image attachments, diagram occlusion, and KaTeX visual formula editor.
   - Two-way Anki package (`.apkg`) import and export.
@@ -59,6 +64,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 ## 📈 Mid-Term Initiatives
 
 ### Phase 3: Analytics, Habit Psychology & Deep Collaboration (v2.1 – v2.5) 📋
+- [ ] **DueVinci Pro Daily Brief** 🚧
+  - Calendar-aware automatic replanning, conflict warnings, and a concise morning workload brief.
 - [ ] **Study Analytics & Cognitive Load Heatmaps** 📋
   - Correlate study hours, time-of-day focus, and Pomodoro sessions with exam outcomes.
   - Visual burnout radar and recommended rest intervals.

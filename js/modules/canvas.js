@@ -8,6 +8,7 @@ import { IS_DEVELOPMENT, supabaseClient } from './config.js';
 
 let _canvasSelectedIds = new Set();
 let _canvasCourses = [];
+let _canvasModalTrigger = null;
 
 const CANVAS_COURSE_COLORS = ['#4f46e5', '#0f766e', '#c2410c', '#be123c', '#7c3aed', '#0369a1'];
 
@@ -431,7 +432,35 @@ export async function handleCanvasDisconnect() {
 export async function openCanvasSyncModal() {
     const modal = document.getElementById('canvasSyncModal');
     if (!modal) return;
+    if (modal.classList.contains('hidden')) _canvasModalTrigger = document.activeElement;
     modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    if (modal.dataset.a11yBound !== 'true') {
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeCanvasSyncModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = [...modal.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => !element.disabled && element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+        modal.dataset.a11yBound = 'true';
+    }
+    const focusClose = () => modal.querySelector('[data-modal-close]')?.focus();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusClose);
+    else focusClose();
 
     _canvasCourses = [];
     _canvasSelectedIds = new Set();
@@ -521,7 +550,12 @@ export function toggleCanvasCourse(id) {
 
 export function closeCanvasSyncModal() {
     const modal = document.getElementById('canvasSyncModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    if (_canvasModalTrigger && typeof _canvasModalTrigger.focus === 'function') _canvasModalTrigger.focus();
+    _canvasModalTrigger = null;
 }
 
 export async function handleCanvasSyncConfirm() {

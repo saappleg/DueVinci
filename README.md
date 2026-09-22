@@ -36,7 +36,7 @@
 
 ## Free Core Promise
 
-DueVinci’s essential planning workflow—course setup, lesson and due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar, timers, and data export—will remain free to use. Optional third-party services may have their own limits or pricing, but they are never required for the core planning experience.
+DueVinci’s essential planning workflow—course setup, lesson and due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar events, `.ics` import/export, timers, and data portability—will remain free to use. Optional third-party services may have their own limits or pricing, but they are never required for the core planning experience. Live provider sync, Canvas automation, and the Socratic Study Companion are optional DueVinci Pro features.
 
 ---
 ## Tech Stack 🛠️

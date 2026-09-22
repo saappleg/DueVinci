@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DueVinci is a focused academic planner for classes, assignments, study plans, grades, and calendars.">
     <title>DueVinci - Dashboard</title>
     <script src="assets/vendor/tailwindcss.js"></script>
     <script>
@@ -32,7 +33,7 @@
 
     <script src="assets/vendor/canvas-confetti.js"></script>
     <script src="assets/vendor/supabase-js.js"></script>
-    <script type="module" src="js/app.js?v=2.4.0"></script>
+    <script type="module" src="js/app.js?v=2.5.0"></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -44,26 +45,26 @@
                 <p class="font-bold text-sm text-zinc-900 dark:text-white">Install DueVinci</p>
                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">Add to your home screen for quick access</p>
                 <div class="flex items-center gap-2 mt-2.5">
-                    <button id="pwaInstallBtn" onclick="window.triggerPWAInstall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm">Install</button>
-                    <button onclick="window.dismissPWABanner()" class="px-3 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition">Not now</button>
+                    <button id="pwaInstallBtn" type="button" onclick="window.triggerPWAInstall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm">Install</button>
+                    <button type="button" onclick="window.dismissPWABanner()" class="px-3 py-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition">Not now</button>
                 </div>
             </div>
-            <button onclick="window.dismissPWABanner()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition shrink-0 self-start">
+            <button type="button" aria-label="Dismiss install prompt" onclick="window.dismissPWABanner()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition shrink-0 self-start">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
     </div>
 
-    <div id="authScreen" class="grid min-h-screen w-full items-center gap-10 overflow-y-auto bg-zinc-50 px-6 py-10 dark:bg-brand-900 lg:grid-cols-2 lg:px-16 xl:px-24">
+    <main id="authScreen" class="grid min-h-screen w-full items-center gap-10 overflow-y-auto bg-zinc-50 px-6 py-10 dark:bg-brand-900 lg:grid-cols-2 lg:px-16 xl:px-24">
         <section class="mx-auto max-w-2xl lg:mx-0">
             <div class="mb-10 flex items-center gap-3"><img src="assets/icons/icon-72x72.png" alt="DueVinci" class="h-11 w-11 rounded-2xl shadow-lg shadow-indigo-500/25"><span class="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white">DueVinci</span></div>
             <p class="mb-4 inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-200">✦ Your study command center</p>
             <h1 class="max-w-xl text-4xl font-black leading-tight tracking-tight text-zinc-900 dark:text-white sm:text-6xl">Make every due date feel manageable.</h1>
             <p class="mt-5 max-w-xl text-base leading-relaxed text-zinc-600 dark:text-zinc-300 sm:text-lg">Organize classes, build a realistic study plan, track grades, and keep moving—whether you are online or working from your cached planner.</p>
             <div class="mt-9 grid max-w-xl gap-3 sm:grid-cols-3">
-                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📚</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Classes & tasks</p><p class="mt-1 text-[11px] text-zinc-500">Keep every deadline together.</p></div>
-                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">🧠</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Study smarter</p><p class="mt-1 text-[11px] text-zinc-500">Turn work into a plan.</p></div>
-                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📱</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Available offline</p><p class="mt-1 text-[11px] text-zinc-500">Pick up where you left off.</p></div>
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📚</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Classes & tasks</p><p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-300">Keep every deadline together.</p></div>
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">🧠</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Study smarter</p><p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-300">Turn work into a plan.</p></div>
+                <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800"><span class="text-lg">📱</span><p class="mt-2 text-xs font-bold text-zinc-900 dark:text-white">Available offline</p><p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-300">Pick up where you left off.</p></div>
             </div>
         </section>
         <div class="mx-auto w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-2xl shadow-zinc-900/10 dark:border-brand-700 dark:bg-brand-800">
@@ -71,7 +72,9 @@
             <p class="text-zinc-500 dark:text-zinc-400 mb-6">Sign in to open your personal planner.</p>
             
             <form id="emailAuthForm" onsubmit="event.preventDefault(); signInWithEmail();" class="space-y-4 mb-4">
+                <label for="authEmail" class="sr-only">Student email</label>
                 <input type="email" id="authEmail" placeholder="Student Email" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500 transition">
+                <label for="authPassword" class="sr-only">Password</label>
                 <input type="password" id="authPassword" placeholder="Password" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm outline-none focus:border-indigo-500 transition">
                 <div class="flex gap-3 pt-2">
                     <button type="submit" class="w-1/2 bg-white dark:bg-zinc-100 text-zinc-900 font-bold py-2.5 rounded-xl hover:bg-zinc-200 transition">Sign In</button>
@@ -81,7 +84,7 @@
             <p id="authMessage" class="text-sm hidden"></p>
 
             <div class="mt-5">
-                <div class="flex items-center gap-3 mb-3"><div class="h-px flex-1 bg-zinc-200 dark:bg-brand-600"></div><span class="text-xs text-zinc-400 dark:text-zinc-500">or continue with</span><div class="h-px flex-1 bg-zinc-200 dark:bg-brand-600"></div></div>
+                <div class="flex items-center gap-3 mb-3"><div class="h-px flex-1 bg-zinc-200 dark:bg-brand-600"></div><span class="text-xs text-zinc-500 dark:text-zinc-300">or continue with</span><div class="h-px flex-1 bg-zinc-200 dark:bg-brand-600"></div></div>
                 <button type="button" onclick="signInWithGoogle()" class="w-full flex items-center justify-center gap-2.5 border border-zinc-300 dark:border-brand-600 bg-white dark:bg-brand-900 text-zinc-800 dark:text-white font-bold py-2.5 rounded-xl hover:bg-zinc-50 dark:hover:bg-brand-700 transition">
                     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.8 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.5a4.7 4.7 0 0 1-2 3.1v2.5h3.2c1.9-1.8 3.1-4.4 3.1-7.4Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2 .9-3.5.9-2.7 0-5-1.8-5.8-4.3H2.9v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.2 13.7a6 6 0 0 1 0-3.4V7.7H2.9a10 10 0 0 0 0 8.6l3.3-2.6Z"/><path fill="#EA4335" d="M12 6a5.4 5.4 0 0 1 3.8 1.5l2.9-2.9A9.6 9.6 0 0 0 2.9 7.7l3.3 2.6C7 7.8 9.3 6 12 6Z"/></svg>
                     Continue with Google
@@ -92,7 +95,7 @@
             <div id="passkeySignInSection" class="hidden mt-4">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
-                    <span class="text-xs text-zinc-400 dark:text-zinc-500 whitespace-nowrap">or</span>
+                    <span class="text-xs text-zinc-500 dark:text-zinc-300 whitespace-nowrap">or</span>
                     <div class="flex-1 h-px bg-zinc-200 dark:bg-brand-600"></div>
                 </div>
                 <button
@@ -107,28 +110,28 @@
                     </svg>
                     Sign in with Passkey
                 </button>
-                <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-2">Use Face ID, Touch ID, or a security key</p>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-300 mt-2">Use Face ID, Touch ID, or a security key</p>
             </div>
 
-            <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700 text-xs text-zinc-400 dark:text-zinc-500">
+            <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700 text-xs text-zinc-500 dark:text-zinc-300">
                 By signing in, you agree to our <a href="legal/terms.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Terms</a> & <a href="legal/privacy.html" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Privacy Policy</a>.
             </div>
         </div>
-    </div>
+    </main>
 
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
 
         <!-- Static shell for the importer announcement. The inline dismissal
              keeps the beta notice usable while an installed PWA refreshes its
              module cache; tour.js reuses this same element when available. -->
-        <div id="importerBetaModal" class="fixed inset-0 z-[65] flex items-center justify-center bg-zinc-900/70 p-4 backdrop-blur-sm">
-            <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-2xl dark:border-violet-900/60 dark:bg-brand-800">
+        <div id="importerBetaModal" aria-hidden="false" class="fixed inset-0 z-[65] flex items-center justify-center bg-zinc-900/70 p-4 backdrop-blur-sm">
+            <div role="dialog" aria-modal="true" aria-labelledby="importerBetaTitle" class="w-full max-w-lg overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-2xl dark:border-violet-900/60 dark:bg-brand-800">
                 <div class="flex items-start justify-between border-b border-violet-100 bg-gradient-to-r from-violet-500/15 via-indigo-500/10 to-transparent p-6 dark:border-brand-700">
                     <div class="flex items-start gap-3">
                         <span class="text-3xl">🧪</span>
                         <div>
                             <p class="text-xs font-black uppercase tracking-wider text-violet-700 dark:text-violet-300">Beta invitation</p>
-                            <h3 class="mt-1 text-xl font-black text-zinc-900 dark:text-white">Import coursework from WGU or Maestro</h3>
+                            <h3 id="importerBetaTitle" class="mt-1 text-xl font-black text-zinc-900 dark:text-white">Import coursework from WGU or Maestro</h3>
                         </div>
                     </div>
                     <button type="button" data-dismiss-importer-beta aria-label="Close importer beta announcement" class="text-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white">✕</button>
@@ -157,19 +160,21 @@
             })();
         </script>
 
-        <div id="whatsNewModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-zinc-900/70 p-4 backdrop-blur-sm">
-            <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-brand-600 dark:bg-brand-800">
+        <div id="whatsNewModal" aria-hidden="true" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-zinc-900/70 p-4 backdrop-blur-sm">
+            <div role="dialog" aria-modal="true" aria-labelledby="whatsNewTitle" class="w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-brand-600 dark:bg-brand-800">
                 <div class="flex items-center justify-between border-b border-zinc-100 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent p-6 dark:border-brand-700">
-                    <div class="flex items-center gap-3"><span class="text-3xl">✨</span><div><h3 class="text-lg font-black text-zinc-900 dark:text-white">What's New in DueVinci</h3><p class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Version 2.4.0 Feature Drop</p></div></div>
+                    <div class="flex items-center gap-3"><span class="text-3xl">✨</span><div><h3 id="whatsNewTitle" class="text-lg font-black text-zinc-900 dark:text-white">What's New in DueVinci</h3><p class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Version 2.5.0 Feature Drop</p></div></div>
                     <button type="button" data-close-whats-new aria-label="Close What's New" class="text-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white">✕</button>
                 </div>
                 <div class="max-h-[70vh] space-y-3.5 overflow-y-auto p-6 text-xs">
-                    <div class="flex gap-3 rounded-xl border border-indigo-200/70 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/20"><span class="text-2xl">🗓️</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Import Your Other Calendars</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with .ics import. Recurring and multi-day events are expanded automatically.</p></div></div>
+                    <div class="flex gap-3 rounded-xl border border-indigo-200/70 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/20"><span class="text-2xl">🗓️</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Import Your Other Calendars</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with a reviewable .ics import. Recurring and multi-day events are expanded, exceptions are honored, and duplicates are skipped.</p></div></div>
                     <div class="flex gap-3 rounded-xl border border-emerald-200/70 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"><span class="text-2xl">📚</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Curriculum-Order Planning</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Rescheduling and sequence planning now keep lessons in unit and lesson order, with WGU, Maestro, and manual pacing profiles for each course.</p></div></div>
                     <div class="flex gap-3 rounded-xl border border-zinc-200/70 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-2xl">📅</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Unit Milestone Planner & Rest Days</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Plan unit milestones, rest days, and workload around real deadlines.</p></div></div>
                     <div class="flex gap-3 rounded-xl border border-violet-200/70 bg-violet-50 p-3 dark:border-violet-900/50 dark:bg-violet-950/20"><span class="text-2xl">🧪</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Coursework Importer Beta</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Import WGU pacing guides and Maestro weekly coursework from the page you have open.</p><a href="https://github.com/saappleg/duevinci-coursework-importer" target="_blank" rel="noopener noreferrer" class="mt-1 inline-block font-bold text-violet-700 hover:underline dark:text-violet-300">Open the beta extension →</a></div></div>
                     <div class="flex gap-3 rounded-xl border border-zinc-200/70 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-2xl">🛡️</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Dual-Persistence & Task Schema Hardening</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Custom task types, editable titles, and priority tags now persist across cloud and local storage.</p></div></div>
                     <div class="flex gap-3 rounded-xl border border-zinc-200/70 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-2xl">⚡</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Canvas LMS Direct Sync</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Optionally import active-term courses and assignments from Canvas.</p></div></div>
+                    <div class="flex gap-3 rounded-xl border border-zinc-200/70 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-2xl">♿</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">Smoother, Safer Modals</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Keyboard focus, escape-to-close, mobile-friendly Quick Add, and clearer status messages make everyday planning easier.</p></div></div>
+                    <div class="flex gap-3 rounded-xl border border-zinc-200/70 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span class="text-2xl">📊</span><div><div class="text-sm font-bold text-zinc-900 dark:text-white">7-Day Workload Radar & GPA Simulator</div><p class="mt-0.5 leading-relaxed text-zinc-600 dark:text-zinc-300">Visualize daily cognitive load to prevent crunch weeks and test "What-If" hypothetical scores on upcoming exams.</p></div></div>
                 </div>
                 <div class="flex justify-end border-t border-zinc-200/70 bg-zinc-50 p-4 dark:border-brand-700 dark:bg-brand-900/80"><button type="button" data-close-whats-new class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-700">Close</button></div>
             </div>
@@ -177,7 +182,11 @@
         <script>
             (() => {
                 const modal = document.getElementById('whatsNewModal');
-                const close = () => modal?.classList.add('hidden');
+                const close = () => {
+                    if (typeof window.closeWhatsNewModal === 'function') return window.closeWhatsNewModal();
+                    modal?.classList.add('hidden');
+                    modal?.setAttribute('aria-hidden', 'true');
+                };
                 modal?.querySelectorAll('[data-close-whats-new]').forEach((button) => button.addEventListener('click', close));
                 modal?.addEventListener('click', (event) => { if (event.target === modal) close(); });
                 window.openWhatsNewModal = window.openWhatsNewModal || (() => modal?.classList.remove('hidden'));
@@ -257,11 +266,11 @@
                             <h3 class="text-md font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Up Next
                             </h3>
-                            <div class="flex items-center gap-1">
-                                <button type="button" id="filter-priority-all" onclick="filterDashboardUpNext('all')" class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-sm transition">All</button>
-                                <button type="button" id="filter-priority-high" onclick="filterDashboardUpNext('high')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🔥 Urgent</button>
-                                <button type="button" id="filter-priority-medium" onclick="filterDashboardUpNext('medium')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">⚡ Normal</button>
-                                <button type="button" id="filter-priority-low" onclick="filterDashboardUpNext('low')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🌱 Low</button>
+                            <div class="flex items-center gap-1" role="group" aria-label="Filter upcoming coursework">
+                                <button type="button" id="filter-priority-all" aria-pressed="true" onclick="filterDashboardUpNext('all')" class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-sm transition">All</button>
+                                <button type="button" id="filter-priority-high" aria-pressed="false" onclick="filterDashboardUpNext('high')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🔥 Urgent</button>
+                                <button type="button" id="filter-priority-medium" aria-pressed="false" onclick="filterDashboardUpNext('medium')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">⚡ Normal</button>
+                                <button type="button" id="filter-priority-low" aria-pressed="false" onclick="filterDashboardUpNext('low')" class="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-brand-600 transition">🌱 Low</button>
                             </div>
                         </div>
                         <ul class="space-y-3" id="upNextList"></ul>
@@ -282,11 +291,11 @@
     </div>
 
     <!-- Modular Settings Modal -->
-    <div id="settingsModal" onclick="if (event.target === this) closeSettingsModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[460px] max-h-[90vh]">
+    <div id="settingsModal" aria-hidden="true" onclick="if (event.target === this) closeSettingsModal()" class="hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-[460px] max-h-[90vh]">
             <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
                 <div>
-                    <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
+                    <h3 id="settingsModalTitle" class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
                     <nav class="space-y-1">
                         <button type="button" onclick="switchSettingsTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
                         <button type="button" onclick="switchSettingsTab('appearance')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
@@ -304,7 +313,7 @@
                 </div>
             </div>
             <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
-                <button type="button" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
+                <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
                 
                 <!-- Tab: Profile -->
                 <div id="content-profile" class="block space-y-6">
@@ -493,10 +502,10 @@
                 <!-- Tab: Subscription -->
                 <div id="content-canvas" class="hidden space-y-5">
                     <div>
-                        <h2 class="text-xl font-bold dark:text-white mb-1">Subscription</h2>
+                        <h2 class="text-xl font-bold dark:text-white mb-1">DueVinci Pro</h2>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">Your existing DueVinci planning tools remain free forever. A subscription adds connected learning and guided study support.</p>
                         <div class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/70 dark:bg-indigo-950/30">
-                            <div class="text-xs font-bold text-indigo-800 dark:text-indigo-200">Included with every subscription</div>
+                            <div class="text-xs font-bold text-indigo-800 dark:text-indigo-200">Included with every DueVinci Pro subscription</div>
                             <ul class="mt-2 space-y-1 text-xs text-indigo-700 dark:text-indigo-300">
                                 <li>✓ Canvas LMS connection and course syncing</li>
                                 <li>✓ Assignment importing and due-date updates</li>
@@ -572,14 +581,14 @@
                     </div>
 
                     <!-- Canvas Sync Modal -->
-                    <div id="canvasSyncModal" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                        <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                    <div id="canvasSyncModal" aria-hidden="true" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                        <div role="dialog" aria-modal="true" aria-labelledby="canvasSyncModalTitle" class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                             <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                 <div>
-                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
+                                    <h3 id="canvasSyncModalTitle" class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
                                     <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Import selected courses plus their dated assignments.</p>
                                 </div>
-                                <button type="button" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
+                                <button type="button" data-modal-close aria-label="Close Canvas sync" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
                             </div>
                             <div id="canvasSyncModalMsg" class="hidden mx-5 mt-4 p-3 rounded-xl text-xs border"></div>
                             <div class="flex-1 overflow-y-auto p-5" id="canvasCourseList">
