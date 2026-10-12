@@ -876,15 +876,13 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             const deadlines = unitTaskList.map(t => calculateDaysRemaining(t.due_date, baseDate));
             const minDeadline = Math.min(...deadlines);
 
-            // If unit is overdue (minDeadline < 0) or due today (minDeadline === 0)
+            // Work due today stays on its deadline, even when that date is a
+            // rest day. Moving it to tomorrow would make the plan knowingly late.
             if (minDeadline <= 0) {
-                const nextActiveDay = days.findIndex((day, index) => index >= Math.max(currentDayPointer, firstCourseDay)
-                    && index <= lastCourseDay && !day.isRestDay);
-                if (nextActiveDay < 0) return;
                 unitTaskList.forEach(task => {
-                    days[nextActiveDay].assignedTasks.push({ task });
+                    days[0].assignedTasks.push({ task });
                 });
-                currentDayPointer = Math.min(daysAhead - 1, nextActiveDay + 1);
+                currentDayPointer = Math.max(currentDayPointer, 1);
                 return;
             }
 
