@@ -19,6 +19,7 @@ import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, s
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, renderAdaptiveDailyBrief, completeTodayTask, startTodayFocus } from './modules/today.js';
 import { applySubscriptionCatalog } from './modules/subscription.js';
+import './modules/brightspace.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';

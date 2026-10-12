@@ -532,7 +532,7 @@ export function ensureSettingsModalExists() {
                                 Start 30-Day Free Trial — No Card Required
                             </button>
                         <div id="canvasCheckoutOptions" class="hidden space-y-2">
-                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Canvas Sync and the Socratic Study Companion enabled. Cancel anytime.</p>
+                                <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Subscribe to keep Pro integrations and the Socratic Study Companion enabled. Cancel anytime.</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button type="button" data-canvas-checkout data-pro-monthly-price onclick="handleCanvasCheckout('monthly')" class="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$5 / month</button>
                                     <button type="button" data-canvas-checkout data-pro-yearly-price onclick="handleCanvasCheckout('yearly')" class="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-lg transition disabled:opacity-50">$45 / year</button>
@@ -584,6 +584,33 @@ export function ensureSettingsModalExists() {
                                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
                                 Sync Canvas coursework…
                             </button>
+                        </div>
+
+                        <!-- SNHU Brightspace Calendar Sync -->
+                        <div id="brightspaceSyncArea" class="hidden p-4 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700 space-y-3">
+                            <div>
+                                <div class="font-bold text-sm text-zinc-900 dark:text-white">🏫 SNHU Brightspace Calendar</div>
+                                <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">Sync SNHU calendar events and assignment due dates into your DueVinci calendar. This calendar feed does not create course records or Smart Plan tasks.</p>
+                            </div>
+                            <div id="brightspaceConnectArea" class="space-y-2">
+                                <ol class="ml-4 list-decimal space-y-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                                    <li>In SNHU Brightspace, open Calendar → Settings and enable Calendar Feeds.</li>
+                                    <li>Select Subscribe → All Calendars and Tasks, then copy the private feed link.</li>
+                                    <li>Paste it below. DueVinci stores it encrypted and never displays it after saving.</li>
+                                </ol>
+                                <label for="brightspaceFeedUrlInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300">Private calendar feed link</label>
+                                <input type="password" id="brightspaceFeedUrlInput" autocomplete="off" spellcheck="false" placeholder="Paste the SNHU Brightspace feed link" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
+                                <button type="button" id="brightspaceConnectButton" onclick="connectBrightspaceCalendar()" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition disabled:opacity-50">Connect and sync SNHU calendar</button>
+                            </div>
+                            <div id="brightspaceConnectedArea" class="hidden space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">SNHU calendar connected</span>
+                                    <button type="button" id="brightspaceDisconnectButton" onclick="disconnectBrightspaceCalendar()" class="text-[11px] text-zinc-500 hover:text-red-500 transition">Disconnect</button>
+                                </div>
+                                <p id="brightspaceLastSynced" class="text-[11px] text-zinc-500 dark:text-zinc-400">Loading sync details…</p>
+                                <button type="button" id="brightspaceSyncButton" onclick="syncBrightspaceCalendar()" class="w-full py-2 px-4 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl transition disabled:opacity-50">Sync now</button>
+                            </div>
+                            <p id="brightspaceSyncMessage" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
                         </div>
 
                         <!-- Canvas Sync Modal -->

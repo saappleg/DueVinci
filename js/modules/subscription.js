@@ -14,6 +14,7 @@ export const SUBSCRIPTION_CATALOG = Object.freeze({
     yearlyLabel: '$45 / year',
     features: [
         'Canvas LMS connection and course syncing',
+        'SNHU Brightspace calendar sync for course events and assignment due dates',
         'Assignment importing and due-date updates',
         'Socratic Study Companion with selected-course context and notes',
         'Daily workload summary and next-focus suggestion',

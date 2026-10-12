@@ -183,10 +183,10 @@ export async function initCanvasSettingsTab({ reconcile = true } = {}) {
 
         if (status === 'inactive') {
             if (profile?.trialStartedAt) {
-                msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Canvas Sync and the Socratic Study Companion.';
+                msg.textContent = 'Your free trial has ended. Choose a subscription to continue using Pro integrations and the Socratic Study Companion.';
                 checkoutArea?.classList.remove('hidden');
             } else {
-                msg.textContent = 'Start a free trial to unlock Canvas Sync and the Socratic Study Companion. No credit card required.';
+                msg.textContent = 'Start a free trial to unlock Pro integrations and the Socratic Study Companion. No credit card required.';
                 trialBtn?.classList.remove('hidden');
             }
         } else if (status === 'trialing') {
@@ -207,8 +207,8 @@ export async function initCanvasSettingsTab({ reconcile = true } = {}) {
             if (hasCanvasAccess(profile)) _showConnectorOrSync(profile);
         } else if (status === 'active') {
             msg.textContent = hasCanvasAccess(profile)
-                ? 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.'
-                : 'Your subscription is active, but Canvas Sync is not included in this plan.';
+                ? 'Your DueVinci Pro features are active, including Canvas Sync, SNHU Brightspace Calendar, and the Socratic Study Companion.'
+                : 'Your subscription is active, but this plan does not include DueVinci Pro integrations.';
             const endDate = profile.cancelAt || profile.currentPeriodEnd;
             if (endDate) {
                 const formattedDate = new Date(endDate).toLocaleDateString(undefined, {
@@ -229,7 +229,7 @@ export async function initCanvasSettingsTab({ reconcile = true } = {}) {
             if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
             checkoutArea?.classList.remove('hidden');
         } else if (status === 'canceled') {
-            msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas Sync and the Socratic Study Companion again.';
+            msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Pro integrations and the Socratic Study Companion again.';
             checkoutArea?.classList.remove('hidden');
             if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
         } else {
@@ -242,8 +242,10 @@ export async function initCanvasSettingsTab({ reconcile = true } = {}) {
     } catch (err) {
         badge.textContent = 'Error';
         if (msg) msg.textContent = err.message || 'Unable to load subscription details.';
+        if (typeof window !== 'undefined') window.initBrightspaceSettings?.(null);
         return null;
     }
+    if (typeof window !== 'undefined') window.initBrightspaceSettings?.(profileSnapshot);
     return profileSnapshot;
 }
 
@@ -417,8 +419,8 @@ export async function handleCanvasCheckoutReturn() {
             : '';
         currentMessage.textContent = hasSubscriptionFeature(snapshot, 'canvas_sync')
             ? snapshot?.status === 'trialing'
-                ? `Your trial is active. Canvas Sync and the Socratic Study Companion are enabled.${refreshNote}`
-                : `Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.${refreshNote}`
+                ? `Your trial is active. DueVinci Pro integrations and the Socratic Study Companion are enabled.${refreshNote}`
+                : `Your subscription is active. DueVinci Pro integrations and the Socratic Study Companion are enabled.${refreshNote}`
             : `Checkout is complete. Stripe is still confirming your subscription; refresh this page in a moment if Pro access does not appear.${refreshNote}`;
     }
     await window.renderTodayWorkspace?.();

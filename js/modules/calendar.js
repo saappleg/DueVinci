@@ -414,7 +414,7 @@ export async function loadCalendarCourses() {
         });
     });
 
-    if (customEvents) customEvents.forEach(ev => {
+    if (customEvents) customEvents.filter(ev => ev.is_active !== false).forEach(ev => {
         calendarEvents.push({ title: ev.title, start: ev.event_date, color: ev.color, extendedProps: { isCustom: true, eventId: ev.id } });
     });
 

@@ -31,7 +31,8 @@ export async function renderTodayWorkspace() {
         try { showProBrief = hasSubscriptionFeature(await getSubscriptionSnapshot(), 'daily_brief'); } catch { /* Keep the free focus card available if billing status is offline. */ }
     }
     const task = blocks[0] || prioritizeTodayTasks(assignmentList, day)[0];
-    const eventCount = (events || []).filter((event) => String(event.event_date).slice(0, 10) === day).length;
+    const activeEvents = (events || []).filter((event) => event.is_active !== false);
+    const eventCount = activeEvents.filter((event) => String(event.event_date).slice(0, 10) === day).length;
     const completed = assignmentList.filter((assignment) => assignment.is_completed).length;
     const weekEnd = todayKey(new Date(Date.now() + 6 * 86400000));
     const openDatedAssignments = assignmentList.filter((assignment) => !assignment.is_completed && assignment.due_date);
@@ -53,7 +54,7 @@ export async function renderTodayWorkspace() {
         ? `<div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${overdueCount}</span><span class="text-xs text-zinc-500">overdue</span></div><div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${dueTodayCount}</span><span class="text-xs text-zinc-500">due today</span></div><div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${dueThisWeek}</span><span class="text-xs text-zinc-500">due this week</span></div><div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${eventCount}</span><span class="text-xs text-zinc-500">calendar events today</span></div>`
         : `<div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${blocks.length}</span><span class="text-xs text-zinc-500">study blocks planned</span></div><div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${eventCount}</span><span class="text-xs text-zinc-500">calendar events today</span></div><div class="rounded-xl bg-white/75 p-3 dark:bg-brand-900/60"><span class="block text-lg font-black">${completed} / ${assignmentList.length}</span><span class="text-xs text-zinc-500">completed · ${dueThisWeek} due this week</span></div>`;
     card.innerHTML = `<div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div class="min-w-0"><p class="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">${focusLabel}</p><h3 class="mt-1 truncate text-xl font-black text-zinc-900 dark:text-white">${escapeHtml(title)}</h3><p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(detail)}${task?.dueText ? ` · ${escapeHtml(task.dueText)}` : ''}</p></div><div class="flex flex-wrap gap-2">${taskId ? `<button type="button" onclick="completeTodayTask('${inlineArg(taskId)}')" class="rounded-xl bg-white px-3 py-2 text-xs font-bold text-zinc-800 shadow-sm ring-1 ring-zinc-200 dark:bg-brand-700 dark:text-white">Complete</button><button type="button" onclick="startTodayFocus(${minutes})" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm">Start ${minutes}m focus</button>` : `<button type="button" onclick="openQuickAddModal()" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm">Add a task</button>`}</div></div><div class="mt-5 grid gap-3 ${showProBrief ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}">${summaryStats}</div>`;
-    await renderAdaptiveDailyBrief(courseList, assignmentList, events || [], blocks);
+    await renderAdaptiveDailyBrief(courseList, assignmentList, activeEvents, blocks);
     applyDashboardWidgetLayout();
 }
 
@@ -77,7 +78,7 @@ export async function renderAdaptiveDailyBrief(courses = null, assignments = nul
         ]);
         courses = courseRows || [];
         assignments = assignmentRows || [];
-        events = eventRows || [];
+        events = (eventRows || []).filter((event) => event.is_active !== false);
     }
 
     const today = todayKey();

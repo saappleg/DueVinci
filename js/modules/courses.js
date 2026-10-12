@@ -2053,8 +2053,10 @@ export async function loadAssignments(courseId, page = 1) {
     }
     const course = localCourses.find((item) => item.id === courseId) || {};
     const weeklyCourse = isWeeklyCourse(course);
+    const courseArg = inlineArg(courseId);
     const listEl = document.getElementById('assignmentList');
     const weekSummaryEl = document.getElementById('course-week-summary');
+    const weekCatchupEl = document.getElementById('course-week-catchup');
     if (!listEl) return;
     listEl.innerHTML = '';
 
@@ -2062,6 +2064,12 @@ export async function loadAssignments(courseId, page = 1) {
         if (weekSummaryEl) {
             weekSummaryEl.classList.add('hidden');
             weekSummaryEl.replaceChildren();
+        }
+        if (weekCatchupEl) {
+            weekCatchupEl.classList.add('hidden');
+            weekCatchupEl.open = false;
+            weekCatchupEl.querySelector('summary')?.replaceChildren();
+            weekCatchupEl.querySelector('div')?.replaceChildren();
         }
         listEl.innerHTML = '<div class="p-4 border border-dashed border-zinc-300 dark:border-brand-600 rounded-lg text-center"><p class="text-sm text-zinc-500 dark:text-zinc-400">No coursework added yet. Use the form above to add weekly units and lessons.</p></div>';
         return;
@@ -2090,6 +2098,41 @@ export async function loadAssignments(courseId, page = 1) {
         }
     }
 
+    if (weekCatchupEl) {
+        const bounds = getCourseDateBounds(course);
+        const todayKey = getLocalDateKey();
+        const weekStart = new Date(`${todayKey}T12:00:00`);
+        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+        const weekStartKey = getLocalDateKey(weekStart);
+        const catchupAssignments = weeklyCourse && !course.is_completed && bounds.isValid
+            && (!bounds.endDate || bounds.endDate >= todayKey)
+            ? assignments.filter((assignment) => {
+                const dueDate = String(assignment.due_date || '').slice(0, 10);
+                return !assignment.is_completed
+                    && dueDate
+                    && dueDate < weekStartKey
+                    && isDateWithinCourseWindow(dueDate, course)
+                    && isCourseProgressItem(assignment);
+            }).sort((a, b) => compareCourseworkOrder(a, b, [course]))
+            : [];
+        const summary = weekCatchupEl.querySelector('summary');
+        const list = weekCatchupEl.querySelector('div');
+        if (summary && list) {
+            weekCatchupEl.classList.toggle('hidden', catchupAssignments.length === 0);
+            weekCatchupEl.open = false;
+            summary.textContent = `Catch up on past weeks (${catchupAssignments.length} overdue item${catchupAssignments.length === 1 ? '' : 's'})`;
+            list.innerHTML = catchupAssignments.map((assignment) => {
+                const assignmentArg = inlineArg(assignment.id);
+                const title = String(assignment.title || '').replace(/^\s*↳\s*/, '');
+                const displayDate = window.formatDate ? window.formatDate(assignment.due_date, false) : String(assignment.due_date).slice(0, 10);
+                return `<div class="flex flex-col gap-2 rounded-lg border border-amber-200/70 bg-white/70 px-3 py-2 dark:border-amber-900/40 dark:bg-brand-900/70 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0"><p class="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-100">${escapeHtml(title)}</p><p class="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">${escapeHtml(displayDate)} · Week ${escapeHtml(getUnitNumber(assignment) || '?')}</p></div>
+                    <button type="button" onclick="toggleAssignment('${assignmentArg}', false, '${courseArg}')" class="shrink-0 rounded-lg border border-emerald-300 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40">Mark complete</button>
+                </div>`;
+            }).join('');
+        }
+    }
+
     assignments.sort((a, b) => compareCourseworkOrder(a, b, [course]));
 
     const pageSize = 6;
@@ -2100,8 +2143,6 @@ export async function loadAssignments(courseId, page = 1) {
 
     const startIndex = (page - 1) * pageSize;
     const paginatedAssignments = assignments.slice(startIndex, startIndex + pageSize);
-    const courseArg = inlineArg(courseId);
-
     let localTypes = {};
     let localPrios = {};
     try {

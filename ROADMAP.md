@@ -40,7 +40,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 ## 🎯 Current Initiatives & Near-Term Releases
 
 ### Subscription packaging
-- **DueVinci Pro (current offer):** Canvas course sync, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
+- **DueVinci Pro (current offer):** Canvas course sync, SNHU Brightspace calendar sync, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
+- **SNHU Brightspace calendar sync:** Pro users can connect the private Brightspace Calendar Feed to bring SNHU calendar events and due dates into DueVinci. This is calendar-only; importing course records and planner assignments requires an approved Brightspace API integration.
 - **Current checkout copy:** $5 monthly or $45 yearly, with a 30-day trial. Confirm Stripe price IDs and trial policy in each environment before release.
 - **Tutor cost controls:** default allowance is 8 requests/day and 40/month during trial, and 30/day and 250/month on an active paid plan. Edge Function secrets can override these limits.
 - **Next Pro addition — connected calendars:** build read-only Google Calendar and Microsoft Outlook/Graph OAuth connections, with encrypted refresh tokens, clear disconnect controls, refresh history, and event de-duplication. Configure provider client IDs, secrets, and exact redirect URIs before enabling the connector. Apple/iCloud remains supported through the existing `.ics` import/export until a suitable web authorization path is available.

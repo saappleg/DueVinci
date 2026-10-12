@@ -1,7 +1,7 @@
 import Stripe from 'https://esm.sh/stripe@14?target=deno'
 import { authenticatedUser, hasFeature, isSubscriptionActive, json } from '../_shared/canvas.ts'
 
-const FEATURE_KEYS = ['canvas_sync', 'socratic_tutor', 'daily_brief']
+const FEATURE_KEYS = ['canvas_sync', 'brightspace_sync', 'socratic_tutor', 'daily_brief']
 const PROFILE_FIELDS = 'subscription_status, subscription_plan, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at, updated_at'
 
 function stripeId(value: any): string | null {

@@ -234,6 +234,10 @@
                             </button>
                         </div>
                         <div id="course-week-summary" class="hidden mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
+                        <details id="course-week-catchup" class="hidden mb-3 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
+                            <summary class="cursor-pointer px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200"></summary>
+                            <div class="max-h-56 space-y-2 overflow-y-auto border-t border-amber-200/70 p-3 dark:border-amber-900/50"></div>
+                        </details>
                         <form id="addAssignmentForm" onsubmit="submitAddAssignment(event)" class="space-y-2.5 mb-4 bg-zinc-50 dark:bg-brand-900 p-3.5 rounded-xl border border-zinc-200 dark:border-brand-700">
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <label for="assignTitle" class="sr-only">Assignment or lesson title</label>

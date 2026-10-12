@@ -116,7 +116,7 @@ async function loadReminderData() {
         supabaseClient.from('custom_events').select('*'),
         supabaseClient.from('courses').select('*'),
     ]);
-    return { assignments: assignments || [], customEvents: customEvents || [], courses: courses || [] };
+    return { assignments: assignments || [], customEvents: (customEvents || []).filter((event) => event.is_active !== false), courses: courses || [] };
 }
 
 export async function renderReminderDashboard() {

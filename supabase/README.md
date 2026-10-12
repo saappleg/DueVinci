@@ -21,6 +21,7 @@ supabase functions deploy canvas-connect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-courses --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-sync --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy brightspace-calendar --project-ref kinsxkeerxguqkyzrjfm
 # Stripe does not send a Supabase JWT; stripe-webhook verifies Stripe's signed
 # payload itself, so it must be deployed without the gateway JWT requirement.
 supabase functions deploy stripe-webhook --no-verify-jwt --project-ref kinsxkeerxguqkyzrjfm
@@ -81,7 +82,9 @@ feature mapping, then use the shared Edge Function entitlement check.
 
 Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.
 
-`CANVAS_TOKEN_ENCRYPTION_KEY` is a separate 32-byte, base64-encoded Edge Function secret used to encrypt Canvas tokens with AES-GCM before storage. Dev and Production must use different keys; never place either key in browser code or source control.
+The `20261012232702_brightspace_calendar_sync.sql` migration adds the server-only Brightspace connection record and idempotent calendar-event source fields. The `brightspace-calendar` Edge Function accepts SNHU's private HTTPS calendar feed link, encrypts it with AES-GCM, fetches it on demand, and upserts calendar events. The browser never reads the saved link. Deploy this function with `subscription-status` after applying the migration.
+
+`CANVAS_TOKEN_ENCRYPTION_KEY` is a separate 32-byte, base64-encoded Edge Function secret used to encrypt Canvas tokens and Brightspace feed links with AES-GCM before storage. Dev and Production must use different keys; never place either key in browser code or source control.
 
 Canvas sync imports selected courses and Canvas assignments that have due dates. LMS source IDs make repeat syncs update the same courses and assignments instead of creating duplicates.
 
