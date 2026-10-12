@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.17';
+const CACHE_NAME = 'duevinci-v8.18';
 const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
@@ -124,7 +124,12 @@ self.addEventListener('fetch', (event) => {
               : route.endsWith('/legal/privacy') ? './legal/privacy.html'
                 : route.endsWith('/legal/terms') ? './legal/terms.html'
                   : './index.html';
-        const cached = (await caches.match(request)) || await caches.match(routeAsset);
+        const appCache = await caches.open(CACHE_NAME);
+        const runtimeCache = await caches.open(RUNTIME_CACHE);
+        const cached = (await appCache.match(request))
+          || (await appCache.match(routeAsset))
+          || (await runtimeCache.match(request))
+          || (await runtimeCache.match(routeAsset));
         // Planner pages are static. Serve the cached document immediately and
         // refresh it in the background; waiting for an offline fetch timeout
         // made page switches feel broken for roughly 15 seconds.
@@ -147,12 +152,17 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+    caches.open(CACHE_NAME).then((appCache) => appCache.match(request)).then(async (cached) => {
+      if (cached) return cached;
+      const runtimeCached = await caches.open(RUNTIME_CACHE).then((cache) => cache.match(request));
+      if (runtimeCached) return runtimeCached;
+      return fetch(request).then((response) => {
       if (response.ok || response.type === 'opaque') {
         const copy = response.clone();
         caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
       }
       return response;
-    })),
+      });
+    }),
   );
 });
