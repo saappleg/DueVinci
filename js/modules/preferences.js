@@ -9,7 +9,7 @@ const SYNCED_PREFERENCE_KEYS = new Set([
     'theme', 'greekTheme', 'focusMinutes', 'breakMinutes', 'timerIsWorking', 'timerCollapsed', 'customTimersExpanded', 'hideUnassigned',
     'duevinci_ambient_noise', 'duevinci_alarm_sound', 'duevinci_date_format', 'duevinci_gpa_scale', 'duevinci_mute_alarm',
     'duevinci_hide_academics', 'duevinci_hide_completed_courses', 'duevinci_show_archived_terms', 'duevinci_terms', 'duevinci_term_details',
-    'duevinci_rest_days', 'duevinci_timers', 'duevinci_dashboard_widget_order', 'duevinci_activity_dates',
+    'duevinci_rest_days', 'duevinci_no_study_dates', 'duevinci_timers', 'duevinci_dashboard_widget_order', 'duevinci_activity_dates',
     'duevinci_assignment_priorities', 'duevinci_assignment_types', 'duevinci_reminders_enabled', 'duevinci_reminder_offsets',
 ]);
 const SYNCED_PREFERENCE_PREFIXES = ['duevinci_workspace_', 'resources_'];
@@ -51,16 +51,18 @@ function clearSyncedPreferences() {
 }
 
 async function uploadPreferences() {
-    if (!activeUserId || typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    if (localStorage.getItem(ACTIVE_USER_KEY) !== activeUserId) return;
+    const userId = activeUserId;
+    if (!userId || typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (localStorage.getItem(ACTIVE_USER_KEY) !== userId) return;
     const preferences = collectSyncedPreferences();
     const snapshot = JSON.stringify(preferences);
     if (snapshot === lastSnapshot) return;
     const updatedAt = new Date().toISOString();
-    const { error } = await supabaseClient.from('user_preferences').upsert({ user_id: activeUserId, preferences, updated_at: updatedAt });
+    const { error } = await supabaseClient.from('user_preferences').upsert({ user_id: userId, preferences, updated_at: updatedAt });
     if (error) throw error;
+    if (activeUserId !== userId || localStorage.getItem(ACTIVE_USER_KEY) !== userId) return;
     lastSnapshot = snapshot;
-    localStorage.setItem(updatedAtKey(activeUserId), updatedAt);
+    localStorage.setItem(updatedAtKey(userId), updatedAt);
 }
 
 export async function initializePreferenceSync(user) {
@@ -90,6 +92,7 @@ export async function initializePreferenceSync(user) {
         console.warn('Preference sync unavailable:', error.message);
         return;
     }
+    if (activeUserId !== user.id || localStorage.getItem(ACTIVE_USER_KEY) !== user.id) return;
     if (data?.preferences && data.updated_at > localUpdatedAt) {
         applySyncedPreferences(data.preferences);
         localStorage.setItem(updatedAtKey(user.id), data.updated_at);

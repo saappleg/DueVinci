@@ -36,7 +36,7 @@
     <script src="../assets/vendor/tesseract.js"></script>
     <script src="../assets/vendor/canvas-confetti.js"></script>
     <script src="../assets/vendor/supabase-js.js"></script>
-    <script type="module" src="../js/app.js?v=2.6.0"></script>
+    <script type="module" src="../js/app.js?v=2.7.0"></script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
@@ -106,18 +106,21 @@
                             <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
                             <div class="flex flex-wrap items-center gap-2">
                                 <label class="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-300"><input id="showArchivedTermsToggle" type="checkbox" onchange="toggleArchivedTerms(this.checked)" class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Show archived</label>
+                                <label class="sr-only" for="courseSearchInput">Search classes and terms</label>
+                                <input type="search" id="courseSearchInput" oninput="filterCourses(this.value)" placeholder="Search classes or terms…" class="w-full sm:w-52 text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
                                 <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
                                 <label for="newTermStartDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Starts<input type="date" id="newTermStartDate" aria-label="Term start date" title="Term start date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
                                 <label for="newTermEndDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Ends<input type="date" id="newTermEndDate" aria-label="Term end date" title="Term end date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
                                 <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
                             </div>
                         </div>
-                        <p class="-mt-2 mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">Optional dates archive a term after its end date and keep coursework inside the term window.</p>
+                        <p class="-mt-2 mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">Optional dates archive a term after its end date and keep coursework inside the term window. Search classes or term names above; turn on “Show archived” to include past terms.</p>
                         <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
                     </div>
 
                     <div class="pt-6 border-t border-zinc-200 dark:border-brand-700">
-                        <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-4">All Classes (Alphabetical)</h3>
+                        <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200 mb-3">All Classes (Alphabetical)</h3>
+                        <div id="courseListTools" class="mb-3"></div>
                         <div id="alphabeticalCourseList" class="bg-white dark:bg-brand-800 rounded-xl border border-zinc-200 dark:border-brand-700 divide-y divide-zinc-200 dark:divide-brand-700 overflow-hidden shadow-sm"></div>
                     </div>
                 </div>

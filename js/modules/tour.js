@@ -5,7 +5,7 @@ import { supabaseClient } from './config.js';
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
 // Each feature drop uses a versioned dismissal marker so students see the
 // latest release notes once after the app updates.
-export const WHATS_NEW_VERSION = '2.6.0';
+export const WHATS_NEW_VERSION = '2.7.0';
 const WHATS_NEW_SEEN_KEY = 'duevinci_whats_new_seen';
 const WHATS_NEW_SEEN_VALUE = `v${WHATS_NEW_VERSION}`;
 const COURSEWORK_IMPORTER_REPO = 'https://github.com/saappleg/duevinci-coursework-importer';
@@ -203,38 +203,38 @@ export function ensureWhatsNewModalExists() {
             </div>
             <div class="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto text-xs">
                 <div class="flex gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl border border-indigo-200/70 dark:border-indigo-900/50">
-                    <span class="text-2xl shrink-0">🗓️</span>
+                    <span class="text-2xl shrink-0">📆</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Import Your Other Calendars</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Bring Google Calendar, Apple Calendar, Outlook, and other calendar exports into DueVinci with a reviewable .ics import. Recurring and multi-day events are expanded, exceptions are honored, and duplicates are skipped.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Course and Term Date Windows</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Set start and end dates for classes and terms. The planner keeps coursework inside those windows and automatically archives terms after they end.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/70 dark:border-emerald-900/50">
+                    <span class="text-2xl shrink-0">🔎</span>
+                    <div>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Find and Organize Classes</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Search classes and terms, select several classes at once, and move them into a term from a dropdown. Hide completed classes in Settings, or search and restore archived terms.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
                     <span class="text-2xl shrink-0">📚</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Curriculum-Order Planning</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Rescheduling and sequence planning now keep lessons in unit and lesson order, with WGU, Maestro, and manual pacing profiles for each course.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Weekly Course Progress and Effort</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">See progress for the current week in paced classes. Add a time estimate to coursework so balanced study blocks reflect how long each task should take.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">📅</span>
+                    <span class="text-2xl shrink-0">🌤️</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Unit Milestone Planner & Rest Days</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Unit-by-unit milestone spacing planner with customizable Rest Days scheduling, deadline-first sorting, and timestamp-aware workload balancing.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Protected Study Dates</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Mark holidays, exams, or other unavailable days. Smart Plan and overdue balancing keep study blocks off protected dates and rest days.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">🛡️</span>
+                    <span class="text-2xl shrink-0">💳</span>
                     <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Dual-Persistence & Task Schema Hardening</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Persist custom task types (assignments, lessons, quizzes, pages), editable coursework titles, and priority tags across IndexedDB and cloud sync.</p>
-                    </div>
-                </div>
-                <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">
-                    <span class="text-2xl shrink-0">⚡</span>
-                    <div>
-                        <div class="font-bold text-zinc-900 dark:text-white text-sm">Canvas LMS Direct Sync</div>
-                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Optional one-click import of active term courses and modules directly from your university's Canvas instance.</p>
+                        <div class="font-bold text-zinc-900 dark:text-white text-sm">More Reliable Subscription Recovery</div>
+                        <p class="text-zinc-600 dark:text-zinc-300 mt-0.5 leading-relaxed">Billing settings can refresh your subscription directly from Stripe, and duplicate billing notifications are safely ignored.</p>
                     </div>
                 </div>
                 <div class="flex gap-3 p-3 bg-zinc-50 dark:bg-brand-900 rounded-xl border border-zinc-200/70 dark:border-brand-700">

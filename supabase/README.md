@@ -62,6 +62,15 @@ owner-scoped reminder updates while keeping billing columns service-role-only.
 It also adds a private per-account checkout lock and active-session record so
 concurrent requests cannot open duplicate subscriptions.
 
+The `20261012222813_planner_effort_and_stripe_webhook_idempotency.sql` migration
+adds optional per-assignment effort estimates and a private Stripe event ledger.
+The webhook claims each event with a short lease, records it after successful
+handling, and releases the claim after a failed attempt so Stripe can retry it.
+The subscription settings refresh also reconciles the saved status against
+Stripe when the billing settings are opened, then keeps the last synced state
+visible if Stripe is temporarily unavailable. Apply the migration before
+deploying the updated `stripe-webhook` and `subscription-status` functions.
+
 Checkout and billing-portal return URLs must match `APP_URL` at the root or its
 `index.html` path. Set `ALLOW_LOCALHOST_RETURN_URLS=true` only in a local development
 environment when testing Stripe redirects.

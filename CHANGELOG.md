@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.0] - 2026-10-12
+
+### Added
+- Added class and term search, bulk class-to-term moves, completed-class visibility controls, and searchable/restorable archived terms.
+- Added current-week course progress, task effort estimates, protected study dates, and automatic term archiving by date range.
+- Added class and term date windows that constrain planned and imported coursework.
+- Added live billing reconciliation in settings and retry-safe Stripe webhook processing.
+
+### Fixed
+- Kept weekly-paced courses on the current study week and prevented Smart Plan from scheduling onto protected dates.
+- Improved billing recovery when a Stripe subscription changes while the profile snapshot is stale.
+- Prevented duplicate Stripe webhook delivery from applying subscription changes more than once.
+- Preserved completed Canvas assignments on later syncs and reported backup restore failures accurately.
+- Scoped preference sync by account and prevented cross-account cached data from being uploaded.
+
+### Security
+- Restricted webhook event idempotency records to service-role access and protected them with database functions.
+
 ## [2.6.0] - 2026-09-22
 
 ### Added

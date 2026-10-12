@@ -354,6 +354,50 @@ export function setRestDays(restDays = []) {
     }
 }
 
+export function getNoStudyDates() {
+    try {
+        const stored = JSON.parse(localStorage.getItem('duevinci_no_study_dates') || '[]');
+        const today = getLocalDateKey();
+        if (!Array.isArray(stored)) return [];
+        return [...new Set(stored.filter((value) => isValidStudyDateKey(value) && value >= today))].sort();
+    } catch (error) {
+        console.warn('Error reading protected study dates:', error);
+        return [];
+    }
+}
+
+export function setNoStudyDates(dates = []) {
+    const today = getLocalDateKey();
+    const validDates = [...new Set((Array.isArray(dates) ? dates : [])
+        .filter((value) => isValidStudyDateKey(value) && value >= today))].sort();
+    try { localStorage.setItem('duevinci_no_study_dates', JSON.stringify(validDates)); }
+    catch (error) { console.warn('Error saving protected study dates:', error); }
+    if (typeof window !== 'undefined') window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+}
+
+function isValidStudyDateKey(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T12:00:00`);
+    return !Number.isNaN(date.valueOf()) && getLocalDateKey(date) === value;
+}
+
+export function addNoStudyDateFromInput() {
+    const input = document.getElementById('noStudyDateInput');
+    const date = input?.value || '';
+    if (!isValidStudyDateKey(date) || date < getLocalDateKey()) {
+        input?.setCustomValidity('Choose today or a future date.');
+        input?.reportValidity();
+        input?.setCustomValidity('');
+        return;
+    }
+    setNoStudyDates([...getNoStudyDates(), date]);
+    if (input) input.value = '';
+}
+
+export function removeNoStudyDate(date) {
+    setNoStudyDates(getNoStudyDates().filter((value) => value !== date));
+}
+
 /**
  * Toggles a day of the week as a rest day.
  * @param {string} dayName Day of week abbreviation (e.g. 'Sun', 'Sat')
@@ -374,7 +418,11 @@ export function toggleRestDay(dayName) {
 const DEFAULT_DAILY_FOCUS_CAP = 120;
 
 function estimatedMinutes(task) {
-    const type = task.task_type || task.type || '';
+    const savedEstimate = Number(task.estimated_minutes);
+    if (Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480) return savedEstimate;
+    let localType = '';
+    try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[task.id] || ''; } catch { /* Use the synced assignment type below. */ }
+    const type = localType || task.task_type || task.type || '';
     return type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
 }
 
@@ -453,15 +501,15 @@ function dateDifferenceInDays(from, to) {
     return Math.round((toDate - fromDate) / 86_400_000);
 }
 
+function isWeeklyUnitHeader(assignment) {
+    const title = String(assignment?.title || '').trim();
+    if (title.startsWith('↳')) return false;
+    const isHeader = /^(?:unit|week|wk|module|mod|chapter)\s*#?\d+\b/i.test(title);
+    return isHeader && !/lesson|exam|final|midterm|test|review|assignment|lab|project|reading|quiz|essay/i.test(title);
+}
+
 function currentWeeklyUnit(course, assignments, baseDate) {
     const { startDate } = getCourseDateBounds(course);
-    if (startDate) {
-        return new Set([Math.max(1, Math.floor(Math.max(0, dateDifferenceInDays(startDate, getLocalDateKey(baseDate))) / 7) + 1)]);
-    }
-
-    const units = [...new Set(assignments.map(getUnitNumber).filter((unit) => unit > 0))].sort((a, b) => a - b);
-    if (!units.length) return new Set();
-
     const today = getLocalDateKey(baseDate);
     const weekday = new Date(`${today}T12:00:00`).getDay();
     const weekStart = new Date(`${today}T12:00:00`);
@@ -470,6 +518,20 @@ function currentWeeklyUnit(course, assignments, baseDate) {
     weekEnd.setDate(weekEnd.getDate() + 6);
     const weekStartKey = getLocalDateKey(weekStart);
     const weekEndKey = getLocalDateKey(weekEnd);
+
+    if (startDate) {
+        const calendarUnit = Math.max(1, Math.floor(Math.max(0, dateDifferenceInDays(startDate, today)) / 7) + 1);
+        const overdueUnits = assignments
+            .filter((assignment) => !assignment.is_completed && !isWeeklyUnitHeader(assignment)
+                && getUnitNumber(assignment) > 0 && getUnitNumber(assignment) <= calendarUnit)
+            .map(getUnitNumber)
+            .sort((a, b) => a - b);
+        return new Set([overdueUnits[0] || calendarUnit]);
+    }
+
+    const units = [...new Set(assignments.map(getUnitNumber).filter((unit) => unit > 0))].sort((a, b) => a - b);
+    if (!units.length) return new Set();
+
     const datesByUnit = new Map();
     assignments.forEach((assignment) => {
         const unit = getUnitNumber(assignment);
@@ -480,7 +542,18 @@ function currentWeeklyUnit(course, assignments, baseDate) {
             datesByUnit.set(unit, dates);
         }
     });
-    return new Set(units.filter((unit) => datesByUnit.get(unit)?.some((date) => date >= weekStartKey && date <= weekEndKey)));
+    const calendarUnits = units.filter((unit) => datesByUnit.get(unit)?.some((date) => date >= weekStartKey && date <= weekEndKey));
+    const latestScheduledUnit = calendarUnits.length ? Math.max(...calendarUnits) : 0;
+    const overdueUnits = assignments
+        .filter((assignment) => !assignment.is_completed
+            && !isWeeklyUnitHeader(assignment)
+            && getUnitNumber(assignment) > 0
+            && (!latestScheduledUnit || getUnitNumber(assignment) <= latestScheduledUnit)
+            && String(assignment.due_date || '').slice(0, 10) < weekStartKey)
+        .map(getUnitNumber)
+        .sort((a, b) => a - b);
+    if (overdueUnits.length) return new Set([overdueUnits[0]]);
+    return new Set(calendarUnits);
 }
 
 function normalizeStudyPlanDate(startDate) {
@@ -495,7 +568,7 @@ function normalizeStudyPlanDate(startDate) {
     return today;
 }
 
-export function getCurrentStudyWeekAssignments(courses = [], assignments = [], referenceDate = new Date()) {
+export function getCurrentStudyWeekAssignments(courses = [], assignments = [], referenceDate = new Date(), options = {}) {
     if (!Array.isArray(courses) || !Array.isArray(assignments)) return [];
     const baseDate = normalizeStudyPlanDate(referenceDate);
     const todayKey = getLocalDateKey(baseDate);
@@ -513,7 +586,7 @@ export function getCurrentStudyWeekAssignments(courses = [], assignments = [], r
     });
 
     return assignments.filter((assignment) => {
-        if (assignment.is_completed || !assignment.due_date) return false;
+        if ((assignment.is_completed && options.includeCompleted !== true) || !assignment.due_date) return false;
         const course = courseById.get(assignment.course_id);
         if (!course) return true;
         if (course.is_completed) return false;
@@ -548,6 +621,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     if (!courses || !assignments || !Array.isArray(courses) || !Array.isArray(assignments)) return [];
 
     const restDays = customRestDays !== null ? (Array.isArray(customRestDays) ? customRestDays : []) : getRestDays();
+    const noStudyDates = new Set(getNoStudyDates());
 
     // Preserve the caller's local calendar date, then normalize to local midnight.
     const baseDate = normalizeStudyPlanDate(startDate);
@@ -563,7 +637,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             currentDate.setDate(baseDate.getDate() + dayOffset);
             const dateStr = getLocalDateKey(currentDate);
             const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
-            const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
+            const isProtectedDate = noStudyDates.has(dateStr);
+            const isRestDay = isProtectedDate || restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
             emptyPlan.push({
                 date: dateStr,
                 currentDate,
@@ -573,6 +648,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
                 fullDate: currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
                 isToday: dayOffset === 0,
                 isRestDay,
+                isProtectedDate,
                 totalMinutes: 0,
                 blocks: [],
                 allBlocks: []
@@ -589,7 +665,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         currentDate.setDate(baseDate.getDate() + dayOffset);
         const dateStr = getLocalDateKey(currentDate);
         const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
-        const isRestDay = restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
+        const isProtectedDate = noStudyDates.has(dateStr);
+        const isRestDay = isProtectedDate || restDays.includes(dayOfWeek) || restDays.includes(currentDate.getDay());
         days.push({
             date: dateStr,
             currentDate,
@@ -599,6 +676,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             fullDate: currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
             isToday: dayOffset === 0,
             isRestDay,
+            isProtectedDate,
             totalMinutes: 0,
             assignedTasks: []
         });
@@ -626,7 +704,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
         const isExam = taskType === 'exam';
         const isReview = taskType === 'review';
-        const durationMin = customMinutes !== null ? customMinutes : (isExam ? 50 : 25);
+        const durationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task);
         const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
         let priority = localPrios[task.id] || task.priority || 'medium';
@@ -800,10 +878,13 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
             // If unit is overdue (minDeadline < 0) or due today (minDeadline === 0)
             if (minDeadline <= 0) {
+                const nextActiveDay = days.findIndex((day, index) => index >= Math.max(currentDayPointer, firstCourseDay)
+                    && index <= lastCourseDay && !day.isRestDay);
+                if (nextActiveDay < 0) return;
                 unitTaskList.forEach(task => {
-                    days[0].assignedTasks.push({ task });
+                    days[nextActiveDay].assignedTasks.push({ task });
                 });
-                currentDayPointer = Math.max(currentDayPointer, 1);
+                currentDayPointer = Math.min(daysAhead - 1, nextActiveDay + 1);
                 return;
             }
 
@@ -819,11 +900,9 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
                 }
             }
 
-            // If every available day is a rest day, the deadline remains a hard
-            // constraint: schedule on its date rather than silently moving work late.
-            if (activeDayIndices.length === 0) {
-                activeDayIndices = [targetEndDay];
-            }
+            // Protected dates and recurring rest days stay clear even when a
+            // deadline leaves no eligible study day in the current window.
+            if (activeDayIndices.length === 0) return;
 
             // Distribute unit tasks evenly across active days available
             const tasksPerActiveDay = Math.max(1, Math.ceil(unitTaskList.length / activeDayIndices.length));
@@ -858,7 +937,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     days.forEach(day => {
         // Collect assigned tasks for this day (and ensure overdue tasks are surfaced on Day 0)
         const combinedTasks = [...day.assignedTasks];
-        if (day.isToday) {
+        if (day.isToday && !day.isRestDay) {
             pendingAssignments.forEach(task => {
                 const daysLeft = calculateDaysRemaining(task.due_date, day.currentDate);
                 if (daysLeft < 0) {
@@ -997,7 +1076,15 @@ export async function openStudyPlanDayModal(dateStr) {
 
     let tasksHtml = '';
     if (day.allBlocks.length === 0) {
-        if (day.isRestDay) {
+        if (day.isProtectedDate) {
+            tasksHtml = `
+                <div class="py-10 px-6 text-center space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-dashed border-emerald-300 dark:border-emerald-800/40">
+                    <span class="text-4xl inline-block">🛡️</span>
+                    <h4 class="text-base font-black text-emerald-800 dark:text-emerald-300">Protected no-study date</h4>
+                    <p class="text-xs text-zinc-600 dark:text-zinc-300 max-w-md mx-auto leading-relaxed">The planner will keep coursework off this date.</p>
+                </div>
+            `;
+        } else if (day.isRestDay) {
             tasksHtml = `
                 <div class="py-10 px-6 text-center space-y-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-dashed border-emerald-300 dark:border-emerald-800/40">
                     <span class="text-4xl inline-block">🌴</span>
@@ -1048,7 +1135,7 @@ export async function openStudyPlanDayModal(dateStr) {
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <span class="px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 ${block.isExam ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30' : (block.isReview ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30')}">
-                            ${block.isExam ? '🎯 50m Exam Prep' : (block.isReview ? '📝 25m Review Block' : '⏱️ 25m Focus Block')}
+                            ⏱️ ${block.durationMinutes}m ${block.isExam ? 'Exam Prep' : (block.isReview ? 'Review Block' : 'Focus Block')}
                         </span>
                     </div>
                 </div>
@@ -1093,7 +1180,7 @@ export async function openStudyPlanDayModal(dateStr) {
                         <span class="text-xl">🗓️</span>
                         <h3 class="font-black text-xl text-zinc-900 dark:text-white">${day.fullDate || `${day.dayOfWeek}, ${day.displayDate}`}</h3>
                         ${day.isToday ? '<span class="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">Today</span>' : ''}
-                        ${day.isRestDay ? '<span class="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">🌴 Rest Day</span>' : ''}
+                        ${day.isProtectedDate ? '<span class="text-[10px] bg-emerald-700 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">🛡️ Protected</span>' : (day.isRestDay ? '<span class="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">🌴 Rest Day</span>' : '')}
                     </div>
                     <div class="flex items-center gap-2 flex-wrap text-xs">
                         <span class="px-2.5 py-0.5 rounded-full border font-bold ${intensityBg}">
@@ -1113,10 +1200,10 @@ export async function openStudyPlanDayModal(dateStr) {
             <!-- Rest Day Toggle Bar -->
             <div class="px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
                 <span class="text-zinc-600 dark:text-zinc-400 font-medium">
-                    ${day.isRestDay ? '🌴 This day is marked as a <strong>Rest Day</strong> (no study blocks assigned).' : '📚 This day is an active <strong>Study Day</strong>.'}
+                    ${day.isProtectedDate ? '🛡️ This is a <strong>protected no-study date</strong>; the planner will not assign coursework here.' : (day.isRestDay ? '🌴 This day is marked as a <strong>Rest Day</strong> (no study blocks assigned).' : '📚 This day is an active <strong>Study Day</strong>.')}
                 </span>
-                <button type="button" onclick="toggleRestDay('${day.dayOfWeek}'); openStudyPlanDayModal('${day.date}')" class="px-3 py-1 bg-white dark:bg-brand-800 hover:bg-zinc-200 dark:hover:bg-brand-700 font-bold rounded-lg border border-zinc-300 dark:border-brand-600 text-zinc-700 dark:text-zinc-300 transition text-[11px]">
-                    ${day.isRestDay ? '✏️ Make Study Day' : '🌴 Set as Rest Day'}
+                <button type="button" onclick="${day.isProtectedDate ? `removeNoStudyDate('${day.date}'); openStudyPlanDayModal('${day.date}')` : `toggleRestDay('${day.dayOfWeek}'); openStudyPlanDayModal('${day.date}')`}" class="px-3 py-1 bg-white dark:bg-brand-800 hover:bg-zinc-200 dark:hover:bg-brand-700 font-bold rounded-lg border border-zinc-300 dark:border-brand-600 text-zinc-700 dark:text-zinc-300 transition text-[11px]">
+                    ${day.isProtectedDate ? 'Remove protected date' : (day.isRestDay ? '✏️ Make Study Day' : '🌴 Set as Rest Day')}
                 </button>
             </div>
 
@@ -1364,7 +1451,9 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
     plan.forEach(day => {
         let blocksHtml = '';
         if (day.blocks.length === 0) {
-            if (day.isRestDay) {
+            if (day.isProtectedDate) {
+                blocksHtml = `<p class="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold py-1">🛡️ Protected no-study date</p>`;
+            } else if (day.isRestDay) {
                 blocksHtml = `<p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold py-1">🌴 Rest & Recovery Day</p>`;
             } else {
                 blocksHtml = `<p class="text-[11px] text-zinc-400 italic py-1">No urgent study blocks. Light review day! 🎉</p>`;
@@ -1403,7 +1492,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <span class="font-extrabold flex items-center gap-1.5 ${day.isRestDay ? 'text-emerald-700 dark:text-emerald-300' : (day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-300')}">
                         ${day.dayOfWeek}, ${day.displayDate}
                         ${day.isToday ? '<span class="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-black tracking-wider uppercase">TODAY</span>' : ''}
-                        ${day.isRestDay ? '<span class="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider">REST</span>' : ''}
+                        ${day.isProtectedDate ? '<span class="text-[9px] bg-emerald-700 text-white px-1.5 py-0.5 rounded font-bold tracking-wider">PROTECTED</span>' : (day.isRestDay ? '<span class="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider">REST</span>' : '')}
                     </span>
                     <span class="text-[11px] text-zinc-400 font-mono font-medium">${day.totalMinutes}m planned</span>
                 </div>
@@ -1422,6 +1511,10 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         const isRest = restDays.includes(d);
         return `<button type="button" onclick="toggleRestDay('${d}')" class="px-2 py-0.5 rounded-lg text-[11px] font-bold transition ${isRest ? 'bg-emerald-500 text-white shadow-xs' : 'bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-600'}" title="Toggle ${d} as Rest Day">${d}${isRest ? ' 🌴' : ''}</button>`;
     }).join('');
+    const noStudyDates = getNoStudyDates();
+    const noStudyDatesHtml = noStudyDates.length
+        ? noStudyDates.map((date) => `<button type="button" onclick="removeNoStudyDate('${inlineArg(date)}')" class="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-200" title="Remove protected date ${date}">🛡️ ${date} ×</button>`).join('')
+        : '<span class="text-[10px] text-zinc-500 dark:text-zinc-400">No protected dates</span>';
 
     container.innerHTML = `
         <div class="bg-white dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 shadow-sm space-y-4">
@@ -1438,12 +1531,18 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                         <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 px-1.5">Rest:</span>
                         ${dayPillsHtml}
                     </div>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <label for="noStudyDateInput" class="sr-only">Protect a no-study date</label>
+                        <input id="noStudyDateInput" type="date" min="${getLocalDateKey()}" aria-label="Protect a no-study date" class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-[11px] text-zinc-700 dark:border-brand-600 dark:bg-brand-900 dark:text-zinc-200">
+                        <button type="button" onclick="addNoStudyDateFromInput()" class="rounded-lg border border-emerald-300 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40">Protect date</button>
+                    </div>
                     ${lastStudyPlanMove ? '<button type="button" onclick="undoStudyPlanMove()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">Undo move</button>' : ''}
                     <button type="button" onclick="resetManualStudyPlanMoves()" class="text-xs text-zinc-500 dark:text-zinc-400 font-bold hover:underline px-2 py-1">Reset moves</button>
                     <button type="button" onclick="refreshStudyPlan()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh plan</button>
                 </div>
             </div>
             <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
+            <div class="flex flex-wrap items-center gap-1.5" aria-label="Protected no-study dates">${noStudyDatesHtml}</div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}
             </div>
@@ -1459,6 +1558,10 @@ _studyScope.getLessonNumber = getLessonNumber;
 _studyScope.getRestDays = getRestDays;
 _studyScope.setRestDays = setRestDays;
 _studyScope.toggleRestDay = toggleRestDay;
+_studyScope.getNoStudyDates = getNoStudyDates;
+_studyScope.setNoStudyDates = setNoStudyDates;
+_studyScope.addNoStudyDateFromInput = addNoStudyDateFromInput;
+_studyScope.removeNoStudyDate = removeNoStudyDate;
 _studyScope.generateBalancedStudyPlan = generateBalancedStudyPlan;
 _studyScope.renderStudyPlanDashboardWidget = renderStudyPlanDashboardWidget;
 _studyScope.refreshStudyPlan = refreshStudyPlan;

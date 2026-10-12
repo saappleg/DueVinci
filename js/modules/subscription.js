@@ -21,7 +21,7 @@ export const SUBSCRIPTION_CATALOG = Object.freeze({
     ]
 });
 
-export async function getSubscriptionSnapshot({ forceRefresh = false } = {}) {
+export async function getSubscriptionSnapshot({ forceRefresh = false, reconcile = false } = {}) {
     let userId = null;
     try {
         const { data } = await supabaseClient.auth.getSession();
@@ -30,7 +30,9 @@ export async function getSubscriptionSnapshot({ forceRefresh = false } = {}) {
     if (!forceRefresh && userId && cachedSnapshotUserId === userId && cachedSubscriptionSnapshot && Date.now() - snapshotLoadedAt < SNAPSHOT_CACHE_MS) {
         return cachedSubscriptionSnapshot;
     }
-    const { data, error } = await supabaseClient.functions.invoke('subscription-status');
+    const { data, error } = await supabaseClient.functions.invoke('subscription-status', {
+        body: reconcile ? { reconcile: true } : {},
+    });
     if (error) throw error;
     if (!data || typeof data !== 'object') throw new Error('Unable to load subscription status.');
     cachedSubscriptionSnapshot = data;

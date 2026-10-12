@@ -100,10 +100,10 @@ function renderCanvasOnboarding(profile) {
     area.classList.remove('hidden');
 }
 
-async function loadCanvasSubscriptionProfile(userId) {
+async function loadCanvasSubscriptionProfile(userId, reconcile = true) {
     void userId;
     try {
-        return { data: await getSubscriptionSnapshot({ forceRefresh: true }), error: null };
+        return { data: await getSubscriptionSnapshot({ forceRefresh: true, reconcile }), error: null };
     } catch (error) {
         return { data: null, error };
     }
@@ -143,7 +143,7 @@ export function buildCanvasCoursePayload(canvasCourse, userId, updatedAt = new D
 
 // ─── Subscription State ────────────────────────────────────────────────────────
 
-export async function initCanvasSettingsTab() {
+export async function initCanvasSettingsTab({ reconcile = true } = {}) {
     const badge   = document.getElementById('canvasSubBadge');
     const msg     = document.getElementById('canvasSubMsg');
     const trialBtn = document.getElementById('canvasStartTrialBtn');
@@ -164,7 +164,7 @@ export async function initCanvasSettingsTab() {
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (!user) throw new Error('Not signed in.');
 
-        const { data: profile, error } = await loadCanvasSubscriptionProfile(user.id);
+        const { data: profile, error } = await loadCanvasSubscriptionProfile(user.id, reconcile);
 
         if (error) throw error;
         profileSnapshot = profile;
@@ -231,9 +231,13 @@ export async function initCanvasSettingsTab() {
         } else if (status === 'canceled') {
             msg.textContent = 'Your subscription has been canceled. Your planner data stays free; choose a plan whenever you want Canvas Sync and the Socratic Study Companion again.';
             checkoutArea?.classList.remove('hidden');
+            if (profile?.hasBillingAccount) manageBillingBtn?.classList.remove('hidden');
         } else {
             msg.textContent = 'Your subscription is not active. Choose a plan to continue.';
             checkoutArea?.classList.remove('hidden');
+        }
+        if (profile?.billingRefreshWarning) {
+            msg.textContent += ' Stripe could not be reached just now, so these details are from the last successful sync.';
         }
     } catch (err) {
         badge.textContent = 'Error';
@@ -386,9 +390,11 @@ export async function handleCanvasCheckoutReturn() {
         const snapshot = await initCanvasSettingsTab();
         if (message && snapshot) {
             const status = snapshot?.status || 'unknown';
-            message.textContent = hasSubscriptionFeature(snapshot, 'canvas_sync')
-                ? 'Billing details refreshed. Your paid features are active.'
-                : `Billing details refreshed. Current subscription status: ${status.replaceAll('_', ' ')}. Paid features are currently unavailable.`;
+            message.textContent = snapshot.billingRefreshWarning
+                ? 'Stripe could not be reached. These billing details are from the last successful sync.'
+                : hasSubscriptionFeature(snapshot, 'canvas_sync')
+                    ? 'Billing details refreshed. Your paid features are active.'
+                    : `Billing details refreshed. Current subscription status: ${status.replaceAll('_', ' ')}. Paid features are currently unavailable.`;
         } else if (message) {
             message.textContent = 'We could not confirm your billing details. Refresh this page to try again.';
         }
@@ -400,17 +406,20 @@ export async function handleCanvasCheckoutReturn() {
 
     let snapshot = null;
     for (let attempt = 0; attempt < 6; attempt++) {
-        snapshot = await initCanvasSettingsTab();
+        snapshot = await initCanvasSettingsTab({ reconcile: attempt === 0 });
         if (hasSubscriptionFeature(snapshot, 'canvas_sync')) break;
         if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 1500));
     }
     const currentMessage = document.getElementById('canvasSubMsg');
     if (currentMessage) {
+        const refreshNote = snapshot?.billingRefreshWarning
+            ? ' Stripe could not be reached; showing the last synced details.'
+            : '';
         currentMessage.textContent = hasSubscriptionFeature(snapshot, 'canvas_sync')
             ? snapshot?.status === 'trialing'
-                ? 'Your trial is active. Canvas Sync and the Socratic Study Companion are enabled.'
-                : 'Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.'
-            : 'Checkout is complete. Stripe is still confirming your subscription; refresh this page in a moment if Pro access does not appear.';
+                ? `Your trial is active. Canvas Sync and the Socratic Study Companion are enabled.${refreshNote}`
+                : `Your subscription is active. Canvas Sync and the Socratic Study Companion are enabled.${refreshNote}`
+            : `Checkout is complete. Stripe is still confirming your subscription; refresh this page in a moment if Pro access does not appear.${refreshNote}`;
     }
     await window.renderTodayWorkspace?.();
 }
@@ -640,7 +649,16 @@ export async function handleCanvasSyncConfirm() {
         const assignmentCount = data.syncedAssignments ?? 0;
         const lastSyncedDisplay = document.getElementById('canvasLastSynced');
         if (lastSyncedDisplay && data.syncedAt) lastSyncedDisplay.textContent = `Last synced ${new Date(data.syncedAt).toLocaleString()}`;
-        showSyncModalMsg(`✓ Synced ${courseCount} course${courseCount === 1 ? '' : 's'} and ${assignmentCount} assignment${assignmentCount === 1 ? '' : 's'} successfully!`, 'success');
+        const adjustedCount = Number(data.adjustedAssignments || 0);
+        const conflictingCount = Number(data.conflictingWindowAssignments || 0);
+        const invalidDateCount = Number(data.invalidCanvasDateAssignments || 0);
+        const dateMessages = [
+            adjustedCount ? `${adjustedCount} due date${adjustedCount === 1 ? ' was' : 's were'} moved inside the class and term date ranges` : '',
+            conflictingCount ? `${conflictingCount} assignment${conflictingCount === 1 ? ' was' : 's were'} skipped because the class and term date ranges do not overlap` : '',
+            invalidDateCount ? `${invalidDateCount} assignment${invalidDateCount === 1 ? ' had' : 's had'} an invalid Canvas due date and ${invalidDateCount === 1 ? 'was' : 'were'} skipped` : '',
+        ].filter(Boolean);
+        const dateMessage = dateMessages.length ? ` ${dateMessages.join('; ')}.` : '';
+        showSyncModalMsg(`✓ Synced ${courseCount} course${courseCount === 1 ? '' : 's'} and ${assignmentCount} assignment${assignmentCount === 1 ? '' : 's'} successfully.${dateMessage}`, 'success');
         setTimeout(async () => {
             closeCanvasSyncModal();
             await initCanvasSettingsTab();

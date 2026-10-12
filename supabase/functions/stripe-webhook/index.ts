@@ -1,11 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14?target=deno'
-
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
-  apiVersion: '2025-03-31.basil',
-  httpClient: Stripe.createFetchHttpClient(),
-})
 
 const SUPPORTED_EVENTS = new Set([
   'checkout.session.completed',
@@ -15,6 +9,13 @@ const SUPPORTED_EVENTS = new Set([
   'invoice.payment_succeeded',
   'invoice.payment_failed',
 ])
+
+function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  })
+}
 
 function stripeId(value: any): string | null {
   if (typeof value === 'string') return value
@@ -49,61 +50,89 @@ function subscriptionPayload(subscription: Stripe.Subscription) {
   }
 }
 
-serve(async (req) => {
-  const body = await req.text()
-  const sig  = req.headers.get('stripe-signature')
-  const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')!
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
 
-  if (!sig) {
-    return new Response('Missing stripe-signature header', { status: 400 })
+  const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
+  const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY')
+  if (!webhookSecret || !stripeSecret) {
+    console.error('Stripe webhook credentials are not configured.')
+    return json({ error: 'Webhook is not configured.' }, 500)
   }
+  const stripe = new Stripe(stripeSecret, {
+    apiVersion: '2025-03-31.basil',
+    httpClient: Stripe.createFetchHttpClient(),
+  })
+
+  const body = await req.text()
+  const signature = req.headers.get('stripe-signature')
+  if (!signature) return new Response('Missing stripe-signature header', { status: 400 })
 
   let event: Stripe.Event
   try {
     // Supabase Edge Functions use Deno's Web Crypto provider, which validates
     // webhook signatures asynchronously.
-    event = await stripe.webhooks.constructEventAsync(body, sig, webhookSecret)
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message)
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 })
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid Stripe signature.'
+    console.error('Webhook signature verification failed:', message)
+    return new Response(`Webhook Error: ${message}`, { status: 400 })
   }
 
-  console.log(`Received Stripe event: ${event.type}`)
-
+  console.log(`Received Stripe event ${event.id}: ${event.type}`)
   if (!SUPPORTED_EVENTS.has(event.type)) {
-    // Event not relevant to us — acknowledge and ignore
-    return new Response(JSON.stringify({ received: true, action: 'ignored' }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return json({ received: true, action: 'ignored' })
   }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
+  const lockToken = crypto.randomUUID()
+  let eventLockAcquired = false
+
+  const acknowledge = async (action: string) => {
+    const { data, error } = await supabase.rpc('mark_stripe_event_processed', {
+      p_event_id: event.id,
+      p_lock_token: lockToken,
+    })
+    if (error) throw error
+    if (!data) throw new Error('Stripe event lock was lost before acknowledgment.')
+    eventLockAcquired = false
+    return json({ received: true, action })
+  }
 
   try {
+    const { data: acquired, error: lockError } = await supabase.rpc('acquire_stripe_event_lock', {
+      p_event_id: event.id,
+      p_event_type: event.type,
+      p_lock_token: lockToken,
+      p_lease_seconds: 180,
+    })
+    if (lockError) throw lockError
+    if (!acquired) {
+      const { data: previous, error: previousError } = await supabase
+        .from('billing_stripe_events').select('processed_at').eq('event_id', event.id).maybeSingle()
+      if (previousError) throw previousError
+      if (previous?.processed_at) return json({ received: true, action: 'duplicate' })
+      return json({ error: 'This event is already being processed. Stripe should retry it.' }, 503, { 'Retry-After': '5' })
+    }
+    eventLockAcquired = true
+
     const dataObj = event.data.object as any
     const customerId = stripeId(dataObj.customer)
-
     if (!customerId) {
-      console.error('No customer ID in event payload')
-      return new Response(JSON.stringify({ received: true, action: 'no_customer' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+      console.error(`Stripe event ${event.id} has no customer ID.`)
+      return await acknowledge('no_customer')
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('stripe_subscription_id')
+      .select('stripe_subscription_id, updated_at')
       .eq('stripe_customer_id', customerId)
       .maybeSingle()
     if (profileError) throw profileError
-    if (!profile) {
-      return new Response(JSON.stringify({ received: true, action: 'profile_not_found' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    if (!profile) return await acknowledge('profile_not_found')
 
     let updatePayload: Record<string, unknown> | null = null
     let expectedSubscriptionId: string | null | undefined
@@ -147,9 +176,7 @@ serve(async (req) => {
       const invoiceSubId = invoiceSubscriptionId(dataObj)
       // One-off invoices and events for old subscriptions never change access.
       if (!invoiceSubId || invoiceSubId !== profile.stripe_subscription_id) {
-        return new Response(JSON.stringify({ received: true, action: 'unlinked_invoice_ignored' }), {
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return await acknowledge('unlinked_invoice_ignored')
       }
       const subscription = await stripe.subscriptions.retrieve(invoiceSubId)
       if (stripeId(subscription.customer) !== customerId) throw new Error('Invoice subscription customer mismatch')
@@ -157,33 +184,29 @@ serve(async (req) => {
       expectedSubscriptionId = profile.stripe_subscription_id
     }
 
-    if (!updatePayload) {
-      return new Response(JSON.stringify({ received: true, action: 'stale_event_ignored' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    if (!updatePayload) return await acknowledge('stale_event_ignored')
 
     let guardedUpdate = supabase.from('profiles').update(updatePayload).eq('stripe_customer_id', customerId)
     if (expectedSubscriptionId === null) guardedUpdate = guardedUpdate.is('stripe_subscription_id', null)
     else if (expectedSubscriptionId) guardedUpdate = guardedUpdate.eq('stripe_subscription_id', expectedSubscriptionId)
+    if (profile.updated_at) guardedUpdate = guardedUpdate.eq('updated_at', profile.updated_at)
+    else guardedUpdate = guardedUpdate.is('updated_at', null)
     const { data: updatedProfiles, error } = await guardedUpdate.select('user_id')
     if (error) throw error
-    if (!updatedProfiles?.length) {
-      return new Response(JSON.stringify({ received: true, action: 'concurrent_update_ignored' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    if (!updatedProfiles?.length) throw new Error('A concurrent billing update changed the profile. Stripe should retry this event.')
 
     console.log(`Updated profile for customer ${customerId} from ${event.type}`)
-  } catch (err) {
-    console.error('DB update failed:', err.message)
-    return new Response(JSON.stringify({ error: 'Database update failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return await acknowledge('processed')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown webhook processing error.'
+    console.error(`Stripe event ${event.id} processing failed:`, message)
+    if (eventLockAcquired) {
+      const { error: releaseError } = await supabase.rpc('release_stripe_event_lock', {
+        p_event_id: event.id,
+        p_lock_token: lockToken,
+      })
+      if (releaseError) console.error(`Could not release lock for Stripe event ${event.id}:`, releaseError.message)
+    }
+    return json({ error: 'Subscription update failed. Stripe should retry this event.' }, 500)
   }
-
-  return new Response(JSON.stringify({ received: true }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
 })

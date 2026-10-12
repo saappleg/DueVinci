@@ -4,6 +4,7 @@ import { currentUser } from './auth.js';
 import { getLocalDateKey } from './utils.js';
 import { collectLocalFlashcardMastery, mergeFlashcardMastery, restoreFlashcardMastery } from './flashcards.js';
 import { applySyncedPreferences, collectSyncedPreferences } from './preferences.js';
+import { processOfflineQueue } from './offlineDb.js';
 
 export function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}, flashcardMastery = {}) {
     return {
@@ -71,6 +72,7 @@ export async function exportUserDataJSON() {
 }
 
 export async function syncDataWithSupabase() {
+    let syncSummary = { processed: 0, remaining: 0 };
     try {
         if (!supabaseClient) {
             alert('Supabase client is not initialized.');
@@ -83,6 +85,17 @@ export async function syncDataWithSupabase() {
         }
         if (!user) {
             alert('Please sign in to sync with your Supabase cloud database.');
+            return;
+        }
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('You are offline. Your local changes are still saved on this device; reconnect before syncing and refreshing cloud data.');
+            return;
+        }
+
+        syncSummary = await processOfflineQueue(supabaseClient, user.id);
+        if (syncSummary.remaining > 0) {
+            const saved = syncSummary.processed;
+            alert(`Sync is incomplete. ${saved} queued change${saved === 1 ? '' : 's'} saved; ${syncSummary.remaining} still waiting. Cloud data was not refreshed so your pending local changes stay visible. Try again when your connection is stable.`);
             return;
         }
 
@@ -103,10 +116,12 @@ export async function syncDataWithSupabase() {
             }
         }
 
-        alert(`✅ Supabase Cloud Sync Successful!\nAccount: ${user.email}\n• ${courses?.length || 0} Courses Synchronized\n• ${assignments?.length || 0} Assignments Synchronized`);
+        alert(`✅ Sync complete\nAccount: ${user.email}\n• ${syncSummary.processed} queued change${syncSummary.processed === 1 ? '' : 's'} saved\n• ${courses?.length || 0} Courses Loaded\n• ${assignments?.length || 0} Assignments Loaded`);
     } catch (err) {
-        console.error('Error syncing with Supabase:', err);
-        alert('Supabase cloud sync failed. Please check network connection.');
+        console.error('Error refreshing from Supabase:', err);
+        const saved = syncSummary.processed;
+        const savedNotice = saved ? `${saved} queued change${saved === 1 ? ' was' : 's were'} saved, but ` : '';
+        alert(`${savedNotice}the latest cloud data could not be loaded. Your local changes remain available; check your connection and try again.`);
     }
 }
 
