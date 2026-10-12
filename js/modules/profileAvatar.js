@@ -62,9 +62,20 @@ export function renderProfileEasterEgg(user = window.currentUser) {
 }
 
 export function activateProfileEasterEgg(egg, user = window.currentUser) {
-    if (!PROFILE_EASTER_EGGS[egg] || typeof localStorage === 'undefined') return false;
-    // One key stores one value, so a new activation always replaces the old badge.
-    localStorage.setItem(profileEasterEggKey(user), egg);
+    return setProfileEasterEgg(egg, user);
+}
+
+export function setProfileEasterEgg(egg, user = window.currentUser) {
+    if (typeof localStorage === 'undefined') return false;
+    const key = profileEasterEggKey(user);
+    if (!egg) {
+        localStorage.removeItem(key);
+        renderProfileEasterEgg(user);
+        return true;
+    }
+    if (!PROFILE_EASTER_EGGS[egg]) return false;
+    // One key stores one value, so a new selection replaces the old badge.
+    localStorage.setItem(key, egg);
     renderProfileEasterEgg(user);
     return true;
 }

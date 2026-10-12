@@ -1,7 +1,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
-import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName } from './profileAvatar.js';
+import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName, getProfileEasterEgg, setProfileEasterEgg } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 import { applySubscriptionCatalog, clearSubscriptionSnapshot } from './subscription.js';
 import { clearOfflineUserData } from './offlineDb.js';
@@ -356,6 +356,15 @@ export function ensureSettingsModalExists() {
                                     <span class="text-[11px] text-zinc-400">JPG, PNG, or WebP · up to 2 MB</span>
                                 </div>
                                 <p id="avatarMsg" class="hidden mt-2 text-xs"></p>
+                            </div>
+                            <div>
+                                <label for="profileAvatarBadgeSelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Profile picture badge</label>
+                                <select id="profileAvatarBadgeSelect" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                                    <option value="">No badge</option>
+                                    <option value="maestro">The Maestro Shield</option>
+                                    <option value="nightowl">Night Owl</option>
+                                </select>
+                                <p id="profileBadgeMsg" class="hidden mt-1 text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
                             </div>
                             <div>
                                 <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
@@ -714,6 +723,23 @@ export function openSettingsModal() {
         if (avatarInput && !avatarInput.dataset.bound) {
             avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
             avatarInput.dataset.bound = 'true';
+        }
+        const badgeSelect = document.getElementById('profileAvatarBadgeSelect');
+        if (badgeSelect) {
+            badgeSelect.value = getProfileEasterEgg(currentUser) || '';
+            if (!badgeSelect.dataset.bound) {
+                badgeSelect.addEventListener('change', () => {
+                    const saved = setProfileEasterEgg(badgeSelect.value, currentUser);
+                    const message = document.getElementById('profileBadgeMsg');
+                    if (message) {
+                        message.textContent = saved
+                            ? (badgeSelect.value ? 'Profile badge updated.' : 'Profile badge removed.')
+                            : 'Could not update the profile badge.';
+                        message.classList.remove('hidden');
+                    }
+                });
+                badgeSelect.dataset.bound = 'true';
+            }
         }
     }
     const themeSelect = document.getElementById('themeSelect');
