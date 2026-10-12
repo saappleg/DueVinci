@@ -3,15 +3,18 @@ import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
 import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
-import { getUnitNumber, getLessonNumber } from './studyPlan.js';
+import { getUnitNumber, getLessonNumber, getCurrentStudyWeekAssignments } from './studyPlan.js';
 import { deleteDeckMastery } from './flashcards.js';
+import { getArchivedTermNames, getCourseDateBounds, getTermDateRange, saveTermDateRange, isDateWithinCourseWindow, clampDateToCourseWindow } from './courseDates.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
 export let hideUnassignedFolder = typeof localStorage !== 'undefined' && localStorage.getItem('hideUnassigned') === 'true';
+let showArchivedTerms = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_show_archived_terms') === 'true';
 export let currentAssignmentPage = 1;
 export let activeTermModalName = '';
 let lastQuickAddTrigger = null;
+let lastTermModalTrigger = null;
 let lastCourseModalTrigger = null;
 
 function isWeeklyCourse(course) {
@@ -137,6 +140,68 @@ function courseWindowLabel(course) {
     return `${format(course.start_date)} – ${format(course.end_date)}`;
 }
 
+function dateRangeLabel(range = {}) {
+    if (!range.start_date && !range.end_date) return '';
+    const format = (value) => {
+        if (!value) return 'Open';
+        const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+        return Number.isNaN(date.valueOf()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+    };
+    return `${format(range.start_date)} – ${format(range.end_date)}`;
+}
+
+function applyCourseDateBoundsToInput(input, course) {
+    if (!input) return;
+    if (!course) {
+        input.removeAttribute('min');
+        input.removeAttribute('max');
+        if (!input.value) input.value = getLocalDateKey();
+        return;
+    }
+    const { startDate, endDate, isValid } = getCourseDateBounds(course);
+    input.min = isValid ? startDate : '';
+    input.max = isValid ? endDate : '';
+    if (!input.value || !isDateWithinCourseWindow(input.value, course)) {
+        input.value = isValid ? clampDateToCourseWindow(getLocalDateKey(), course) : getLocalDateKey();
+    }
+}
+
+function isCourseHiddenByArchive(course, archivedTerms = getArchivedTermNames(customTerms)) {
+    return !showArchivedTerms && Boolean(course?.term && archivedTerms.has(course.term.trim()));
+}
+
+function renderTermOptions(course) {
+    const archivedTerms = getArchivedTermNames(customTerms);
+    const currentTerm = course?.term?.trim() || '';
+    const terms = customTerms.filter((term) => showArchivedTerms || !archivedTerms.has(term) || term === currentTerm);
+    return `<option value="">Unassigned</option>${terms.map((term) => {
+        const isArchived = archivedTerms.has(term);
+        const label = `${term}${isArchived ? ' (Archived)' : ''}`;
+        return `<option value="${escapeHtml(term)}" ${currentTerm === term ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('')}`;
+}
+
+function constrainImportedCourseDate(value, course, adjustmentCounter) {
+    if (!value || !course) return value;
+    const bounded = clampDateToCourseWindow(value, course);
+    if (bounded !== value) adjustmentCounter.count += 1;
+    return bounded;
+}
+
+async function countAssignmentsOutsideCourseWindows(courses = []) {
+    const coursesById = new Map(courses.filter(Boolean).map((course) => [course.id, course]));
+    if (!coursesById.size) return 0;
+    try {
+        const { data, error } = await supabaseClient.from('assignments')
+            .select('course_id, due_date')
+            .in('course_id', [...coursesById.keys()]);
+        if (error) return null;
+        return (data || []).filter((assignment) => !isDateWithinCourseWindow(assignment.due_date, coursesById.get(assignment.course_id))).length;
+    } catch {
+        return null;
+    }
+}
+
 async function getSyllabusParserError(error) {
     try {
         const body = await error?.context?.clone?.().json();
@@ -229,7 +294,8 @@ export async function loadDashboardStats() {
         upNextListEl.innerHTML = '';
         const currentFilter = window.activePriorityFilter || 'all';
 
-        let upcoming = assignments.filter(a => !a.is_completed && (a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title)));
+        const currentStudyWeekAssignments = getCurrentStudyWeekAssignments(courses, assignments, new Date());
+        let upcoming = currentStudyWeekAssignments.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
         
         if (currentFilter !== 'all') {
             upcoming = upcoming.filter(a => (a.priority || 'medium') === currentFilter);
@@ -380,18 +446,31 @@ export async function submitEditCourseForm(event) {
     const code = document.getElementById('editCourseCode')?.value.trim();
     const color = document.getElementById('editCourseColor')?.value;
     const profile = document.getElementById('editCoursePacingType')?.value || 'manual';
+    const term = document.getElementById('editCourseTerm')?.value || null;
+    const startDate = document.getElementById('editCourseStartDate')?.value || null;
+    const endDate = document.getElementById('editCourseEndDate')?.value || null;
     const submitButton = event?.currentTarget?.querySelector('button[type="submit"]');
     const message = document.getElementById('courseSettingsMessage');
     const course = localCourses.find((item) => item.id === courseId);
     const showMessage = (text, tone = 'error') => {
         if (!message) return;
         message.textContent = text;
-        message.className = `text-xs text-center mt-2 ${tone === 'success' ? 'text-green-500' : 'text-red-500'}`;
+        const color = tone === 'success' ? 'text-green-500' : tone === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500';
+        message.className = `text-xs text-center mt-2 ${color}`;
         message.classList.remove('hidden');
     };
 
     if (!courseId || !emoji || !code || !color || !course) {
         showMessage('Please complete the course settings first.');
+        return;
+    }
+    if (startDate && endDate && startDate > endDate) {
+        showMessage('The class end date must be on or after the start date.');
+        return;
+    }
+    const effectiveWindow = getCourseDateBounds({ ...course, term, start_date: startDate, end_date: endDate });
+    if (!effectiveWindow.isValid) {
+        showMessage('The class and term date ranges do not overlap. Adjust one of the ranges to continue.');
         return;
     }
 
@@ -414,6 +493,9 @@ export async function submitEditCourseForm(event) {
         emoji,
         code,
         color,
+        term,
+        start_date: startDate,
+        end_date: endDate,
         ...getCoursePacingUpdates(course, profile)
     };
 
@@ -422,14 +504,19 @@ export async function submitEditCourseForm(event) {
         if (error) throw error;
 
         Object.assign(course, updates);
+        const outsideWindowCount = await countAssignmentsOutsideCourseWindows([course]);
         openCourseModal(courseId);
         const refreshedMessage = document.getElementById('courseSettingsMessage');
         if (refreshedMessage) {
-            refreshedMessage.textContent = 'Course settings saved.';
-            refreshedMessage.className = 'text-xs text-center mt-2 text-green-500';
+            refreshedMessage.textContent = outsideWindowCount
+                ? `Course settings saved. ${outsideWindowCount} existing due date${outsideWindowCount === 1 ? ' falls' : 's fall'} outside this window; adjust them in Coursework.`
+                : 'Course settings saved.';
+            refreshedMessage.className = `text-xs text-center mt-2 ${outsideWindowCount ? 'text-amber-600 dark:text-amber-400' : 'text-green-500'}`;
             refreshedMessage.classList.remove('hidden');
         }
         loadCoursesPage();
+        window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+        window.loadDashboardStats?.();
     } catch (error) {
         console.error('Error updating course settings:', error);
         showMessage(`Could not save settings: ${error.message || 'Please try again.'}`);
@@ -472,16 +559,23 @@ export function renderTermFolders() {
     if (typeof document === 'undefined') return;
     const foldersGrid = document.getElementById('termFoldersGrid');
     if (!foldersGrid) return;
+    const archivedToggle = document.getElementById('showArchivedTermsToggle');
+    if (archivedToggle) archivedToggle.checked = showArchivedTerms;
 
+    const archivedTerms = getArchivedTermNames(customTerms);
+    const visibleTerms = customTerms.filter((term) => showArchivedTerms || !archivedTerms.has(term));
+    const hideCompleted = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_completed_courses') === 'true';
+    const visibleCourses = localCourses.filter((course) => !(hideCompleted && course.is_completed));
     const termsMap = {};
-    customTerms.forEach(t => { termsMap[t] = []; });
+    visibleTerms.forEach(t => { termsMap[t] = []; });
 
     if (!hideUnassignedFolder) {
         if (!termsMap['Unassigned']) termsMap['Unassigned'] = [];
     }
 
-    localCourses.forEach(c => {
+    visibleCourses.forEach(c => {
         const t = (c.term && c.term.trim() !== '') ? c.term.trim() : 'Unassigned';
+        if (archivedTerms.has(t) && !showArchivedTerms) return;
         if (t === 'Unassigned' && hideUnassignedFolder) return;
         if (!termsMap[t]) termsMap[t] = [];
         termsMap[t].push(c);
@@ -493,6 +587,9 @@ export function renderTermFolders() {
     termNames.forEach(termName => {
         const termCourses = termsMap[termName];
         const termArg = inlineArg(termName);
+        const termRange = getTermDateRange(termName);
+        const rangeLabel = dateRangeLabel(termRange);
+        const isArchived = archivedTerms.has(termName);
         foldersGrid.innerHTML += `
             <div role="button" tabindex="0" onclick="openTermModal('${termArg}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTermModal('${termArg}'); }"
                  ondragover="allowDrop(event)" 
@@ -505,13 +602,22 @@ export function renderTermFolders() {
                     </div>
                     <span class="text-xs bg-zinc-100 dark:bg-brand-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold">${termCourses.length} class${termCourses.length === 1 ? '' : 'es'}</span>
                 </div>
+                ${isArchived ? '<span class="mt-2 inline-flex w-fit rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600 dark:bg-brand-700 dark:text-zinc-300">Archived</span>' : ''}
+                ${rangeLabel ? `<p class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(rangeLabel)}</p>` : ''}
                 <div class="mt-3 flex flex-wrap gap-1.5">
                     ${termCourses.slice(0, 4).map(c => { const color = safeCourseColor(c.color); return `<span class="text-[11px] px-2 py-0.5 rounded font-medium" style="background-color: ${color}20; color: ${color}; border: 1px solid ${color}40;">${escapeHtml(c.code)}</span>`; }).join('')}
                     ${termCourses.length > 4 ? `<span class="text-[11px] text-zinc-400 px-1">+${termCourses.length - 4} more</span>` : ''}
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-2 text-right">Click to open &bull; Drag class here</p>
+                <p class="text-[11px] text-zinc-400 mt-2 text-right">Click to open &bull; Assign classes from the list</p>
             </div>`;
     });
+}
+
+export function toggleArchivedTerms(visible) {
+    showArchivedTerms = Boolean(visible);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_show_archived_terms', String(showArchivedTerms));
+    renderTermFolders();
+    renderAlphabeticals();
 }
 
 export function renderAlphabeticals() {
@@ -525,7 +631,14 @@ export function renderAlphabeticals() {
         return;
     }
 
-    const sortedCourses = [...localCourses].sort((a, b) => a.code.localeCompare(b.code));
+    const hideCompleted = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_completed_courses') === 'true';
+    const archivedTerms = getArchivedTermNames(customTerms);
+    const sortedCourses = localCourses.filter((course) => !(hideCompleted && course.is_completed) && !isCourseHiddenByArchive(course, archivedTerms))
+        .sort((a, b) => a.code.localeCompare(b.code));
+    if (sortedCourses.length === 0) {
+        listEl.innerHTML = '<div class="p-4 text-sm text-zinc-500 text-center">No current classes to show. Use “Show archived” above to reveal past terms, or turn off “Hide completed classes” in Settings.</div>';
+        return;
+    }
 
     sortedCourses.forEach(course => {
         const emoji = course.emoji || '📚';
@@ -534,13 +647,14 @@ export function renderAlphabeticals() {
         const courseColor = safeCourseColor(course.color);
         const opacity = course.is_completed ? 'opacity-50' : '';
         const checkIcon = course.is_completed ? `<span class="text-indigo-500 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded">✔ Completed</span>` : '';
+        const termOptions = renderTermOptions(course);
 
         const windowLabel = courseWindowLabel(course);
         const pacingBadge = isWeeklyCourse(course) ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded font-bold">Weekly pacing</span>' : '';
         const windowBadge = windowLabel ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${escapeHtml(windowLabel)}</span>` : '';
         listEl.innerHTML += `
-            <div role="button" tabindex="0" draggable="true" ondragstart="handleDragStart(event, '${courseArg}')" onclick="openCourseModal('${courseArg}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourseModal('${courseArg}'); }" class="cursor-pointer p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex items-center justify-between ${opacity}">
-                <div class="flex items-center gap-4">
+            <div role="group" class="p-4 hover:bg-zinc-50 dark:hover:bg-brand-700/50 transition flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${opacity}">
+                <div role="button" tabindex="0" onclick="openCourseModal('${courseArg}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourseModal('${courseArg}'); }" class="cursor-pointer flex items-center gap-4 min-w-0">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0" style="background-color: ${courseColor}20; color: ${courseColor}; border: 1px solid ${courseColor}40;">${escapeHtml(emoji)}</div>
                     <div>
                         <div class="flex items-center gap-2">
@@ -548,10 +662,17 @@ export function renderAlphabeticals() {
                             ${termBadge}
                         </div>
                         <div class="flex flex-wrap items-center gap-2 mt-0.5">${pacingBadge}${windowBadge}</div>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Drag card to move term &bull; Click to open coursework</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Choose a term here &bull; Click to open coursework</p>
                     </div>
                 </div>
-                <div>${checkIcon}</div>
+                <div class="flex flex-row flex-wrap items-center justify-between gap-2 sm:flex-col sm:items-end">
+                    ${checkIcon}
+                    <label class="flex items-center gap-1.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400" onclick="event.stopPropagation()">Term
+                        <select aria-label="Move ${escapeHtml(course.code)} to term" onchange="updateCourseTerm('${courseArg}', this.value, event)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" class="max-w-36 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-brand-600 dark:bg-brand-900 dark:text-zinc-200">
+                            ${termOptions}
+                        </select>
+                    </label>
+                </div>
             </div>`;
     });
 }
@@ -589,17 +710,69 @@ export async function handleDropToTerm(e, termName) {
     renderAlphabeticals();
 }
 
+export async function updateCourseTerm(courseId, termName, event) {
+    event?.stopPropagation?.();
+    const course = localCourses.find((item) => item.id === courseId);
+    if (!course) return;
+    const newTerm = termName || null;
+    if (!getCourseDateBounds({ ...course, term: newTerm }).isValid) {
+        alert('This class date range does not overlap the selected term. Adjust its dates first.');
+        renderAlphabeticals();
+        return;
+    }
+    if (newTerm && !customTerms.includes(newTerm)) {
+        customTerms.push(newTerm);
+        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    }
+    const { error } = await supabaseClient.from('courses').update({ term: newTerm }).eq('id', courseId);
+    if (error) {
+        alert(`Could not move this class: ${error.message || 'Please try again.'}`);
+        renderAlphabeticals();
+        return;
+    }
+    course.term = newTerm;
+    renderTermFolders();
+    renderAlphabeticals();
+    window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+}
+
+export function updateQuickAddDateBounds(courseId) {
+    const course = localCourses.find((item) => item.id === courseId);
+    applyCourseDateBoundsToInput(document.getElementById('quickAddDueDate'), course);
+}
+
 export function createNewTermFolder() {
     const input = document.getElementById('newTermInput');
     const termVal = input ? input.value.trim() : '';
     if (!termVal) return;
 
-    if (!customTerms.includes(termVal)) {
-        customTerms.push(termVal);
-        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    if (customTerms.includes(termVal)) {
+        alert('That term already exists. Open its folder to edit the date range.');
+        return;
     }
+
+    const startDate = document.getElementById('newTermStartDate')?.value || '';
+    const endDate = document.getElementById('newTermEndDate')?.value || '';
+    if (startDate && endDate && startDate > endDate) {
+        const endInput = document.getElementById('newTermEndDate');
+        if (endInput) {
+            endInput.setCustomValidity('The term end date must be on or after the start date.');
+            endInput.reportValidity();
+            endInput.setCustomValidity('');
+        }
+        return;
+    }
+
+    customTerms.push(termVal);
+    localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+    saveTermDateRange(termVal, startDate, endDate);
     input.value = '';
+    const startInput = document.getElementById('newTermStartDate');
+    const endInput = document.getElementById('newTermEndDate');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
     renderTermFolders();
+    renderAlphabeticals();
 }
 
 export function ensureTermModalExists() {
@@ -608,14 +781,24 @@ export function ensureTermModalExists() {
         const div = document.createElement('div');
         div.id = 'termModal';
         div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
+        div.setAttribute('aria-hidden', 'true');
         div.innerHTML = `
-            <div class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-lg p-6 shadow-xl max-h-[85vh] flex flex-col">
+            <div role="dialog" aria-modal="true" aria-labelledby="termModalTitle" class="bg-white dark:bg-brand-800 rounded-2xl border border-zinc-200 dark:border-brand-700 w-full max-w-lg p-6 shadow-xl max-h-[85vh] flex flex-col">
                 <div class="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-brand-700">
                     <div class="flex items-center gap-2">
                         <span class="text-2xl">📁</span>
                         <h3 id="termModalTitle" class="text-lg font-bold text-zinc-800 dark:text-zinc-200"></h3>
                     </div>
                     <button type="button" onclick="closeTermModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xl font-bold">✕</button>
+                </div>
+                <div id="termDateEditor" class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900">
+                    <h4 class="text-xs font-bold text-zinc-700 dark:text-zinc-200">Term date range</h4>
+                    <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                        <label class="text-[11px] font-semibold text-zinc-500">Starts<input type="date" id="termStartDateInput" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white"></label>
+                        <label class="text-[11px] font-semibold text-zinc-500">Ends<input type="date" id="termEndDateInput" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white"></label>
+                        <button type="button" onclick="saveCurrentTermDateRange()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save dates</button>
+                    </div>
+                    <p id="termDatesMessage" role="status" aria-live="polite" class="mt-2 hidden text-[11px]"></p>
                 </div>
                 <div id="termModalCourseList" class="py-4 space-y-3 overflow-y-auto flex-1"></div>
                 <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex justify-between items-center">
@@ -627,26 +810,62 @@ export function ensureTermModalExists() {
         div.addEventListener('click', (event) => {
             if (event.target === div) closeTermModal();
         });
+        div.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeTermModal();
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            const focusable = [...div.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => !element.disabled && element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
     }
 }
 
 export function openTermModal(termName) {
     ensureTermModalExists();
+    if (document.getElementById('termModal')?.classList.contains('hidden')) lastTermModalTrigger = document.activeElement;
     activeTermModalName = termName;
     const titleEl = document.getElementById('termModalTitle');
     if (titleEl) titleEl.innerText = `Classes in ${termName}`;
+    const range = getTermDateRange(termName);
+    const dateEditor = document.getElementById('termDateEditor');
+    if (dateEditor) dateEditor.classList.toggle('hidden', termName === 'Unassigned');
+    const termStartInput = document.getElementById('termStartDateInput');
+    const termEndInput = document.getElementById('termEndDateInput');
+    if (termStartInput) termStartInput.value = range.start_date;
+    if (termEndInput) termEndInput.value = range.end_date;
+    document.getElementById('termDatesMessage')?.classList.add('hidden');
 
     const listEl = document.getElementById('termModalCourseList');
     if (!listEl) return;
 
+    const hideCompleted = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_hide_completed_courses') === 'true';
     const termCourses = localCourses.filter(c => {
         const t = c.term ? c.term.trim() : 'Unassigned';
-        return t === termName;
+        return t === termName && !(hideCompleted && c.is_completed);
     });
 
     listEl.innerHTML = '';
     if (termCourses.length === 0) {
-        listEl.innerHTML = '<p class="text-sm text-zinc-500 text-center py-6">No classes in this term yet. Drag a class card here or assign one.</p>';
+        const completedHidden = hideCompleted && localCourses.some((course) => {
+            const courseTerm = course.term ? course.term.trim() : 'Unassigned';
+            return courseTerm === termName && course.is_completed;
+        });
+        listEl.innerHTML = completedHidden
+            ? '<p class="text-sm text-zinc-500 text-center py-6">Only completed classes are in this term. Turn off “Hide completed classes” in Settings to show them.</p>'
+            : '<p class="text-sm text-zinc-500 text-center py-6">No classes in this term yet. Choose this term from a class row to assign one.</p>';
     } else {
         termCourses.forEach(course => {
             const emoji = course.emoji || '📚';
@@ -665,12 +884,52 @@ export function openTermModal(termName) {
         });
     }
 
-    document.getElementById('termModal')?.classList.remove('hidden');
+    const modal = document.getElementById('termModal');
+    modal?.classList.remove('hidden');
+    modal?.setAttribute('aria-hidden', 'false');
+    modal?.querySelector('button')?.focus();
+}
+
+export async function saveCurrentTermDateRange() {
+    if (!activeTermModalName || activeTermModalName === 'Unassigned') return;
+    const startDate = document.getElementById('termStartDateInput')?.value || '';
+    const endDate = document.getElementById('termEndDateInput')?.value || '';
+    const message = document.getElementById('termDatesMessage');
+    if (startDate && endDate && startDate > endDate) {
+        if (message) {
+            message.textContent = 'The end date must be on or after the start date.';
+            message.className = 'mt-2 text-[11px] text-red-500';
+            message.classList.remove('hidden');
+        }
+        return;
+    }
+    saveTermDateRange(activeTermModalName, startDate, endDate);
+    const termCourses = localCourses.filter((course) => course.term?.trim() === activeTermModalName);
+    const conflictingCourses = termCourses.filter((course) => !getCourseDateBounds(course).isValid);
+    const outsideWindowCount = await countAssignmentsOutsideCourseWindows(termCourses);
+    if (message) {
+        message.textContent = conflictingCourses.length
+            ? `Dates saved, but ${conflictingCourses.length} class date range${conflictingCourses.length === 1 ? ' does' : 's do'} not overlap this term. Those classes need adjusted dates before scheduling.`
+            : outsideWindowCount
+                ? `Term dates saved. ${outsideWindowCount} existing due date${outsideWindowCount === 1 ? ' falls' : 's fall'} outside the new window; adjust them in Coursework. This term will be archived after its end date.`
+                : 'Term dates saved. This term will be archived after its end date.';
+        message.className = `mt-2 text-[11px] ${conflictingCourses.length || outsideWindowCount ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`;
+        message.classList.remove('hidden');
+    }
+    renderTermFolders();
+    renderAlphabeticals();
+    window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+    window.loadDashboardStats?.();
 }
 
 export function closeTermModal() {
     const modal = document.getElementById('termModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    if (lastTermModalTrigger?.focus) lastTermModalTrigger.focus();
+    lastTermModalTrigger = null;
 }
 
 export async function deleteCurrentTermFolder() {
@@ -703,6 +962,7 @@ export async function deleteCurrentTermFolder() {
 
         customTerms = customTerms.filter(t => t !== activeTermModalName);
         localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+        saveTermDateRange(activeTermModalName, '', '');
 
         closeTermModal();
         renderTermFolders();
@@ -723,6 +983,17 @@ export function openCourseModal(courseId) {
     document.getElementById('editCourseColor').value = course.color;
     const pacingInput = document.getElementById('editCoursePacingType');
     if (pacingInput) pacingInput.value = getCoursePacingProfile(course);
+    const termInput = document.getElementById('editCourseTerm');
+    if (termInput) {
+        const termNames = [...new Set([...customTerms, ...(course.term ? [course.term.trim()] : [])])];
+        termInput.innerHTML = renderTermOptions({ ...course, term: termNames.includes(course.term?.trim()) ? course.term : '' });
+        termInput.value = course.term?.trim() || '';
+    }
+    const startDateInput = document.getElementById('editCourseStartDate');
+    const endDateInput = document.getElementById('editCourseEndDate');
+    if (startDateInput) startDateInput.value = String(course.start_date || '').slice(0, 10);
+    if (endDateInput) endDateInput.value = String(course.end_date || '').slice(0, 10);
+    applyCourseDateBoundsToInput(document.getElementById('assignDate'), course);
 
     const descInput = document.getElementById('editCourseDescription');
     if (descInput) descInput.value = course.description || '';
@@ -949,6 +1220,8 @@ export async function parseSyllabusPDF() {
     const fileInput = document.getElementById('syllabusFile');
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
+    const course = localCourses.find((item) => item.id === courseId);
+    const adjustedDateCount = { count: 0 };
 
     if (!fileInput.files || fileInput.files.length === 0) {
         statusMsg.textContent = "Please select a PDF file first.";
@@ -1014,6 +1287,12 @@ export async function parseSyllabusPDF() {
             return;
         }
 
+        if (!course || !getCourseDateBounds(course).isValid) {
+            statusMsg.textContent = 'Fix the class and term date ranges before importing coursework.';
+            statusMsg.className = 'text-xs text-center mt-2 text-red-500';
+            return;
+        }
+
         let baseDate = new Date();
         if (parsedData.units && parsedData.units.length > 0) {
             parsedData.units.sort((a, b) => {
@@ -1029,8 +1308,10 @@ export async function parseSyllabusPDF() {
                     fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
                     targetDate = getLocalDateKey(fallbackDate);
                 }
+                targetDate = constrainImportedCourseDate(targetDate, course, adjustedDateCount);
                 // Resolve optional end date for range spreading
-                const endDate = u.endDateStr ? smartParseDate(u.endDateStr) : null;
+                let endDate = u.endDateStr ? smartParseDate(u.endDateStr) : null;
+                endDate = constrainImportedCourseDate(endDate, course, adjustedDateCount);
 
                 const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                     course_id: courseId, user_id: currentUser.id,
@@ -1057,7 +1338,7 @@ export async function parseSyllabusPDF() {
             }
         }
 
-        statusMsg.textContent = "Successfully imported curriculum via secure Edge Function!";
+        statusMsg.textContent = `Successfully imported curriculum via secure Edge Function.${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
         statusMsg.className = "text-xs text-center mt-2 text-green-500";
         openCourseModal(courseId);
         loadCoursesPage();
@@ -1073,7 +1354,16 @@ export async function parseSyllabusPDF() {
 export async function parseLessonsImage(inputElement) {
     const statusMsg = document.getElementById('pdfStatusMsg');
     const courseId = document.getElementById('editCourseId').value;
+    const course = localCourses.find((item) => item.id === courseId);
+    const adjustedDateCount = { count: 0 };
     if (!inputElement.files || inputElement.files.length === 0) return;
+
+    if (!course || !getCourseDateBounds(course).isValid) {
+        statusMsg.textContent = 'Fix the class and term date ranges before importing coursework.';
+        statusMsg.className = 'text-xs text-center mt-2 text-red-500';
+        statusMsg.classList.remove('hidden');
+        return;
+    }
 
     const file = inputElement.files[0];
     statusMsg.textContent = "AI is securely reading lessons and dates...";
@@ -1113,8 +1403,10 @@ export async function parseLessonsImage(inputElement) {
                         fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
                     targetDate = getLocalDateKey(fallbackDate);
                     }
+                    targetDate = constrainImportedCourseDate(targetDate, course, adjustedDateCount);
                     // Resolve optional end date for range spreading
-                    const endDate = wk.endDateStr ? smartParseDate(wk.endDateStr) : null;
+                    let endDate = wk.endDateStr ? smartParseDate(wk.endDateStr) : null;
+                    endDate = constrainImportedCourseDate(endDate, course, adjustedDateCount);
 
                     const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
                         course_id: courseId, user_id: currentUser.id,
@@ -1141,7 +1433,7 @@ export async function parseLessonsImage(inputElement) {
                 }
             }
 
-            statusMsg.textContent = "Successfully imported lessons via secure Edge Function!";
+            statusMsg.textContent = `Successfully imported lessons via secure Edge Function.${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
             statusMsg.className = "text-xs text-center mt-2 text-green-500";
             loadAssignments(courseId, 1);
 
@@ -1202,8 +1494,13 @@ export async function rescheduleOverdueToThisWeek(courseId) {
     }
 
     const course = localCourses.find((item) => item.id === courseId);
+    const allowedWeekdays = course ? weekdays.filter((date) => isDateWithinCourseWindow(date, course)) : weekdays;
+    if (allowedWeekdays.length === 0) {
+        alert('There are no available weekdays inside this class and term date range. Update the dates before rescheduling.');
+        return;
+    }
     // Distribute across the week slots in curriculum order.
-    const updates = buildRescheduleUpdates(overdue, weekdays, course ? [course] : []);
+    const updates = buildRescheduleUpdates(overdue, allowedWeekdays, course ? [course] : []);
     const total = updates.length;
 
     // Batch update, but retain individual results so a partial failure is not
@@ -1253,9 +1550,10 @@ export function buildSequencePlanUpdates(assignments = [], startDate, endDate, c
 
     const orderedAssignments = [...assignments].sort((a, b) => compareCourseworkOrder(a, b, courses));
     const plannedDates = spreadDatesAcrossRange(startDate, endDate, orderedAssignments.length);
+    const courseById = new Map(courses.map((course) => [course.id, course]));
     return orderedAssignments.map((assignment, index) => ({
         id: assignment.id,
-        due_date: plannedDates[index]
+        due_date: clampDateToCourseWindow(plannedDates[index], courseById.get(assignment.course_id))
     }));
 }
 
@@ -1277,15 +1575,22 @@ export async function planCourseworkInSequence(courseId) {
     }
 
     const today = getLocalDateKey(new Date());
+    const bounds = getCourseDateBounds(course);
+    if (!bounds.isValid || (bounds.endDate && bounds.endDate < today)) {
+        alert('This class date range has ended or conflicts with its term date range. Update the dates before planning coursework.');
+        return;
+    }
+    const scheduleStart = bounds.startDate && bounds.startDate > today ? bounds.startDate : today;
     const futureDates = [
-        course.end_date,
+        bounds.endDate,
         ...incompleteAssignments.map((assignment) => String(assignment.due_date || '').slice(0, 10))
     ]
-        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= scheduleStart && (!bounds.endDate || date <= bounds.endDate))
         .sort();
     const fallbackDays = Math.max(4, Math.ceil(incompleteAssignments.length / 5) * 5 - 1);
-    const endDate = futureDates.at(-1) || addLocalDays(today, fallbackDays);
-    const updates = buildSequencePlanUpdates(incompleteAssignments, today, endDate, [course]);
+    const endDate = futureDates.at(-1) || addLocalDays(scheduleStart, fallbackDays);
+    const boundedEndDate = bounds.endDate && endDate > bounds.endDate ? bounds.endDate : endDate;
+    const updates = buildSequencePlanUpdates(incompleteAssignments, scheduleStart, boundedEndDate, [course]);
 
     const results = await Promise.all(updates.map(async (update) => {
         try {
@@ -1347,6 +1652,12 @@ export async function toggleAssignment(assignId, currentState, courseId) {
 export async function updateAssignmentDate(assignId, newDate, courseId) {
     if (!newDate) return;
     const parsedDate = parseInputDate(newDate);
+    const course = localCourses.find((item) => item.id === courseId);
+    if (course && !isDateWithinCourseWindow(parsedDate, course)) {
+        alert('Choose a date inside this class and term date range.');
+        loadAssignments(courseId, currentAssignmentPage);
+        return;
+    }
     await supabaseClient.from('assignments').update({ due_date: parsedDate }).eq('id', assignId);
     loadAssignments(courseId, currentAssignmentPage);
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
@@ -1467,6 +1778,11 @@ export async function submitAddAssignment(event) {
 
     if (!courseId || !title) {
         alert('Please provide a title for the unit or lesson.');
+        return;
+    }
+    const course = localCourses.find((item) => item.id === courseId);
+    if (course && !isDateWithinCourseWindow(dueDate, course)) {
+        alert('Choose a due date inside this class and term date range.');
         return;
     }
 
@@ -1766,7 +2082,7 @@ export async function openQuickAddModal() {
                 <form id="quickAddForm" onsubmit="submitQuickAddTask(event)" class="space-y-3">
                     <div>
                         <label for="quickAddCourseSelect" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Class / Course</label>
-                        <select id="quickAddCourseSelect" required class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+                        <select id="quickAddCourseSelect" required onchange="updateQuickAddDateBounds(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
                             <option value="">Select a class...</option>
                         </select>
                     </div>
@@ -1868,6 +2184,7 @@ export async function openQuickAddModal() {
             : 'No classes found';
         select.innerHTML = `<option value="">${options ? 'Select a class...' : emptyLabel}</option>${options}`;
         select.disabled = coursesForSelect.length === 0;
+        updateQuickAddDateBounds(select.value);
     }
 
     const modalEl = document.getElementById('quickAddModal');
@@ -1911,6 +2228,11 @@ export async function submitQuickAddTask(event) {
 
     if (!courseId || !title || !dueDate) {
         setQuickAddStatus('Choose a class, enter a title, and select a due date.');
+        return;
+    }
+    const selectedCourse = localCourses.find((course) => course.id === courseId);
+    if (selectedCourse && !isDateWithinCourseWindow(dueDate, selectedCourse)) {
+        setQuickAddStatus('Choose a due date inside this class and term date range.');
         return;
     }
 
@@ -1985,12 +2307,16 @@ if (typeof window !== 'undefined') {
     window.loadCoursesPage = loadCoursesPage;
     window.renderTermFolders = renderTermFolders;
     window.renderAlphabeticals = renderAlphabeticals;
+    window.toggleArchivedTerms = toggleArchivedTerms;
     window.handleDragStart = handleDragStart;
     window.allowDrop = allowDrop;
     window.handleDropToTerm = handleDropToTerm;
+    window.updateCourseTerm = updateCourseTerm;
+    window.updateQuickAddDateBounds = updateQuickAddDateBounds;
     window.createNewTermFolder = createNewTermFolder;
     window.openTermModal = openTermModal;
     window.closeTermModal = closeTermModal;
+    window.saveCurrentTermDateRange = saveCurrentTermDateRange;
     window.deleteCurrentTermFolder = deleteCurrentTermFolder;
     window.openCourseModal = openCourseModal;
     window.closeCourseModal = closeCourseModal;

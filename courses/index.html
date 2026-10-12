@@ -102,13 +102,17 @@
                     </div>
 
                     <div>
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
                             <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <label class="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-300"><input id="showArchivedTermsToggle" type="checkbox" onchange="toggleArchivedTerms(this.checked)" class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Show archived</label>
                                 <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
+                                <label for="newTermStartDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Starts<input type="date" id="newTermStartDate" aria-label="Term start date" title="Term start date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
+                                <label for="newTermEndDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Ends<input type="date" id="newTermEndDate" aria-label="Term end date" title="Term end date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
                                 <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
                             </div>
                         </div>
+                        <p class="-mt-2 mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">Optional dates archive a term after its end date and keep coursework inside the term window.</p>
                         <div id="termFoldersGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
                     </div>
 
@@ -168,6 +172,15 @@
                                     </select>
                                     <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">Choose a profile to label units/weeks and guide sequence planning.</p>
                                 </div>
+                                <div>
+                                    <label for="editCourseTerm" class="block text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1">Term</label>
+                                    <select id="editCourseTerm" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"></select>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <label for="editCourseStartDate" class="block text-xs font-bold text-zinc-600 dark:text-zinc-400">Class starts<input type="date" id="editCourseStartDate" class="mt-1 w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"></label>
+                                    <label for="editCourseEndDate" class="block text-xs font-bold text-zinc-600 dark:text-zinc-400">Class ends<input type="date" id="editCourseEndDate" class="mt-1 w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"></label>
+                                </div>
+                                <p class="-mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">The class and term date ranges guide the study plan and keep scheduled work within the active window.</p>
                                 <button type="submit" class="w-full bg-zinc-100 dark:bg-brand-700 text-zinc-800 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-600 transition mt-2">Update Info</button>
                             </form>
                             <p id="courseSettingsMessage" role="status" aria-live="polite" class="text-xs text-center mt-2 hidden"></p>

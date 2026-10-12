@@ -3,6 +3,7 @@ import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { getLocalDateKey } from './utils.js';
 import { collectLocalFlashcardMastery, mergeFlashcardMastery, restoreFlashcardMastery } from './flashcards.js';
+import { applySyncedPreferences, collectSyncedPreferences } from './preferences.js';
 
 export function buildBackupPayload(courses = [], assignments = [], customEvents = [], timers = [], preferences = {}, flashcardMastery = {}) {
     return {
@@ -49,14 +50,7 @@ export async function exportUserDataJSON() {
             }
         } catch { /* Keep the local progress in an offline backup. */ }
 
-        const prefs = {
-            theme: typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null,
-            dateFormat: typeof localStorage !== 'undefined' ? localStorage.getItem('duevinci_date_format') : null,
-            gpaScale: typeof localStorage !== 'undefined' ? localStorage.getItem('duevinci_gpa_scale') : null,
-            muteAlarm: typeof localStorage !== 'undefined' ? localStorage.getItem('duevinci_mute_alarm') : null,
-            hideAcademics: typeof localStorage !== 'undefined' ? localStorage.getItem('duevinci_hide_academics') : null,
-            activityDates: typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('duevinci_activity_dates') || '[]') : []
-        };
+        const prefs = collectSyncedPreferences();
 
         const payload = buildBackupPayload(courses || [], assignments || [], customEvents || [], timers, prefs, flashcardMastery);
         const jsonStr = JSON.stringify(payload, null, 2);
@@ -134,46 +128,57 @@ export async function importUserDataJSON(fileInput) {
                 return;
             }
 
-            if (json.data.timers && Array.isArray(json.data.timers) && typeof localStorage !== 'undefined') {
-                localStorage.setItem('duevinci_timers', JSON.stringify(json.data.timers));
-            }
-
-            if (json.data.preferences && typeof localStorage !== 'undefined') {
-                if (json.data.preferences.theme) localStorage.setItem('theme', json.data.preferences.theme);
-                if (json.data.preferences.gpaScale) localStorage.setItem('duevinci_gpa_scale', json.data.preferences.gpaScale);
-                if (json.data.preferences.dateFormat) localStorage.setItem('duevinci_date_format', json.data.preferences.dateFormat);
-                if (json.data.preferences.activityDates) localStorage.setItem('duevinci_activity_dates', JSON.stringify(json.data.preferences.activityDates));
-            }
-
-            restoreFlashcardMastery(json.data.flashcardMastery || {});
-
             // Sync restored courses and assignments to Supabase
             let user = currentUser;
             if (!user && supabaseClient && supabaseClient.auth) {
                 const sessionRes = await supabaseClient.auth.getUser();
                 user = sessionRes.data?.user;
             }
+            if (!supabaseClient || !user) throw new Error('Sign in before restoring course and assignment data.');
 
-            if (supabaseClient && user) {
-                if (Array.isArray(json.data.courses) && json.data.courses.length > 0) {
-                    const coursesToUpsert = json.data.courses.map(c => ({ ...c, user_id: user.id }));
-                    await supabaseClient.from('courses').upsert(coursesToUpsert);
+            const restoredTables = [];
+            const restoreTable = async (tableName, records) => {
+                if (!Array.isArray(records) || records.length === 0) return;
+                const rows = records.map((record) => ({ ...record, user_id: user.id }));
+                const { error } = await supabaseClient.from(tableName).upsert(rows);
+                if (error) {
+                    const prior = restoredTables.length ? ` Already restored: ${restoredTables.join(', ')}.` : '';
+                    throw new Error(`Could not restore ${tableName}: ${error.message || 'cloud write failed'}.${prior}`);
                 }
-                if (Array.isArray(json.data.assignments) && json.data.assignments.length > 0) {
-                    const assignmentsToUpsert = json.data.assignments.map(a => ({ ...a, user_id: user.id }));
-                    await supabaseClient.from('assignments').upsert(assignmentsToUpsert);
-                }
-                if (Array.isArray(json.data.customEvents) && json.data.customEvents.length > 0) {
-                    const eventsToUpsert = json.data.customEvents.map(ev => ({ ...ev, user_id: user.id }));
-                    await supabaseClient.from('custom_events').upsert(eventsToUpsert);
+                restoredTables.push(tableName);
+            };
+
+            await restoreTable('courses', json.data.courses);
+            await restoreTable('assignments', json.data.assignments);
+            await restoreTable('custom_events', json.data.customEvents);
+
+            if (json.data.timers && Array.isArray(json.data.timers) && typeof localStorage !== 'undefined') {
+                localStorage.setItem('duevinci_timers', JSON.stringify(json.data.timers));
+            }
+            if (json.data.preferences && typeof localStorage !== 'undefined') {
+                applySyncedPreferences(json.data.preferences);
+                // Support portable backups created before settings used their localStorage keys.
+                const legacyPreferenceMap = {
+                    dateFormat: 'duevinci_date_format',
+                    gpaScale: 'duevinci_gpa_scale',
+                    muteAlarm: 'duevinci_mute_alarm',
+                    hideAcademics: 'duevinci_hide_academics',
+                };
+                Object.entries(legacyPreferenceMap).forEach(([legacyKey, currentKey]) => {
+                    const value = json.data.preferences[legacyKey];
+                    if (typeof value === 'string') applySyncedPreferences({ [currentKey]: value });
+                });
+                if (Array.isArray(json.data.preferences.activityDates)) {
+                    applySyncedPreferences({ duevinci_activity_dates: JSON.stringify(json.data.preferences.activityDates) });
                 }
             }
+            restoreFlashcardMastery(json.data.flashcardMastery || {});
 
             alert('Backup data and Supabase cloud sync restored successfully! Refreshing page...');
             if (typeof window !== 'undefined') window.location.reload();
         } catch (err) {
-            console.error('Failed to parse backup JSON:', err);
-            alert('Failed to parse the backup file. Ensure it is valid JSON.');
+            console.error('Failed to restore backup:', err);
+            alert(`Failed to restore backup: ${err.message || 'Check the file and your cloud connection.'}`);
         }
     };
 

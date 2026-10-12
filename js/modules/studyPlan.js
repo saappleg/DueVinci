@@ -3,12 +3,14 @@ import { calculateDaysRemaining } from './academics.js';
 import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
+import { getCourseDateBounds, isDateWithinCourseWindow, isWeeklyPacedCourse } from './courseDates.js';
 
 function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
 }
 
 let cachedStudyPlan = [];
+let cachedCoursesById = new Map();
 const MANUAL_PLAN_MOVES_KEY = 'duevinci_manual_study_plan_moves';
 const PLAN_MOVE_SYNC_INTERVAL_MS = 30_000;
 let draggedStudyPlanTaskId = null;
@@ -32,8 +34,9 @@ function saveManualStudyMoves(moves) {
     try { localStorage.setItem(MANUAL_PLAN_MOVES_KEY, JSON.stringify(moves)); } catch { /* Optional local preference. */ }
 }
 
-function applyManualStudyMoves(days) {
+function applyManualStudyMoves(days, courses = []) {
     const moves = getManualStudyMoves();
+    const coursesById = new Map(courses.map((course) => [course.id, course]));
     let changed = false;
     Object.entries(moves).forEach(([taskId, move]) => {
         const targetDate = move?.date;
@@ -41,7 +44,9 @@ function applyManualStudyMoves(days) {
         const source = days.find((day) => day.assignedTasks.some((entry) => entry.task.id === taskId));
         const target = days.find((day) => day.date === targetDate);
         const entry = source?.assignedTasks.find((item) => item.task.id === taskId);
-        if (!source || !target || !entry || target.isRestDay || calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0) {
+        const course = coursesById.get(entry?.task?.course_id);
+        if (!source || !target || !entry || target.isRestDay || calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0
+            || !isDateWithinCourseWindow(target.date, course)) {
             moves[taskId] = { date: null, updatedAt: new Date().toISOString() }; changed = true; return;
         }
         if (source !== target) {
@@ -141,6 +146,7 @@ export function getStudyPlanMoveError(taskId, targetDate) {
     if (!source || !target) return 'That study block is no longer available. Refresh the plan and try again.';
     if (target.isRestDay) return 'Rest days are protected. Choose an active study day instead.';
     if (calculateDaysRemaining(source.block.dueDate, target.currentDate) < 0) return 'That assignment cannot be moved past its due date.';
+    if (!isDateWithinCourseWindow(target.date, cachedCoursesById.get(source.block.courseId))) return 'Choose a date inside this class and term date range.';
 
     if (source.block.lessonNumber !== null) {
         const unitLessons = cachedStudyPlan.flatMap((day) => day.allBlocks
@@ -382,12 +388,14 @@ function taskMovePriority(task) {
  * deadline or onto a rest day. Moving later is curriculum-safe: it cannot put
  * a later lesson before an earlier one already scheduled on the source day.
  */
-export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP) {
+export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP, courses = []) {
+    const coursesById = new Map(courses.map((course) => [course.id, course]));
     const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task), 0);
     const canMoveToDay = (entry, sourceIndex, targetIndex) => {
         const target = days[targetIndex];
         if (!target || target.isRestDay || sourceIndex === targetIndex) return false;
         if (calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0) return false;
+        if (!isDateWithinCourseWindow(target.date, coursesById.get(entry.task.course_id))) return false;
 
         // Preserve the sequence of explicitly numbered lessons when moving a
         // block to an earlier or lighter day.
@@ -438,6 +446,94 @@ export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOC
     return days;
 }
 
+function dateDifferenceInDays(from, to) {
+    const fromDate = new Date(`${String(from).slice(0, 10)}T12:00:00`);
+    const toDate = new Date(`${String(to).slice(0, 10)}T12:00:00`);
+    if (Number.isNaN(fromDate.valueOf()) || Number.isNaN(toDate.valueOf())) return 0;
+    return Math.round((toDate - fromDate) / 86_400_000);
+}
+
+function currentWeeklyUnit(course, assignments, baseDate) {
+    const { startDate } = getCourseDateBounds(course);
+    if (startDate) {
+        return new Set([Math.max(1, Math.floor(Math.max(0, dateDifferenceInDays(startDate, getLocalDateKey(baseDate))) / 7) + 1)]);
+    }
+
+    const units = [...new Set(assignments.map(getUnitNumber).filter((unit) => unit > 0))].sort((a, b) => a - b);
+    if (!units.length) return new Set();
+
+    const today = getLocalDateKey(baseDate);
+    const weekday = new Date(`${today}T12:00:00`).getDay();
+    const weekStart = new Date(`${today}T12:00:00`);
+    weekStart.setDate(weekStart.getDate() - ((weekday + 6) % 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekStartKey = getLocalDateKey(weekStart);
+    const weekEndKey = getLocalDateKey(weekEnd);
+    const datesByUnit = new Map();
+    assignments.forEach((assignment) => {
+        const unit = getUnitNumber(assignment);
+        const dueDate = String(assignment.due_date || '').slice(0, 10);
+        if (unit > 0 && dueDate) {
+            const dates = datesByUnit.get(unit) || [];
+            dates.push(dueDate);
+            datesByUnit.set(unit, dates);
+        }
+    });
+    return new Set(units.filter((unit) => datesByUnit.get(unit)?.some((date) => date >= weekStartKey && date <= weekEndKey)));
+}
+
+function normalizeStudyPlanDate(startDate) {
+    if (typeof startDate === 'string') {
+        return new Date(`${startDate.split('T')[0]}T00:00:00`);
+    }
+    if (startDate instanceof Date) {
+        return new Date(`${getLocalDateKey(startDate)}T00:00:00`);
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+}
+
+export function getCurrentStudyWeekAssignments(courses = [], assignments = [], referenceDate = new Date()) {
+    if (!Array.isArray(courses) || !Array.isArray(assignments)) return [];
+    const baseDate = normalizeStudyPlanDate(referenceDate);
+    const todayKey = getLocalDateKey(baseDate);
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+    const assignmentsByCourse = new Map();
+    assignments.forEach((assignment) => {
+        if (!assignment.due_date) return;
+        const grouped = assignmentsByCourse.get(assignment.course_id) || [];
+        grouped.push(assignment);
+        assignmentsByCourse.set(assignment.course_id, grouped);
+    });
+    const currentUnits = new Map();
+    courses.filter(isWeeklyPacedCourse).forEach((course) => {
+        currentUnits.set(course.id, currentWeeklyUnit(course, assignmentsByCourse.get(course.id) || [], baseDate));
+    });
+
+    return assignments.filter((assignment) => {
+        if (assignment.is_completed || !assignment.due_date) return false;
+        const course = courseById.get(assignment.course_id);
+        if (!course) return true;
+        if (course.is_completed) return false;
+        const { startDate, endDate, isValid } = getCourseDateBounds(course);
+        if (!isValid || (endDate && endDate < todayKey)) return false;
+        if (!isWeeklyPacedCourse(course)) return true;
+        if (startDate && startDate > todayKey) return false;
+        const taskUnit = getUnitNumber(assignment);
+        if (taskUnit > 0) return currentUnits.get(course.id)?.has(taskUnit) || false;
+
+        const dueDate = String(assignment.due_date).slice(0, 10);
+        const weekday = new Date(`${todayKey}T12:00:00`).getDay();
+        const weekStart = new Date(`${todayKey}T12:00:00`);
+        weekStart.setDate(weekStart.getDate() - ((weekday + 6) % 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return dueDate >= getLocalDateKey(weekStart) && dueDate <= getLocalDateKey(weekEnd);
+    });
+}
+
 /**
  * Calculates a balanced daily study schedule across multiple enrolled courses.
  * Enforces proper unit-lesson organization, strict sequential order, deadline-driven pacing, and rest day exclusion.
@@ -453,20 +549,13 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     const restDays = customRestDays !== null ? (Array.isArray(customRestDays) ? customRestDays : []) : getRestDays();
 
-    let baseDate;
-    if (typeof startDate === 'string') {
-        const datePart = startDate.split('T')[0];
-        baseDate = new Date(datePart + 'T00:00:00');
-    } else if (startDate instanceof Date) {
-        // Preserve the caller's local calendar date, then normalize to local midnight.
-        const datePart = getLocalDateKey(startDate);
-        baseDate = new Date(datePart + 'T00:00:00');
-    } else {
-        baseDate = new Date();
-        baseDate.setHours(0, 0, 0, 0);
-    }
+    // Preserve the caller's local calendar date, then normalize to local midnight.
+    const baseDate = normalizeStudyPlanDate(startDate);
 
-    const pendingAssignments = assignments.filter(a => !a.is_completed && a.due_date);
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+    cachedCoursesById = courseById;
+    const todayKey = getLocalDateKey(baseDate);
+    const pendingAssignments = getCurrentStudyWeekAssignments(courses, assignments, baseDate);
     if (pendingAssignments.length === 0) {
         const emptyPlan = [];
         for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
@@ -675,6 +764,12 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // Allocate lessons unit-by-unit and lesson-by-lesson, spaced across available study days leading to due dates
     courseMap.forEach((cTasks, courseId) => {
         if (cTasks.length === 0) return;
+        const course = courseById.get(courseId);
+        const bounds = course ? getCourseDateBounds(course) : { startDate: '', endDate: '', isValid: true };
+        if (!bounds.isValid) return;
+        const firstCourseDay = bounds.startDate ? Math.max(0, dateDifferenceInDays(todayKey, bounds.startDate)) : 0;
+        const lastCourseDay = bounds.endDate ? dateDifferenceInDays(todayKey, bounds.endDate) : daysAhead - 1;
+        if (firstCourseDay >= daysAhead || lastCourseDay < firstCourseDay) return;
 
         // Group tasks by unit number
         const unitGroups = new Map();
@@ -693,7 +788,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             return deadlineA - deadlineB || a - b;
         });
 
-        let currentDayPointer = 0;
+        let currentDayPointer = firstCourseDay;
 
         sortedUnitKeys.forEach(uKey => {
             const unitTaskList = sortTasks(unitGroups.get(uKey), baseDate, false);
@@ -713,7 +808,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             }
 
             // Find target end day for this unit (capped at daysAhead - 1)
-            const targetEndDay = Math.min(daysAhead - 1, Math.max(currentDayPointer, minDeadline));
+            const targetEndDay = Math.min(daysAhead - 1, lastCourseDay, Math.max(currentDayPointer, minDeadline));
+            if (targetEndDay < currentDayPointer) return;
 
             // Collect active (non-rest) study days available for this unit
             let activeDayIndices = [];
@@ -755,8 +851,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // A course-by-course allocation can otherwise stack every course's first
     // lesson on day zero. Rebalance only when there is later, non-rest time
     // before the item's own deadline.
-    rebalanceStudyPlanAssignments(days);
-    applyManualStudyMoves(days);
+    rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses);
+    applyManualStudyMoves(days, courses);
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {
@@ -1245,7 +1341,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                         <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">🗓️</div>
                         <div>
                             <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines.</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Balanced study blocks lead up to deadlines. Weekly-paced classes show the week you are working through now.</p>
                         </div>
                     </div>
                 </div>
@@ -1334,7 +1430,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">🗓️</div>
                     <div>
                         <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optimized daily study blocks distributed evenly leading up to deadlines.</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Balanced study blocks lead up to deadlines. Weekly-paced classes show the week you are working through now.</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">

@@ -103,9 +103,10 @@ export async function signUpWithEmail() {
     const password = document.getElementById('authPassword')?.value;
     if (!email || !password) return showAuthMessage("Please enter an email and password.");
 
-    const { error } = await supabaseClient.auth.signUp({ email, password });
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
     if (error) showAuthMessage(error.message);
-    else showAuthMessage("Account created! You are now logged in.", "text-green-500");
+    else if (data?.session) showAuthMessage("Account created! You are now logged in.", "text-green-500");
+    else showAuthMessage("Account created. Check your email to confirm it before signing in.", "text-green-500");
 }
 
 export async function signInWithEmail() {

@@ -124,7 +124,7 @@ export function startWalkthrough(manualStart = false) {
         steps = [
             { popover: { title: 'Class & Syllabus Center 📚', description: 'Here is where you set up your classes and automatically parse coursework.' } },
             { element: '#courseForm', popover: { title: '1. Add a Class', description: 'Pick an emoji, type your course code (e.g. CS101), select a color badge, and click Add.', side: "bottom" } },
-            { element: '#termFoldersGrid', popover: { title: '2. Term Folders', description: 'Create folders for your semesters (e.g., Fall 2026). Simply drag-and-drop course cards directly into folders to organize them.', side: "top" } },
+            { element: '#termFoldersGrid', popover: { title: '2. Term Folders', description: 'Create folders for your semesters, set their date ranges, and choose a term from each class row to organize your courses.', side: "top" } },
             { element: '#alphabeticalCourseList', popover: { title: '3. Syllabus & AI Scanner', description: 'Click any class card to open its modal. You can upload a PDF syllabus or a screenshot of lessons to let Gemini AI build your schedule automatically.', side: "top" } }
         ];
     } else if (page === 'grades' || page === 'grades.html') {
