@@ -48,6 +48,9 @@ export async function handleAuth(session) {
         }
         if (document.getElementById('authScreen')) document.getElementById('authScreen').classList.add('hidden');
         if (document.getElementById('appScreen')) document.getElementById('appScreen').classList.remove('hidden');
+        document.body?.classList.add('overflow-hidden');
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         if (typeof window !== 'undefined') window.currentUser = currentUser;
         refreshProfileAvatar(currentUser).catch(() => {});
         startReminderService();
@@ -87,6 +90,7 @@ export async function handleAuth(session) {
         if (typeof window !== 'undefined') window.currentUser = null;
         stopPreferenceSync();
         stopReminderService();
+        document.body?.classList.remove('overflow-hidden');
         const page = getCurrentPageName();
         if (page !== 'index' && page !== 'index.html') {
             if (typeof window !== 'undefined' && window.location) window.location.href = getBasePath() + 'index.html';
