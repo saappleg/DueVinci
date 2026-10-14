@@ -40,6 +40,16 @@ export async function openWeeklyPlan() {
 
     const target = document.getElementById('studyPlanWidgetContainer');
     if (!target?.childElementCount || target.offsetParent === null) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+
+    // The dashboard is the intended scroll region. scrollIntoView() also
+    // scrolls the document, which moves the app header and sidebar offscreen.
+    const dashboard = document.getElementById('dashboardGrid');
+    if (!dashboard) return;
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const targetTop = target.getBoundingClientRect().top
+        - dashboard.getBoundingClientRect().top
+        + dashboard.scrollTop;
+    dashboard.scrollTo({ top: targetTop, behavior: 'smooth' });
 }
 if (typeof window !== 'undefined') Object.assign(window, { renderWeeklyReview, openWeeklyPlan });
