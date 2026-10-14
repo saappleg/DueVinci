@@ -36,7 +36,15 @@ export async function renderWeeklyReview() {
 }
 
 export async function openWeeklyPlan() {
-    document.getElementById('studyPlanWidgetContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     await refreshStudyPlan();
+
+    const scroller = document.getElementById('dashboardGrid');
+    const target = document.getElementById('studyPlanWidgetContainer');
+    if (!scroller || !target?.childElementCount || target.offsetParent === null) return;
+
+    const targetTop = target.getBoundingClientRect().top
+        - scroller.getBoundingClientRect().top
+        + scroller.scrollTop;
+    scroller.scrollTo({ top: Math.max(0, targetTop - 16), behavior: 'smooth' });
 }
 if (typeof window !== 'undefined') Object.assign(window, { renderWeeklyReview, openWeeklyPlan });
