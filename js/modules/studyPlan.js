@@ -34,27 +34,27 @@ function saveManualStudyMoves(moves) {
     try { localStorage.setItem(MANUAL_PLAN_MOVES_KEY, JSON.stringify(moves)); } catch { /* Optional local preference. */ }
 }
 
-function applyManualStudyMoves(days, courses = []) {
+function applyManualStudyMoves(days) {
     const moves = getManualStudyMoves();
-    const coursesById = new Map(courses.map((course) => [course.id, course]));
-    let changed = false;
     Object.entries(moves).forEach(([taskId, move]) => {
         const targetDate = move?.date;
         if (!targetDate) return;
         const source = days.find((day) => day.assignedTasks.some((entry) => entry.task.id === taskId));
         const target = days.find((day) => day.date === targetDate);
         const entry = source?.assignedTasks.find((item) => item.task.id === taskId);
-        const course = coursesById.get(entry?.task?.course_id);
-        if (!source || !target || !entry || target.isRestDay || calculateDaysRemaining(entry.task.due_date, target.currentDate) < 0
-            || !isDateWithinCourseWindow(target.date, course)) {
-            moves[taskId] = { date: null, updatedAt: new Date().toISOString() }; changed = true; return;
-        }
-        if (source !== target) {
-            source.assignedTasks = source.assignedTasks.filter((item) => item.task.id !== taskId);
-            target.assignedTasks.push(entry);
-        }
+        if (!source || !entry) return;
+
+        // Once a pinned day has passed, let the normal overdue/current plan
+        // surface unfinished work again instead of hiding it off-screen.
+        if (!target && targetDate < days[0]?.date) return;
+
+        // A saved manual date is the user's placement decision. Keep honoring
+        // it if course dates or rest-day settings later change. When the date
+        // is outside this render's horizon, hide the task instead of letting
+        // the automatic scheduler silently place it somewhere else.
+        source.assignedTasks = source.assignedTasks.filter((item) => item.task.id !== taskId);
+        if (target) target.assignedTasks.push(entry);
     });
-    if (changed) saveAndSyncManualStudyMoves(moves);
 }
 
 function activeManualMoveDate(moves, taskId) {
@@ -929,7 +929,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // lesson on day zero. Rebalance only when there is later, non-rest time
     // before the item's own deadline.
     rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses);
-    applyManualStudyMoves(days, courses);
+    applyManualStudyMoves(days);
 
     // Build rich daily blocks from assigned tasks
     days.forEach(day => {
