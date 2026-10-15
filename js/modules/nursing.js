@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 14709)
-Total output lines: 698
-
 // --- NURSING HUB: student organization and educational practice tools ---
 import { supabaseClient } from './config.js';
 import { calculateSM2Repetition } from './flashcards.js';
@@ -331,7 +328,114 @@ function rotationCard(rotation) {
         '<div class="mt-4 flex items-center justify-between"><h4 class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Skills & check-offs</h4><span class="text-xs text-zinc-500 dark:text-zinc-400">' + checkedCount + ' of ' + rotation.skills.length + ' checked</span></div>' +
         '<ul class="mt-2">' + skillRows + '</ul>' +
         '<form data-nursing-form="skill" data-rotation-id="' + escapeHtml(rotation.id) + '" class="mt-3 flex gap-2">' +
-        '<label class="sr-only" for="skill-' + escapeHtml(rotation.id) + '">Skill to track</label><input id="skill-' + escapeHtml(rotation.id) + '" name="skill" maxlength="120" required placeholder="Add a skill or competency" class="min-w-0 flex-1 rounded-lg border border-zinc-300 b…4709 tokens truncated…em) => '<li class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-brand-900"><span class="min-w-0 truncate"><strong>' + escapeHtml(item.topic) + ':</strong> ' + escapeHtml(item.front) + '</span><button type="button" data-action="delete-card" data-id="' + escapeHtml(item.id) + '" class="shrink-0 text-rose-600 hover:underline dark:text-rose-300">Remove</button></li>').join('') + '</ul>'
+        '<label class="sr-only" for="skill-' + escapeHtml(rotation.id) + '">Skill to track</label><input id="skill-' + escapeHtml(rotation.id) + '" name="skill" maxlength="120" required placeholder="Add a skill or competency" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900">' +
+        '<button class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500">Add</button></form></article>';
+}
+
+function renderOverview() {
+    const activeRotations = workspace.rotations.filter((rotation) => !rotation.endDate || rotation.endDate >= getLocalDateKey()).length;
+    const trackedSkills = workspace.rotations.reduce((total, rotation) => total + rotation.skills.length, 0);
+    const checkedSkills = workspace.rotations.reduce((total, rotation) => total + rotation.skills.filter((skill) => skill.status === 'checked').length, 0);
+    const dueCards = getAllCards().filter((card) => {
+        const due = workspace.cardMastery[card.id] && workspace.cardMastery[card.id].nextReviewDate;
+        return !due || due <= getLocalDateKey();
+    }).length;
+    const correctCount = Object.values(workspace.dosageProgress).reduce((sum, item) => sum + (item.correct || 0), 0);
+    const tile = (title, value, note, icon, tab) => '<button type="button" data-nursing-tab="' + tab + '" class="rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:hover:border-indigo-600"><span class="text-xl">' + icon + '</span><span class="mt-3 block text-2xl font-black text-zinc-900 dark:text-white">' + value + '</span><span class="block text-sm font-bold">' + title + '</span><span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">' + note + '</span></button>';
+    return '<section class="mx-auto max-w-6xl">' +
+        '<div class="rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white shadow-lg sm:p-8"><p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-100">Nursing school, organized</p><h2 class="mt-2 max-w-2xl text-2xl font-black sm:text-3xl">A place to prepare, practice, and keep track of your progress.</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-indigo-100">Connect your clinical rotations to your classes, work through dosage math, build study cards, and review body systems.</p><button type="button" data-nursing-tab="clinical" class="mt-5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 shadow-sm hover:bg-indigo-50">Set up a rotation</button></div>' +
+        '<div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">' +
+        tile('Active rotations', activeRotations, workspace.rotations.length + ' tracked', '🩺', 'clinical') +
+        tile('Skills checked off', checkedSkills, trackedSkills + ' skills tracked', '✅', 'clinical') +
+        tile('Cards ready to review', dueCards, workspace.customCards.length + NURSING_STARTER_CARDS.length + ' in your deck', '🎴', 'flashcards') +
+        tile('Practice problems solved', correctCount, 'Dosage math practice', '🧮', 'dosage') + '</div>' +
+        '<div class="mt-6 grid gap-4 lg:grid-cols-2">' +
+        '<section class="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-brand-700 dark:bg-brand-800"><h3 class="font-bold text-zinc-900 dark:text-white">Your nursing workspace</h3><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Start with one tool, then build it around your courses.</p><div class="mt-4 grid gap-2 sm:grid-cols-2">' +
+        '<button data-nursing-tab="careplans" class="rounded-xl border border-zinc-200 p-3 text-left hover:border-indigo-300 dark:border-brand-700">🗂️ <strong class="ml-1 text-sm">Care-plan studio</strong><span class="mt-1 block text-xs text-zinc-500">Practice with fictional cases</span></button>' +
+        '<button data-nursing-tab="anatomy" class="rounded-xl border border-zinc-200 p-3 text-left hover:border-indigo-300 dark:border-brand-700">🫀 <strong class="ml-1 text-sm">Anatomy studio</strong><span class="mt-1 block text-xs text-zinc-500">Explore eleven body systems</span></button>' +
+        '</div></section>' +
+        '<section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/20"><h3 class="font-bold text-amber-950 dark:text-amber-100">Practice safely</h3><p class="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">These tools support learning. They are not clinical references or patient-care instructions. Use fictional cases only; never add patient names, dates of birth, room numbers, photos, or other identifying information.</p></section>' +
+        '</div><p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">Your workspace is saved to your DueVinci account when online.</p></section>';
+}
+
+function renderClinicalTab() {
+    const courseOptions = '<option value="">No class linked</option>' + availableCourses.map((course) => {
+        const label = course.code ? course.code + ' · ' + course.name : course.name;
+        return '<option value="' + escapeHtml(course.id) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+    const cards = workspace.rotations.length
+        ? '<div class="mt-5 grid gap-4 xl:grid-cols-2">' + workspace.rotations.map(rotationCard).join('') + '</div>'
+        : '<div class="mt-5 rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-brand-600"><p class="font-bold">No rotations tracked yet</p><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Add a rotation, then list the skills you want to practice or have checked off.</p></div>';
+    return '<section class="mx-auto max-w-6xl"><div class="mb-5"><h2 class="text-2xl font-black text-zinc-900 dark:text-white">Clinical tracker</h2><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Keep rotation dates and competency progress together. This tracker has no patient-detail fields.</p></div>' +
+        '<form id="rotationForm" data-nursing-form="rotation" class="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:grid-cols-2 lg:grid-cols-5">' +
+        '<label class="text-xs font-semibold sm:col-span-2 lg:col-span-2">Rotation name<input name="name" maxlength="120" required placeholder="Example: Fundamentals clinical" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label>' +
+        '<label class="text-xs font-semibold">Linked class<select name="courseId" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900">' + courseOptions + '</select></label>' +
+        '<label class="text-xs font-semibold">Start date<input name="startDate" type="date" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label>' +
+        '<label class="text-xs font-semibold">End date<input name="endDate" type="date" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label>' +
+        '<button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 sm:col-span-2 lg:col-span-5">Add rotation</button></form>' +
+        cards + '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
+}
+
+function renderCarePlanTab() {
+    const bodyOptions = '<option value="">Choose a study area</option>' + ANATOMY_SYSTEMS.map((system) => '<option>' + escapeHtml(system.name) + '</option>').join('');
+    const saved = workspace.carePlans.length
+        ? '<div class="mt-5 grid gap-3 md:grid-cols-2">' + workspace.carePlans.map((plan) => '<article class="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-brand-700 dark:bg-brand-800"><div class="flex items-start justify-between gap-3"><div><h3 class="font-bold text-zinc-900 dark:text-white">' + escapeHtml(plan.title) + '</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">' + escapeHtml(plan.bodySystem || 'General') + ' · ' + dateLabel((plan.createdAt || '').slice(0, 10)) + '</p></div><button type="button" data-action="delete-care-plan" data-id="' + escapeHtml(plan.id) + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40">Delete</button></div>' +
+            '<details class="mt-3"><summary class="cursor-pointer text-xs font-bold text-indigo-700 dark:text-indigo-300">Open study draft</summary><dl class="mt-3 space-y-2 text-xs leading-5">' +
+            '<dt class="font-bold">Practice scenario</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.scenario || '—') + '</dd>' +
+            '<dt class="font-bold">Cues to notice</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.cues || '—') + '</dd>' +
+            '<dt class="font-bold">Priority concept</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.priority || '—') + '</dd>' +
+            '<dt class="font-bold">Outcome / goal</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.outcome || '—') + '</dd>' +
+            '<dt class="font-bold">Actions and rationale</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.actions || '—') + '<br>' + escapeHtml(plan.rationale || '') + '</dd>' +
+            '<dt class="font-bold">Evaluation</dt><dd class="text-zinc-600 dark:text-zinc-300">' + escapeHtml(plan.evaluation || '—') + '</dd></dl></details></article>').join('') + '</div>'
+        : '<p class="mt-5 rounded-xl border border-dashed border-zinc-300 p-5 text-center text-sm text-zinc-500 dark:border-brand-600 dark:text-zinc-400">Your saved study drafts will appear here.</p>';
+    return '<section class="mx-auto max-w-6xl"><div class="mb-5"><h2 class="text-2xl font-black text-zinc-900 dark:text-white">Care-plan studio</h2><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Use the nursing process to organize your own reasoning with a fictional practice case.</p></div>' +
+        '<div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100"><strong>Fictional cases only.</strong> Drafts sync to your DueVinci account. Do not enter information from a real patient, even if names are removed. No patient identifiers or clinical documentation belong here.</div>' +
+        '<form data-nursing-form="care-plan" class="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-6">' +
+        '<div class="grid gap-3 sm:grid-cols-2"><label class="text-xs font-semibold">Draft title<input name="title" maxlength="120" required placeholder="Example: Respiratory assessment practice" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label><label class="text-xs font-semibold">Study area<select name="bodySystem" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900">' + bodyOptions + '</select></label></div>' +
+        '<label class="block text-xs font-semibold">Fictional or instructor-provided practice scenario<textarea name="scenario" maxlength="1800" rows="2" placeholder="Use a made-up scenario. Do not include any real patient details." class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label>' +
+        '<div class="grid gap-3 md:grid-cols-2"><label class="text-xs font-semibold">Cues to notice<textarea name="cues" maxlength="1800" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><label class="text-xs font-semibold">Priority concept or hypothesis<textarea name="priority" maxlength="1000" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><label class="text-xs font-semibold">Expected outcome or goal<textarea name="outcome" maxlength="1000" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><label class="text-xs font-semibold">Planned learning actions<textarea name="actions" maxlength="1800" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><label class="text-xs font-semibold">Why these actions fit the scenario<textarea name="rationale" maxlength="1800" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><label class="text-xs font-semibold">How would you evaluate the outcome?<textarea name="evaluation" maxlength="1400" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label></div>' +
+        '<label class="flex items-start gap-2 text-xs leading-5"><input name="fictionalConfirm" type="checkbox" required class="mt-1 rounded border-zinc-300 text-indigo-600"><span>I confirm this is a fictional study case and contains no real patient information.</span></label>' +
+        '<button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500">Save study draft</button></form>' +
+        saved + '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p>' +
+        '<p class="mt-5 text-[11px] text-zinc-500 dark:text-zinc-400">Study structure follows the nursing process described in <a class="underline" href="https://openstax.org/books/fundamentals-nursing/pages/13-1-evolution-of-nursing-diagnosis" target="_blank" rel="noreferrer">OpenStax Fundamentals of Nursing</a>. Use your course rubric and instructor guidance.</p></section>';
+}
+
+function renderDosageTab() {
+    const problemIndex = Number(workspace.dosageIndex || 0) % DOSAGE_PROBLEMS.length;
+    const problem = DOSAGE_PROBLEMS[problemIndex];
+    const result = workspace.dosageProgress[problem.id] || { attempts: 0, correct: 0, completed: false };
+    const feedback = dosageFeedback && dosageFeedback.id === problem.id
+        ? '<div class="mt-4 rounded-xl border ' + (dosageFeedback.correct ? 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100' : 'border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100') + ' p-4" role="status"><p class="font-bold">' + (dosageFeedback.correct ? 'Correct — nice work.' : 'Try the setup again.') + '</p><p class="mt-1 text-sm">' + escapeHtml(problem.worked) + '</p></div>'
+        : '';
+    const completed = DOSAGE_PROBLEMS.reduce((sum, item) => sum + (workspace.dosageProgress[item.id] && workspace.dosageProgress[item.id].completed ? 1 : 0), 0);
+    return '<section class="mx-auto max-w-4xl"><div class="mb-5"><h2 class="text-2xl font-black text-zinc-900 dark:text-white">Dosage practice</h2><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Practice-only arithmetic with fictional values and no drug names.</p></div>' +
+        '<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">For coursework practice only. This is not a dosing tool. Follow your program’s method, unit conventions, rounding rules, drug references, and instructor guidance in real clinical settings.</div>' +
+        '<article class="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-7">' +
+        '<div class="flex flex-wrap items-center justify-between gap-2"><span class="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">' + escapeHtml(problem.title) + '</span><span class="text-xs text-zinc-500 dark:text-zinc-400">Practice set ' + (problemIndex + 1) + ' of ' + DOSAGE_PROBLEMS.length + ' · ' + completed + ' completed</span></div>' +
+        '<h3 class="mt-5 text-lg font-bold text-zinc-900 dark:text-white">' + escapeHtml(problem.prompt) + '</h3><p class="mt-3 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><strong>Set-up:</strong> ' + escapeHtml(problem.formula) + '</p>' +
+        '<form data-nursing-form="dosage" data-problem-id="' + problem.id + '" class="mt-5 flex flex-col gap-3 sm:flex-row"><label class="flex-1 text-xs font-semibold">Your answer<input name="answer" inputmode="decimal" autocomplete="off" required placeholder="Enter a number (unit optional)" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-3 text-base dark:border-brand-600 dark:bg-brand-900"></label><button class="self-end rounded-lg bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500">Check answer</button></form>' +
+        feedback + '<div class="mt-5 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-zinc-500 dark:text-zinc-400">Attempts: ' + result.attempts + ' · Correct: ' + result.correct + '</p><button type="button" data-action="next-dosage" class="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-bold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-700">Next problem →</button></div></article>' +
+        '<p class="mt-5 text-xs text-zinc-500 dark:text-zinc-400">Calculation format is adapted from <a class="underline" href="https://openstax.org/books/pharmacology/pages/2-4-dosage-calculations" target="_blank" rel="noreferrer">OpenStax Pharmacology for Nurses, Dosage Calculations</a>. Check your program’s policy for rounding and units.</p>' +
+        '<p id="nursingSaveStatus" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
+}
+
+function getAllCards() {
+    return NURSING_STARTER_CARDS.concat(workspace.customCards);
+}
+
+function isCardDue(card) {
+    const nextDate = workspace.cardMastery[card.id] && workspace.cardMastery[card.id].nextReviewDate;
+    return !nextDate || nextDate <= getLocalDateKey();
+}
+
+function renderFlashcardsTab() {
+    const cards = getAllCards();
+    const due = cards.filter(isCardDue);
+    const card = (due.length ? due : cards)[0];
+    const mastery = card && workspace.cardMastery[card.id];
+    const deckText = due.length ? due.length + ' due now' : 'Nothing due today — practice any card';
+    const customRows = workspace.customCards.length
+        ? '<ul class="mt-3 space-y-2">' + workspace.customCards.map((item) => '<li class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-brand-900"><span class="min-w-0 truncate"><strong>' + escapeHtml(item.topic) + ':</strong> ' + escapeHtml(item.front) + '</span><button type="button" data-action="delete-card" data-id="' + escapeHtml(item.id) + '" class="shrink-0 text-rose-600 hover:underline dark:text-rose-300">Remove</button></li>').join('') + '</ul>'
         : '<p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Your custom cards will appear here.</p>';
     const cardFace = card
         ? '<div class="mt-5 min-h-56 rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-6 dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-violet-950/30"><p class="text-[11px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">' + escapeHtml(card.topic) + ' · ' + escapeHtml(deckText) + '</p><p class="mt-6 text-xl font-bold leading-relaxed text-zinc-900 dark:text-white">' + escapeHtml(showCardAnswer ? card.back : card.front) + '</p>' +
