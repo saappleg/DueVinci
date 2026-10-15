@@ -19,7 +19,7 @@ function calendarWeekEnd(date = new Date()) {
 function isActionableAssignment(task) {
     const title = String(task?.title || '').trim();
     const isUnitHeading = /^(?:unit|week|wk|module|mod|chapter)\s*#?\d+\b/i.test(title) ||
-        /^(?:unit|week|wk|module|mod|chapter)\s*[:—-]?\s*$/i.test(title);
+        /^(?:unit|week|wk|module|mod|chapter)\s*[:—–-]?\s*$/i.test(title);
     return !isUnitHeading || /lesson|exam|final|midterm|test|review|assignment|lab|project|reading|quiz|essay|check[\s-]?in/i.test(title);
 }
 
