@@ -21,6 +21,15 @@ function contrastRatio(first, second) {
     return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+function blendColor(foreground, background, opacity) {
+    const foregroundChannels = foreground.slice(1).match(/.{2}/g).map((value) => parseInt(value, 16));
+    const backgroundChannels = background.slice(1).match(/.{2}/g).map((value) => parseInt(value, 16));
+    const channels = foregroundChannels.map((value, index) =>
+        Math.round(value * opacity + backgroundChannels[index] * (1 - opacity))
+    );
+    return `#${channels.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+}
+
 describe('degree themes', () => {
     it('offers the requested study fields and education paths', () => {
         const ids = DEGREE_THEMES.map((theme) => theme.id);
@@ -52,6 +61,10 @@ describe('degree themes', () => {
             expect(contrastRatio(light, '#1c1c1c'), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(light, darkSoft), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(light, accent), theme.id).toBeGreaterThanOrEqual(4.5);
+            const lightArtworkSurface = blendColor(accent, '#ffffff', 0.18);
+            const darkArtworkSurface = blendColor(light, '#1c1c1c', 0.18);
+            expect(contrastRatio('#52525b', lightArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio('#d4d4d8', darkArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
 
             const artworkRule = degreeThemeCss.split('\n').find((line) =>
                 line.startsWith(`html[data-degree-theme="${theme.id}"] { --dv-degree-pattern-light:`)
