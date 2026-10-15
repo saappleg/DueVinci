@@ -50,8 +50,14 @@ describe('degree themes', () => {
             expect(contrastRatio('#ffffff', accent), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(light, '#1c1c1c'), theme.id).toBeGreaterThanOrEqual(4.5);
 
-            expect(degreeThemeCss).toContain(`html[data-degree-theme="${theme.id}"] { --dv-degree-pattern-light:url("data:image/svg+xml,`);
-            expect(degreeThemeCss).toContain(`--dv-degree-pattern-dark:url("data:image/svg+xml,`);
+            const artworkRule = degreeThemeCss.split('\\n').find((line) =>
+                line.startsWith(`html[data-degree-theme="${theme.id}"] { --dv-degree-pattern-light:`)
+            );
+            expect(artworkRule, theme.id).toBeTruthy();
+            const artwork = [...artworkRule.matchAll(/data:image\\/svg\\+xml,([^"]+)/g)].map(([, source]) => decodeURIComponent(source));
+            expect(artwork).toHaveLength(2);
+            expect(artwork[0]).toContain(`stroke="${accent}"`);
+            expect(artwork[1]).toContain(`stroke="${light}"`);
         }
         expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="text-indigo-600"]');
     });
