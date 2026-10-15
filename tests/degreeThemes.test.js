@@ -81,7 +81,11 @@ describe('degree themes', () => {
             expect(artwork[1]).toContain(`stroke="${light}"`);
             expect(artwork[1]).toContain('opacity=".1"');
         }
-        expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-700"] { color:var(--dv-degree-strong); }');
+        expect(degreeThemeCss).toContain('html[data-degree-theme]:not(.dark) [class~="bg-indigo-50"] { background-color:var(--dv-degree-soft); }');
+        expect(degreeThemeCss).toContain('html[data-degree-theme]:not(.dark) [class~="from-indigo-50"] { background-image:linear-gradient(135deg,var(--dv-degree-soft),var(--dv-degree-light)); }');
+        expect(degreeThemeCss).toContain('html[data-degree-theme]:not(.dark) [class~="hover:bg-indigo-50"]:hover,');
+        expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="degree-theme-white-control"] { color:var(--dv-degree-strong); }');
+        expect(degreeThemeCss).not.toContain('html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-700"]');
     });
 
 });
