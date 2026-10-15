@@ -18,6 +18,7 @@ describe('Daily Brief assignment summary', () => {
             { id: 'sunday', course_id: 'weekly', title: 'Unit 3 Reading', due_date: '2026-10-18', is_completed: false },
             { id: 'next-week-unit', course_id: 'weekly', title: 'Unit 4 Quiz', due_date: '2026-10-19', is_completed: false },
             { id: 'next-week-self-paced', course_id: 'self-paced', title: 'Research paper', due_date: '2026-10-19', is_completed: false },
+            { id: 'bare-unit-heading', course_id: 'weekly', title: 'Unit', due_date: '2026-10-16', is_completed: false },
             { id: 'finished-task', course_id: 'weekly', title: 'Unit 3 Lab', due_date: '2026-10-16', is_completed: true },
             { id: 'completed-course-task', course_id: 'completed-course', title: 'Reflection', due_date: '2026-10-16', is_completed: false },
             { id: 'unit-heading', course_id: 'weekly', title: 'Week 3', due_date: '2026-10-16', is_completed: false },
