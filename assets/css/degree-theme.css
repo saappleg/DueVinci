@@ -36,6 +36,9 @@ html[data-degree-theme].dark [class~="text-indigo-800"],
 html[data-degree-theme].dark [class~="dark:text-indigo-400"],
 html[data-degree-theme].dark [class~="dark:text-indigo-300"],
 html[data-degree-theme].dark [class~="dark:text-indigo-200"] { color:var(--dv-degree-light); }
+/* Keep indigo labels legible on white controls when dark mode is active. */
+html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-600"],
+html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-700"] { color:var(--dv-degree-strong); }
 
 /* Muted labels stay readable over the subject artwork in both color modes. */
 html[data-degree-theme] [class~="text-zinc-400"],
