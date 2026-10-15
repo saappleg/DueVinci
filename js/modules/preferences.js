@@ -6,6 +6,7 @@ const UPDATED_AT_PREFIX = 'duevinci_preferences_updated_at:';
 const SNAPSHOT_PREFIX = 'duevinci_preferences_snapshot:';
 const PENDING_PREFIX = 'duevinci_preferences_pending:';
 const ACTIVE_USER_KEY = 'duevinci_preferences_account';
+const RELOAD_GUARD_PREFIX = 'duevinci_preferences_reload_once:';
 const LEGACY_UPDATED_AT_KEY = 'duevinci_preferences_updated_at';
 const NURSING_WORKSPACE_PREFIX = 'duevinci_workspace_nursing_hub_';
 const SYNC_INTERVAL_MS = 20_000;
@@ -338,10 +339,23 @@ async function initializePreferenceSyncForUser(user) {
 
     syncReadyUserId = userId;
     ensureSyncTimer();
+    const reloadGuardKey = `${RELOAD_GUARD_PREFIX}${userId}`;
     if (result.localChanged && typeof window !== 'undefined' && window.location) {
-        // Theme and timer modules read localStorage at module load; reload once
-        // so downloaded preferences and merged offline edits take effect.
-        window.location.reload();
+        // Persist the guard across a reload so a repeatedly detected preference
+        // difference cannot trap the dashboard in a reload loop.
+        try {
+            if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(reloadGuardKey) !== '1') {
+                sessionStorage.setItem(reloadGuardKey, '1');
+                window.location.reload();
+            }
+        } catch (error) {
+            // If session storage is unavailable, keep the page stable.
+            console.warn('Preference refresh skipped because the reload guard is unavailable:', error.message || error);
+        }
+    } else if (!result.localChanged) {
+        try {
+            if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(reloadGuardKey);
+        } catch { /* Storage can be disabled by the browser. */ }
     }
 }
 
