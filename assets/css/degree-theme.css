@@ -36,6 +36,14 @@ html[data-degree-theme].dark [class~="text-indigo-800"],
 html[data-degree-theme].dark [class~="dark:text-indigo-400"],
 html[data-degree-theme].dark [class~="dark:text-indigo-300"],
 html[data-degree-theme].dark [class~="dark:text-indigo-200"] { color:var(--dv-degree-light); }
+
+/* Muted labels stay readable over the subject artwork in both color modes. */
+html[data-degree-theme] [class~="text-zinc-400"],
+html[data-degree-theme] [class~="text-zinc-500"] { color:#52525b; }
+html[data-degree-theme].dark [class~="text-zinc-400"],
+html[data-degree-theme].dark [class~="text-zinc-500"],
+html[data-degree-theme].dark [class~="dark:text-zinc-400"],
+html[data-degree-theme].dark [class~="dark:text-zinc-500"] { color:#d4d4d8; }
 html[data-degree-theme].dark [class~="dark:bg-indigo-950/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-950/30"], html[data-degree-theme].dark [class~="dark:bg-indigo-900/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-500/20"] { background-color:var(--dv-degree-dark-soft); }
 html[data-degree-theme].dark [class~="dark:border-indigo-900/50"], html[data-degree-theme].dark [class~="dark:border-indigo-800"], html[data-degree-theme].dark [class~="dark:border-indigo-700"] { border-color:var(--dv-degree-dark-soft); }
 html[data-degree-theme] [class~="from-indigo-700"] { background-image:linear-gradient(135deg,var(--dv-degree-strong),var(--dv-degree-accent),var(--dv-degree-strong)); }
