@@ -117,7 +117,7 @@ export function getCurrentPageName() {
     const segments = path.split("/").filter(Boolean);
     if (segments.length === 0) return 'index';
 
-    const last = segments[segments.length - 1].replace(/\\.html$/, '');
+    const last = segments[segments.length - 1].replace(/\.html$/, '');
     const appRoutes = new Set(['courses', 'grades', 'calendar', 'tutor', 'nursing']);
 
     // A project hosted under a prefix (such as /DueVinci/) still has the
