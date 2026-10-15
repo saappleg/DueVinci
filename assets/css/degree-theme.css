@@ -22,9 +22,10 @@ html[data-degree-theme] [class~="text-indigo-800"] { color:var(--dv-degree-stron
 html[data-degree-theme] [class~="text-indigo-100"], html[data-degree-theme] [class~="text-indigo-200"], html[data-degree-theme] [class~="text-indigo-300"] { color:var(--dv-degree-light); }
 html[data-degree-theme] [class~="border-indigo-500"], html[data-degree-theme] [class~="border-indigo-400"] { border-color:var(--dv-degree-accent); }
 html[data-degree-theme] [class~="border-indigo-300"], html[data-degree-theme] [class~="border-indigo-200"], html[data-degree-theme] [class~="border-indigo-100"] { border-color:var(--dv-degree-border); }
-html[data-degree-theme] [class~="bg-indigo-50"] { background-color:var(--dv-degree-soft); }
+html[data-degree-theme]:not(.dark) [class~="bg-indigo-50"] { background-color:var(--dv-degree-soft); }
 html[data-degree-theme] [class~="hover:bg-indigo-700"]:hover, html[data-degree-theme] [class~="hover:bg-indigo-500"]:hover { background-color:var(--dv-degree-strong); }
-html[data-degree-theme] [class~="hover:bg-indigo-50"]:hover, html[data-degree-theme] [class~="hover:bg-indigo-100"]:hover { background-color:var(--dv-degree-soft); }
+html[data-degree-theme]:not(.dark) [class~="hover:bg-indigo-50"]:hover,
+html[data-degree-theme]:not(.dark) [class~="hover:bg-indigo-100"]:hover { background-color:var(--dv-degree-soft); }
 html[data-degree-theme] [class~="hover:border-indigo-300"]:hover, html[data-degree-theme] [class~="dark:hover:border-indigo-600"]:hover { border-color:var(--dv-degree-accent); }
 html[data-degree-theme] [class~="focus:border-indigo-500"]:focus { border-color:var(--dv-degree-accent); }
 html[data-degree-theme] [class~="accent-indigo-600"] { accent-color:var(--dv-degree-accent); }
@@ -36,9 +37,8 @@ html[data-degree-theme].dark [class~="text-indigo-800"],
 html[data-degree-theme].dark [class~="dark:text-indigo-400"],
 html[data-degree-theme].dark [class~="dark:text-indigo-300"],
 html[data-degree-theme].dark [class~="dark:text-indigo-200"] { color:var(--dv-degree-light); }
-/* Keep indigo labels legible on white controls when dark mode is active. */
-html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-600"],
-html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-700"] { color:var(--dv-degree-strong); }
+/* Use dark accent text only on controls that stay white in dark mode. */
+html[data-degree-theme].dark [class~="degree-theme-white-control"] { color:var(--dv-degree-strong); }
 
 /* Muted labels stay readable over the subject artwork in both color modes. */
 html[data-degree-theme] [class~="text-zinc-400"],
@@ -50,7 +50,7 @@ html[data-degree-theme].dark [class~="dark:text-zinc-500"] { color:#d4d4d8; }
 html[data-degree-theme].dark [class~="dark:bg-indigo-950/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-950/30"], html[data-degree-theme].dark [class~="dark:bg-indigo-900/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-500/20"] { background-color:var(--dv-degree-dark-soft); }
 html[data-degree-theme].dark [class~="dark:border-indigo-900/50"], html[data-degree-theme].dark [class~="dark:border-indigo-800"], html[data-degree-theme].dark [class~="dark:border-indigo-700"] { border-color:var(--dv-degree-dark-soft); }
 html[data-degree-theme] [class~="from-indigo-700"] { background-image:linear-gradient(135deg,var(--dv-degree-strong),var(--dv-degree-accent),var(--dv-degree-strong)); }
-html[data-degree-theme] [class~="from-indigo-50"] { background-image:linear-gradient(135deg,var(--dv-degree-soft),var(--dv-degree-light)); }
+html[data-degree-theme]:not(.dark) [class~="from-indigo-50"] { background-image:linear-gradient(135deg,var(--dv-degree-soft),var(--dv-degree-light)); }
 
 
 /* Subject line-art textures stay in the page background, never over content. */
