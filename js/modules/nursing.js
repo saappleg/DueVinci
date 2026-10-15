@@ -1,10 +1,10 @@
 // --- NURSING HUB: student organization and educational practice tools ---
 import { supabaseClient } from './config.js';
 import { calculateSM2Repetition } from './flashcards.js';
+import { isValidNursingWorkspaceShape, MAX_NURSING_WORKSPACE_BYTES } from './preferenceMerge.js';
 import { escapeHtml, getLocalDateKey } from './utils.js';
 
 const STORAGE_PREFIX = 'duevinci_workspace_nursing_hub_';
-const MAX_WORKSPACE_BYTES = 240000;
 
 export const DOSAGE_PROBLEMS = [
     {
@@ -75,12 +75,12 @@ export const ANATOMY_SYSTEMS = [
 ];
 
 export const NURSING_STARTER_CARDS = [
-    { id: 'starter-anatomy', topic: 'Anatomy', front: 'What does anatomy study?', back: 'The structures of the body and how those structures relate to one another.', source: 'OpenStax Anatomy & Physiology 2e, section 1.1' },
-    { id: 'starter-physiology', topic: 'Anatomy', front: 'What does physiology study?', back: 'How body structures function and work together.', source: 'OpenStax Anatomy & Physiology 2e, section 1.1' },
-    { id: 'starter-organ-system', topic: 'Anatomy', front: 'What is an organ system?', back: 'A group of organs that work together to perform major functions or meet physiological needs.', source: 'OpenStax Anatomy & Physiology 2e, section 1.2' },
-    { id: 'starter-process', topic: 'Nursing process', front: 'What are the five nursing-process steps?', back: 'Assessment, diagnosis, planning/outcomes, implementation, and evaluation. The process is iterative.', source: 'OpenStax Fundamentals of Nursing, chapter 13' },
-    { id: 'starter-dosage', topic: 'Dosage math', front: 'What is the desired ÷ have × quantity setup used for?', back: 'A proportion method for calculating a practice amount from a desired dose, the amount on hand, and its quantity.', source: 'OpenStax Pharmacology for Nurses, section 2.4' },
-    { id: 'starter-clinical-judgment', topic: 'Clinical judgment', front: 'What should happen after evaluating an outcome?', back: 'Use the evaluation to decide whether the learning plan or next action needs revision; judgment is an ongoing process.', source: 'OpenStax Fundamentals of Nursing, chapter 14' }
+    { id: 'starter-anatomy', topic: 'Anatomy', front: 'How do anatomy and physiology differ?', back: 'Anatomy focuses on body structures; physiology focuses on how those structures work.', source: 'DueVinci original practice prompt' },
+    { id: 'starter-physiology', topic: 'Anatomy', front: 'Why study structure and function together?', back: 'A structure’s location and form can help explain what it does and how it contributes to the whole body.', source: 'DueVinci original practice prompt' },
+    { id: 'starter-organ-system', topic: 'Anatomy', front: 'What makes several organs part of one body system?', back: 'They coordinate related jobs that support a larger body function.', source: 'DueVinci original practice prompt' },
+    { id: 'starter-process', topic: 'Nursing process', front: 'What are the common phases of a nursing process?', back: 'Assessment, diagnosis, planning, implementation, and evaluation. Use the framework taught by your program.', source: 'DueVinci original practice prompt' },
+    { id: 'starter-dosage', topic: 'Dosage math', front: 'What relationship can help calculate a practice quantity?', back: 'For a compatible dose and unit, divide the desired amount by the amount on hand, then multiply by the supplied quantity.', source: 'DueVinci original practice prompt' },
+    { id: 'starter-clinical-judgment', topic: 'Clinical judgment', front: 'After checking whether a learning outcome was met, what is a useful next step?', back: 'Compare the result with the goal, then decide what to keep practicing or discuss with your instructor.', source: 'DueVinci original practice prompt' }
 ];
 
 function safeText(value, max = 500) {
@@ -114,6 +114,7 @@ export function createEmptyNursingWorkspace() {
         dosageProgress: {},
         dosageIndex: 0,
         completedSystems: [],
+        syncConflicts: [],
         updatedAt: ''
     };
 }
@@ -157,10 +158,10 @@ export function sanitizeNursingWorkspace(value = {}) {
         const source = card && typeof card === 'object' ? card : {};
         return {
             id: safeText(source.id, 100),
-            topic: safeText(source.topic, 60) || 'My cards',
+            topic: Object.hasOwn(source, 'topic') ? safeText(source.topic, 60) : 'My cards',
             front: safeText(source.front, 500),
             back: safeText(source.back, 1200),
-            source: 'Your card'
+            source: safeText(source.source, 1200) || 'Your card'
         };
     }).filter((card) => card.id && card.front && card.back) : [];
     const cardMastery = {};
@@ -190,8 +191,18 @@ export function sanitizeNursingWorkspace(value = {}) {
         });
     }
     const completedSystems = Array.isArray(value.completedSystems)
-        ? [...new Set(value.completedSystems.filter((id) => ANATOMY_SYSTEMS.some((system) => system.id === id)))]
+        ? [...new Set(value.completedSystems.filter((id) => typeof id === 'string').slice(0, 80))]
         : [];
+    const syncConflicts = Array.isArray(value.syncConflicts) ? value.syncConflicts.slice(0, 80).map((conflict) => {
+        const source = conflict && typeof conflict === 'object' ? conflict : {};
+        const path = Array.isArray(source.path) ? source.path.slice(0, 12).map((part) => safeText(part, 120)).filter(Boolean) : [];
+        return {
+            id: safeText(source.id, 100),
+            path,
+            versionA: typeof source.versionA === 'string' ? source.versionA.slice(0, 3000) : '',
+            versionB: typeof source.versionB === 'string' ? source.versionB.slice(0, 3000) : ''
+        };
+    }).filter((conflict) => conflict.id && conflict.path.length && conflict.versionA !== conflict.versionB) : [];
     return {
         version: 1,
         rotations,
@@ -201,6 +212,7 @@ export function sanitizeNursingWorkspace(value = {}) {
         dosageProgress,
         dosageIndex: Math.floor(boundedNumber(value.dosageIndex, 0, 0, DOSAGE_PROBLEMS.length - 1)),
         completedSystems,
+        syncConflicts,
         updatedAt: safeText(value.updatedAt, 40)
     };
 }
@@ -267,29 +279,96 @@ function getWorkspaceUserId() {
 
 let workspace = createEmptyNursingWorkspace();
 let workspaceUserId = '';
+let workspaceLoadIssue = '';
+let workspaceRecoveryRaw = '';
+let workspaceRecoveryAvailable = false;
 let activeTab = 'overview';
 let activeSystemId = 'cardiovascular';
 let showAnatomyAnswer = false;
 let showCardAnswer = false;
 let dosageFeedback = null;
 let availableCourses = [];
+let workspaceSaveSequence = 0;
 
 function saveWorkspace() {
+    if (workspaceLoadIssue) {
+        setStatus('Saving is paused because the saved draft could not be read. Download a recovery copy or reset the workspace first.', true);
+        return false;
+    }
     if (!workspaceUserId || typeof localStorage === 'undefined') return false;
+    if (workspaceUserId !== getWorkspaceUserId()) {
+        setStatus('Saving is paused while the signed-in account changes.', true);
+        return false;
+    }
     workspace.updatedAt = new Date().toISOString();
     const snapshot = JSON.stringify(sanitizeNursingWorkspace(workspace));
-    if (snapshot.length > MAX_WORKSPACE_BYTES) {
+    if (snapshot.length > MAX_NURSING_WORKSPACE_BYTES) {
         setStatus('This workspace is full. Remove older drafts or cards before saving.', true);
         return false;
     }
     try {
         localStorage.setItem(getNursingStorageKey(workspaceUserId), snapshot);
         workspace = sanitizeNursingWorkspace(JSON.parse(snapshot));
-        setStatus('Saved. Your Nursing Hub data syncs with your DueVinci account while online.');
+        const saveSequence = ++workspaceSaveSequence;
+        setStatus('Saved on this device. Syncing to your account…');
+        if (typeof window !== 'undefined' && typeof window.syncPreferencesNow === 'function') {
+            window.syncPreferencesNow().then((synced) => {
+                if (saveSequence !== workspaceSaveSequence) return;
+                setStatus(synced
+                    ? 'Saved on this device and synced to your account.'
+                    : 'Saved on this device. Account sync will retry when online.');
+            }).catch(() => {
+                if (saveSequence === workspaceSaveSequence) setStatus('Saved on this device. Account sync will retry when online.');
+            });
+        } else {
+            setStatus('Saved on this device. Account sync will retry when online.');
+        }
         return true;
     } catch {
         setStatus('Could not save this change in this browser.', true);
         return false;
+    }
+}
+
+function downloadNursingRecoveryCopy() {
+    if (!workspaceRecoveryAvailable || typeof document === 'undefined' || typeof URL === 'undefined') return;
+    const blob = new Blob([workspaceRecoveryRaw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'nursing-hub-recovery.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function resetCorruptNursingWorkspace() {
+    if (!workspaceLoadIssue || !workspaceRecoveryAvailable || !window.confirm('Start with an empty Nursing Hub? The unreadable saved copy will be replaced. Download a recovery copy first if you want to keep it.')) return;
+    const priorIssue = workspaceLoadIssue;
+    const priorRaw = workspaceRecoveryRaw;
+    const priorRecoveryAvailable = workspaceRecoveryAvailable;
+    workspaceLoadIssue = '';
+    workspace = createEmptyNursingWorkspace();
+    if (!saveWorkspace()) {
+        workspaceLoadIssue = priorIssue;
+        workspaceRecoveryRaw = priorRaw;
+        workspaceRecoveryAvailable = priorRecoveryAvailable;
+        renderActiveTab();
+        setStatus('The empty workspace was not saved. Your unreadable saved copy remains unchanged.', true);
+        const resetButton = document.querySelector('#nursingHub [data-action="reset-corrupt-workspace"]');
+        resetButton?.focus({ preventScroll: true });
+        resetButton?.scrollIntoView({ block: 'nearest' });
+        return;
+    }
+    workspaceRecoveryRaw = '';
+    workspaceRecoveryAvailable = false;
+    renderActiveTab();
+    const heading = document.querySelector('#nursingHub h2');
+    if (heading) {
+        heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ block: 'start' });
     }
 }
 
@@ -329,7 +408,8 @@ function rotationCard(rotation) {
         '<ul class="mt-2">' + skillRows + '</ul>' +
         '<form data-nursing-form="skill" data-rotation-id="' + escapeHtml(rotation.id) + '" class="mt-3 flex gap-2">' +
         '<label class="sr-only" for="skill-' + escapeHtml(rotation.id) + '">Skill to track</label><input id="skill-' + escapeHtml(rotation.id) + '" name="skill" maxlength="120" required placeholder="Add a skill or competency" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900">' +
-        '<button class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500">Add</button></form></article>';
+        '<button class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500">Add</button></form>' +
+        '<p class="mt-2 text-[11px] leading-5 text-rose-700 dark:text-rose-300">Use school-approved, fictional study details only. Do not enter patient names or other identifying information.</p></article>';
 }
 
 function renderOverview() {
@@ -341,9 +421,21 @@ function renderOverview() {
         return !due || due <= getLocalDateKey();
     }).length;
     const correctCount = Object.values(workspace.dosageProgress).reduce((sum, item) => sum + (item.correct || 0), 0);
+    const conflicts = workspace.syncConflicts || [];
+    const recoveryNotice = workspaceLoadIssue
+        ? '<section class="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100" role="alert"><h3 class="font-bold">Saved Nursing Hub data needs recovery</h3><p class="mt-2 text-sm leading-6">' + escapeHtml(workspaceLoadIssue) + ' Your unreadable saved copy has not been overwritten.</p>' + (workspaceRecoveryAvailable ? '<div class="mt-3 flex flex-wrap gap-2"><button type="button" data-action="download-recovery-copy" class="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-bold dark:border-rose-800 dark:bg-brand-900">Download recovery copy</button><button type="button" data-action="reset-corrupt-workspace" class="rounded-lg bg-rose-700 px-3 py-2 text-xs font-bold text-white hover:bg-rose-800">Start with an empty workspace</button></div>' : '<p class="mt-3 text-xs leading-5">Browser storage could not be read. Keep this page open, enable site storage, then reload to try again.</p>') + '</section>'
+        : '';
+    const conflictNotice = conflicts.length
+        ? '<details open class="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><summary data-conflict-summary class="cursor-pointer font-bold">Review ' + conflicts.length + ' draft edit' + (conflicts.length === 1 ? '' : 's') + ' saved on multiple devices</summary><p class="mt-2 text-sm leading-6">Both versions are kept. Choose the wording you want to keep in each saved draft.</p><div class="mt-3 space-y-3">' + conflicts.map((conflict) => {
+            const fieldLabel = conflict.path.join(' · ');
+            const visibleLocation = conflict.path.slice(0, -1).join(' · ') + ' · ' + conflict.path.at(-1);
+            return '<article aria-labelledby="sync-conflict-title-' + escapeHtml(conflict.id) + '" class="rounded-xl border border-amber-300/70 bg-white p-3 dark:border-amber-800 dark:bg-brand-900"><h4 id="sync-conflict-title-' + escapeHtml(conflict.id) + '" class="text-xs font-semibold">' + escapeHtml(visibleLocation) + '</h4><div class="mt-3 grid gap-3 sm:grid-cols-2"><div><p class="text-xs font-bold uppercase tracking-wide">Version A</p><p class="mt-1 whitespace-pre-wrap break-words text-sm">' + escapeHtml(conflict.versionA) + '</p><button type="button" data-action="resolve-sync-conflict" data-id="' + escapeHtml(conflict.id) + '" data-choice="a" aria-label="Use Version A for ' + escapeHtml(fieldLabel) + '" class="mt-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-800">Use Version A</button></div><div><p class="text-xs font-bold uppercase tracking-wide">Version B</p><p class="mt-1 whitespace-pre-wrap break-words text-sm">' + escapeHtml(conflict.versionB) + '</p><button type="button" data-action="resolve-sync-conflict" data-id="' + escapeHtml(conflict.id) + '" data-choice="b" aria-label="Use Version B for ' + escapeHtml(fieldLabel) + '" class="mt-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-800">Use Version B</button></div></div><button type="button" data-action="dismiss-sync-conflict" data-id="' + escapeHtml(conflict.id) + '" aria-label="Dismiss saved comparison for ' + escapeHtml(fieldLabel) + '" class="mt-3 text-xs font-semibold text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">Dismiss this comparison</button></article>';
+        }).join('') + '</div></details>'
+        : '';
     const tile = (title, value, note, icon, tab) => '<button type="button" data-nursing-tab="' + tab + '" class="rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:hover:border-indigo-600"><span class="text-xl">' + icon + '</span><span class="mt-3 block text-2xl font-black text-zinc-900 dark:text-white">' + value + '</span><span class="block text-sm font-bold">' + title + '</span><span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">' + note + '</span></button>';
     return '<section class="mx-auto max-w-6xl">' +
         '<div class="rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white shadow-lg sm:p-8"><p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-100">Nursing school, organized</p><h2 class="mt-2 max-w-2xl text-2xl font-black sm:text-3xl">A place to prepare, practice, and keep track of your progress.</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-indigo-100">Connect your clinical rotations to your classes, work through dosage math, build study cards, and review body systems.</p><button type="button" data-nursing-tab="clinical" class="mt-5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 shadow-sm hover:bg-indigo-50">Set up a rotation</button></div>' +
+        recoveryNotice + conflictNotice +
         '<div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">' +
         tile('Active rotations', activeRotations, workspace.rotations.length + ' tracked', '🩺', 'clinical') +
         tile('Skills checked off', checkedSkills, trackedSkills + ' skills tracked', '✅', 'clinical') +
@@ -355,7 +447,7 @@ function renderOverview() {
         '<button data-nursing-tab="anatomy" class="rounded-xl border border-zinc-200 p-3 text-left hover:border-indigo-300 dark:border-brand-700">🫀 <strong class="ml-1 text-sm">Anatomy studio</strong><span class="mt-1 block text-xs text-zinc-500">Explore eleven body systems</span></button>' +
         '</div></section>' +
         '<section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/60 dark:bg-amber-950/20"><h3 class="font-bold text-amber-950 dark:text-amber-100">Practice safely</h3><p class="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">These tools support learning. They are not clinical references or patient-care instructions. Use fictional cases only; never add patient names, dates of birth, room numbers, photos, or other identifying information.</p></section>' +
-        '</div><p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">Your workspace is saved to your DueVinci account when online.</p></section>';
+        '</div><p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">Your workspace is saved on this device and syncs to your account while online.</p></section>';
 }
 
 function renderClinicalTab() {
@@ -373,6 +465,7 @@ function renderClinicalTab() {
         '<label class="text-xs font-semibold">Start date<input name="startDate" type="date" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label>' +
         '<label class="text-xs font-semibold">End date<input name="endDate" type="date" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label>' +
         '<button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 sm:col-span-2 lg:col-span-5">Add rotation</button></form>' +
+        '<p class="mt-2 text-xs leading-5 text-rose-700 dark:text-rose-300">Use a generic rotation label. Do not enter patient information; this workspace syncs to your account.</p>' +
         cards + '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
 }
 
@@ -397,7 +490,7 @@ function renderCarePlanTab() {
         '<label class="flex items-start gap-2 text-xs leading-5"><input name="fictionalConfirm" type="checkbox" required class="mt-1 rounded border-zinc-300 text-indigo-600"><span>I confirm this is a fictional study case and contains no real patient information.</span></label>' +
         '<button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500">Save study draft</button></form>' +
         saved + '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p>' +
-        '<p class="mt-5 text-[11px] text-zinc-500 dark:text-zinc-400">Study structure follows the nursing process described in <a class="underline" href="https://openstax.org/books/fundamentals-nursing/pages/13-1-evolution-of-nursing-diagnosis" target="_blank" rel="noreferrer">OpenStax Fundamentals of Nursing</a>. Use your course rubric and instructor guidance.</p></section>';
+        '<p class="mt-5 text-[11px] text-zinc-500 dark:text-zinc-400">Use the nursing process and care-plan format taught in your program. This organizer is for fictional learning scenarios and does not assess clinical decisions.</p></section>';
 }
 
 function renderDosageTab() {
@@ -415,7 +508,7 @@ function renderDosageTab() {
         '<h3 class="mt-5 text-lg font-bold text-zinc-900 dark:text-white">' + escapeHtml(problem.prompt) + '</h3><p class="mt-3 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><strong>Set-up:</strong> ' + escapeHtml(problem.formula) + '</p>' +
         '<form data-nursing-form="dosage" data-problem-id="' + problem.id + '" class="mt-5 flex flex-col gap-3 sm:flex-row"><label class="flex-1 text-xs font-semibold">Your answer<input name="answer" inputmode="decimal" autocomplete="off" required placeholder="Enter a number (unit optional)" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-3 text-base dark:border-brand-600 dark:bg-brand-900"></label><button class="self-end rounded-lg bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500">Check answer</button></form>' +
         feedback + '<div class="mt-5 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-zinc-500 dark:text-zinc-400">Attempts: ' + result.attempts + ' · Correct: ' + result.correct + '</p><button type="button" data-action="next-dosage" class="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-bold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-700">Next problem →</button></div></article>' +
-        '<p class="mt-5 text-xs text-zinc-500 dark:text-zinc-400">Calculation format is adapted from <a class="underline" href="https://openstax.org/books/pharmacology/pages/2-4-dosage-calculations" target="_blank" rel="noreferrer">OpenStax Pharmacology for Nurses, Dosage Calculations</a>. Check your program’s policy for rounding and units.</p>' +
+        '<p class="mt-5 text-xs text-zinc-500 dark:text-zinc-400">These synthetic examples are for arithmetic practice only. Verify calculation methods, unit conventions, and rounding with your instructor and program policy.</p>' +
         '<p id="nursingSaveStatus" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
 }
 
@@ -445,9 +538,10 @@ function renderFlashcardsTab() {
         : '<p class="mt-5 rounded-xl border border-dashed border-zinc-300 p-5 text-center text-sm text-zinc-500 dark:border-brand-600 dark:text-zinc-400">No cards are available.</p>';
     const customForm = '<form data-nursing-form="card" class="mt-5 grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-brand-700 dark:bg-brand-800 sm:grid-cols-3"><label class="text-xs font-semibold">Topic<input name="topic" maxlength="60" placeholder="Pharmacology" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label><label class="text-xs font-semibold sm:col-span-2">Question / front<input name="front" maxlength="500" required class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></label><label class="text-xs font-semibold sm:col-span-3">Answer / back<textarea name="back" maxlength="1200" rows="2" required class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-brand-600 dark:bg-brand-900"></textarea></label><button class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 sm:col-span-3">Add card to my deck</button></form>';
     return '<section class="mx-auto max-w-4xl"><div class="mb-5"><h2 class="text-2xl font-black text-zinc-900 dark:text-white">Nursing flashcards</h2><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Review starter cards or make a deck from your own study notes. Ratings schedule the next review using DueVinci’s SM-2 system.</p></div>' +
-        '<div class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800"><div class="flex items-center justify-between gap-3"><h3 class="font-bold text-zinc-900 dark:text-white">Review deck</h3><span class="text-xs text-zinc-500 dark:text-zinc-400">' + deckText + '</span></div>' + cardFace + '<p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">Starter cards summarize concepts from the linked OpenStax chapters. Confirm content with your assigned text and course materials.</p></div>' +
+        '<div class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800"><div class="flex items-center justify-between gap-3"><h3 class="font-bold text-zinc-900 dark:text-white">Review deck</h3><span class="text-xs text-zinc-500 dark:text-zinc-400">' + deckText + '</span></div>' + cardFace + '<p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">Original practice prompts are simplified starting points. Check details against your assigned text, instructor, and program guidance.</p></div>' +
         '<div class="mt-5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-brand-700 dark:bg-brand-800"><h3 class="font-bold text-zinc-900 dark:text-white">My custom cards</h3>' + customRows + '</div>' +
-        customForm + '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
+        customForm + '<p class="mt-2 text-xs leading-5 text-rose-700 dark:text-rose-300">Use your own fictional or course-approved study notes only. Do not include patient names, dates of birth, or other identifying information.</p>' +
+        '<p id="nursingSaveStatus" class="mt-4 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
 }
 
 function renderAnatomyTab() {
@@ -455,9 +549,9 @@ function renderAnatomyTab() {
     const systemButtons = ANATOMY_SYSTEMS.map((item) => {
         const active = item.id === system.id;
         const complete = workspace.completedSystems.includes(item.id);
-        return '<button type="button" data-system-id="' + item.id + '" class="flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ' + (active ? 'border-indigo-400 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800') + '"><span>' + item.icon + '</span><span class="min-w-0 flex-1">' + escapeHtml(item.name) + '</span>' + (complete ? '<span aria-label="Reviewed">✓</span>' : '') + '</button>';
+        return '<button type="button" data-system-id="' + item.id + '" aria-pressed="' + active + '" aria-controls="anatomy-system-detail" class="flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ' + (active ? 'border-indigo-400 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800') + '"><span>' + item.icon + '</span><span class="min-w-0 flex-1">' + escapeHtml(item.name) + '</span>' + (complete ? '<span aria-label="Reviewed">✓</span>' : '') + '</button>';
     }).join('');
-    const detail = '<article class="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-7"><div class="flex items-start gap-4"><span class="text-4xl" aria-hidden="true">' + system.icon + '</span><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Body system</p><h3 class="text-xl font-black text-zinc-900 dark:text-white">' + escapeHtml(system.name) + '</h3></div></div>' +
+    const detail = '<article id="anatomy-system-detail" aria-labelledby="anatomy-system-title" class="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-7"><div class="flex items-start gap-4"><span class="text-4xl" aria-hidden="true">' + system.icon + '</span><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Body system</p><h3 id="anatomy-system-title" class="text-xl font-black text-zinc-900 dark:text-white">' + escapeHtml(system.name) + '</h3></div></div>' +
         '<dl class="mt-5 space-y-4"><div><dt class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Big picture</dt><dd class="mt-1 text-sm leading-6">' + escapeHtml(system.focus) + '</dd></div><div><dt class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Structures to review</dt><dd class="mt-1 text-sm leading-6">' + escapeHtml(system.structures) + '</dd></div></dl>' +
         '<div class="mt-5 rounded-xl bg-zinc-50 p-4 dark:bg-brand-900"><p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Quick self-check</p><p class="mt-2 text-sm font-semibold">' + escapeHtml(system.check) + '</p>' +
         (showAnatomyAnswer ? '<p class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/20">' + escapeHtml(system.answer) + '</p>' : '') +
@@ -466,7 +560,7 @@ function renderAnatomyTab() {
     const reviewed = workspace.completedSystems.length;
     return '<section class="mx-auto max-w-6xl"><div class="mb-5"><h2 class="text-2xl font-black text-zinc-900 dark:text-white">Anatomy studio</h2><p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Explore body systems, test recall, and mark topics for review. ' + reviewed + ' of ' + ANATOMY_SYSTEMS.length + ' systems reviewed.</p></div>' +
         '<div class="grid gap-4 lg:grid-cols-[minmax(240px,0.75fr)_minmax(0,1.25fr)]"><nav aria-label="Body systems" class="grid content-start grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">' + systemButtons + '</nav>' + detail + '</div>' +
-        '<p class="mt-5 text-xs text-zinc-500 dark:text-zinc-400">System overview follows <a class="underline" href="https://openstax.org/books/anatomy-and-physiology-2e/pages/1-2-structural-organization-of-the-human-body" target="_blank" rel="noreferrer">OpenStax Anatomy & Physiology 2e</a>. This compact overview is a starting point; use your assigned course text for complete detail.</p>' +
+        '<p class="mt-5 text-xs text-zinc-500 dark:text-zinc-400">This compact overview supports basic recall only. Use your assigned course text and instructor guidance for complete detail.</p>' +
         '<p id="nursingSaveStatus" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
 }
 
@@ -479,18 +573,45 @@ const TAB_DEFINITIONS = [
     { id: 'anatomy', label: 'Anatomy', icon: '🫀' }
 ];
 
-function renderActiveTab() {
+function findRestoredFocusTarget(container, source) {
+    if (!source || !container) return null;
+    if (source.matches?.('form[data-nursing-form]')) {
+        const formType = source.dataset.nursingForm;
+        const rotationId = source.dataset.rotationId || '';
+        const replacement = Array.from(container.querySelectorAll('form[data-nursing-form]')).find((form) =>
+            form.dataset.nursingForm === formType && (form.dataset.rotationId || '') === rotationId
+        );
+        return replacement?.querySelector('input:not([type="checkbox"]), select, textarea, button') || null;
+    }
+    const identityKeys = ['nursingTab', 'systemId', 'action', 'id', 'rotationId', 'skillId', 'cardId', 'quality', 'choice'];
+    const keys = identityKeys.filter((key) => source.dataset?.[key] !== undefined);
+    if (!keys.length) return null;
+    return Array.from(container.querySelectorAll('button')).find((candidate) =>
+        keys.every((key) => candidate.dataset[key] === source.dataset[key])
+    ) || null;
+}
+
+function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
     const container = document.getElementById('nursingHub');
     if (!container) return;
+    const previousScrollTop = container.scrollTop;
     const body = activeTab === 'clinical' ? renderClinicalTab()
         : activeTab === 'careplans' ? renderCarePlanTab()
             : activeTab === 'dosage' ? renderDosageTab()
                 : activeTab === 'flashcards' ? renderFlashcardsTab()
                     : activeTab === 'anatomy' ? renderAnatomyTab()
                         : renderOverview();
-    container.innerHTML = '<div class="mx-auto max-w-6xl"><div class="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Nursing Hub tools">' +
-        TAB_DEFINITIONS.map((tab) => '<button type="button" role="tab" aria-selected="' + (activeTab === tab.id ? 'true' : 'false') + '" data-nursing-tab="' + tab.id + '" class="rounded-xl px-3 py-2 text-xs font-bold transition ' + (activeTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + tab.icon + ' <span class="ml-1">' + tab.label + '</span></button>').join('') +
-        '</div>' + body + '</div>';
+    container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="sticky top-0 z-20 -mx-4 mb-5 flex gap-2 overflow-x-auto border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur dark:border-brand-700 dark:bg-brand-900/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">' +
+        TAB_DEFINITIONS.map((tab) => '<button type="button" ' + (activeTab === tab.id ? 'aria-current="page" ' : '') + 'data-nursing-tab="' + tab.id + '" class="shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 ' + (activeTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + tab.icon + ' <span class="ml-1">' + tab.label + '</span></button>').join('') +
+        '</nav>' + body + '</div>';
+    container.scrollTop = resetScroll ? 0 : previousScrollTop;
+    const restored = findRestoredFocusTarget(container, focusTarget);
+    if (focusTarget) {
+        const fallback = container.querySelector('[data-nursing-tab="' + activeTab + '"]');
+        const target = restored || fallback;
+        target?.focus({ preventScroll: true });
+        if (target?.matches('[data-nursing-tab]')) target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
 }
 
 function formValue(form, name) {
@@ -504,8 +625,16 @@ function selectedCourseLabel(courseId) {
     return course.code ? course.code + ' · ' + course.name : course.name;
 }
 
-function saveAndRender() {
-    if (saveWorkspace()) renderActiveTab();
+function saveAndRender(focusTarget = null) {
+    if (!saveWorkspace()) return;
+    renderActiveTab({ focusTarget });
+}
+
+function removeSyncConflictsForRecord(collection, id) {
+    workspace.syncConflicts = (workspace.syncConflicts || []).filter((conflict) => {
+        const [recordCollection, recordId] = conflict.path || [];
+        return !(recordCollection === collection && recordId === id);
+    });
 }
 
 function handleFormSubmit(event) {
@@ -527,7 +656,7 @@ function handleFormSubmit(event) {
             startDate, endDate, skills: []
         });
         activeTab = 'clinical';
-        saveAndRender();
+        saveAndRender(form);
         return;
     }
     if (formType === 'skill') {
@@ -535,7 +664,7 @@ function handleFormSubmit(event) {
         const rotation = workspace.rotations.find((item) => item.id === form.dataset.rotationId);
         if (!rotation || !name) return;
         rotation.skills.push({ id: newId('skill'), name: safeText(name, 120), status: 'planned' });
-        saveAndRender();
+        saveAndRender(form);
         return;
     }
     if (formType === 'care-plan') {
@@ -556,7 +685,7 @@ function handleFormSubmit(event) {
             createdAt: new Date().toISOString()
         });
         activeTab = 'careplans';
-        saveAndRender();
+        saveAndRender(form);
         return;
     }
     if (formType === 'dosage') {
@@ -572,7 +701,7 @@ function handleFormSubmit(event) {
         }
         workspace.dosageProgress[problem.id] = record;
         dosageFeedback = { id: problem.id, correct };
-        saveAndRender();
+        saveAndRender(form);
         return;
     }
     if (formType === 'card') {
@@ -588,7 +717,7 @@ function handleFormSubmit(event) {
         });
         showCardAnswer = false;
         activeTab = 'flashcards';
-        saveAndRender();
+        saveAndRender(form);
     }
 }
 
@@ -600,13 +729,13 @@ function handleHubClick(event) {
         dosageFeedback = null;
         showCardAnswer = false;
         showAnatomyAnswer = false;
-        renderActiveTab();
+        renderActiveTab({ focusTarget: button, resetScroll: true });
         return;
     }
     if (button.dataset.systemId) {
         activeSystemId = button.dataset.systemId;
         showAnatomyAnswer = false;
-        renderActiveTab();
+        renderActiveTab({ focusTarget: button });
         return;
     }
     const action = button.dataset.action;
@@ -614,24 +743,26 @@ function handleHubClick(event) {
     if (action === 'delete-rotation') {
         if (!window.confirm('Remove this rotation and its tracked skills?')) return;
         workspace.rotations = workspace.rotations.filter((item) => item.id !== id);
-        saveAndRender();
+        removeSyncConflictsForRecord('rotations', id);
+        saveAndRender(button);
     } else if (action === 'cycle-skill') {
         const rotation = workspace.rotations.find((item) => item.id === button.dataset.rotationId);
         const skill = rotation && rotation.skills.find((item) => item.id === button.dataset.skillId);
         if (!skill) return;
         skill.status = skill.status === 'planned' ? 'practiced' : skill.status === 'practiced' ? 'checked' : 'planned';
-        saveAndRender();
+        saveAndRender(button);
     } else if (action === 'delete-care-plan') {
         if (!window.confirm('Delete this study draft?')) return;
         workspace.carePlans = workspace.carePlans.filter((item) => item.id !== id);
-        saveAndRender();
+        removeSyncConflictsForRecord('carePlans', id);
+        saveAndRender(button);
     } else if (action === 'next-dosage') {
         workspace.dosageIndex = (Number(workspace.dosageIndex || 0) + 1) % DOSAGE_PROBLEMS.length;
         dosageFeedback = null;
-        saveAndRender();
+        saveAndRender(button);
     } else if (action === 'flip-card') {
         showCardAnswer = !showCardAnswer;
-        renderActiveTab();
+        renderActiveTab({ focusTarget: button });
     } else if (action === 'rate-card') {
         const cardId = button.dataset.cardId;
         const card = getAllCards().find((item) => item.id === cardId);
@@ -643,27 +774,86 @@ function handleHubClick(event) {
         if (!nextCard) {
             activeTab = 'flashcards';
         }
-        saveAndRender();
+        saveAndRender(button);
     } else if (action === 'delete-card') {
         if (!window.confirm('Remove this card from your deck?')) return;
         workspace.customCards = workspace.customCards.filter((item) => item.id !== id);
         delete workspace.cardMastery[id];
-        saveAndRender();
+        removeSyncConflictsForRecord('customCards', id);
+        removeSyncConflictsForRecord('cardMastery', id);
+        saveAndRender(button);
     } else if (action === 'reveal-anatomy') {
         showAnatomyAnswer = !showAnatomyAnswer;
-        renderActiveTab();
+        renderActiveTab({ focusTarget: button });
     } else if (action === 'mark-system') {
         const exists = workspace.completedSystems.includes(id);
         workspace.completedSystems = exists ? workspace.completedSystems.filter((item) => item !== id) : workspace.completedSystems.concat(id);
-        saveAndRender();
+        saveAndRender(button);
+    } else if (action === 'download-recovery-copy') {
+        downloadNursingRecoveryCopy();
+    } else if (action === 'reset-corrupt-workspace') {
+        resetCorruptNursingWorkspace();
+    } else if (action === 'resolve-sync-conflict' || action === 'dismiss-sync-conflict') {
+        const conflict = workspace.syncConflicts.find((item) => item.id === id);
+        if (!conflict) return;
+        const priorConflictOrder = workspace.syncConflicts.map((item) => item.id);
+        const resolvedIndex = priorConflictOrder.indexOf(id);
+        if (action === 'resolve-sync-conflict') {
+            const value = button.dataset.choice === 'b' ? conflict.versionB : conflict.versionA;
+            let current = workspace;
+            for (const segment of conflict.path.slice(0, -1)) {
+                current = Array.isArray(current) ? current.find((item) => item.id === segment) : current?.[segment];
+                if (!current || typeof current !== 'object') {
+                    setStatus('This draft field is no longer present. Dismiss the comparison to clear it while keeping the current draft.', true);
+                    return;
+                }
+            }
+            const field = conflict.path.at(-1);
+            if (Array.isArray(current) || !Object.hasOwn(current, field)) {
+                setStatus('This draft field is no longer present. Dismiss the comparison to clear it while keeping the current draft.', true);
+                return;
+            }
+            current[field] = value;
+        }
+        workspace.syncConflicts = workspace.syncConflicts.filter((item) => item.id !== id);
+        if (!saveWorkspace()) return;
+        renderActiveTab();
+        const container = document.getElementById('nursingHub');
+        const remainingIds = new Set(workspace.syncConflicts.map((item) => item.id));
+        const preferredConflictId = priorConflictOrder.slice(resolvedIndex + 1).find((conflictId) => remainingIds.has(conflictId))
+            || priorConflictOrder.slice(0, resolvedIndex).reverse().find((conflictId) => remainingIds.has(conflictId));
+        const nextControl = (preferredConflictId && Array.from(container?.querySelectorAll('[data-action="resolve-sync-conflict"]') || [])
+            .find((candidate) => candidate.dataset.id === preferredConflictId))
+            || container?.querySelector('[data-conflict-summary]')
+            || container?.querySelector('[data-nursing-tab="overview"]');
+        nextControl?.focus({ preventScroll: true });
+        if (nextControl?.matches('[data-action="resolve-sync-conflict"]')) nextControl.scrollIntoView({ block: 'nearest' });
     }
 }
+
+let nursingLoadGeneration = 0;
 
 export async function loadNursingPage() {
     const container = document.getElementById('nursingHub');
     if (!container) return;
-    if (typeof localStorage === 'undefined' || localStorage.getItem('duevinci_workspace_nursing_hub') !== 'visible') {
+    const loadGeneration = ++nursingLoadGeneration;
+    // Invalidate the previous account's editor immediately. Delegated event
+    // listeners remain attached to the container, so clear its interactive
+    // content before any asynchronous auth lookup begins.
+    workspaceUserId = '';
+    workspaceSaveSequence += 1;
+    workspaceLoadIssue = '';
+    workspaceRecoveryRaw = '';
+    workspaceRecoveryAvailable = false;
+    workspace = createEmptyNursingWorkspace();
+    availableCourses = [];
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML = '<p role="status" class="mx-auto max-w-6xl py-10 text-sm text-zinc-500 dark:text-zinc-400">Loading your Nursing Hub…</p>';
+    let isVisible = false;
+    try { isVisible = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_workspace_nursing_hub') === 'visible'; } catch { /* Keep the optional feature off when storage is unavailable. */ }
+    if (!isVisible) {
         container.innerHTML = '<section class="mx-auto max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-8"><p class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Optional workspace feature</p><h2 class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">Nursing Hub is turned off</h2><p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">Enable it to add clinical rotation tracking, fictional care-plan practice, dosage drills, flashcards, and anatomy review to your workspace. It will stay out of your sidebar until you opt in.</p><p class="mt-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Use fictional study cases only. Do not save real patient information here.</p><div class="mt-5 flex flex-wrap gap-2"><button type="button" onclick="setWorkspaceFeatureVisibility(\'nursing_hub\', true)" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500">Enable Nursing Hub</button><a href="../index.html" class="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-700">Back to dashboard</a></div></section>';
+        container.removeAttribute('aria-busy');
         return;
     }
     let userId = getWorkspaceUserId();
@@ -673,17 +863,58 @@ export async function loadNursingPage() {
     } catch {
         // An existing offline session may still open the locally saved workspace.
     }
-    if (!userId) return;
+    if (!userId) {
+        if (loadGeneration === nursingLoadGeneration && container.isConnected) {
+            container.removeAttribute('aria-busy');
+            container.innerHTML = '<p role="status" class="mx-auto max-w-6xl py-10 text-sm text-zinc-500 dark:text-zinc-400">Sign in to open your Nursing Hub.</p>';
+        }
+        return;
+    }
+    if (loadGeneration !== nursingLoadGeneration || !container.isConnected) return;
+    if (getWorkspaceUserId() !== userId) {
+        container.removeAttribute('aria-busy');
+        container.innerHTML = '<p role="status" class="mx-auto max-w-6xl py-10 text-sm text-zinc-500 dark:text-zinc-400">Your account changed. Reopen the Nursing Hub to load the right workspace.</p>';
+        return;
+    }
     workspaceUserId = userId;
+    let serializedWorkspace = '{}';
     try {
-        workspace = sanitizeNursingWorkspace(JSON.parse(localStorage.getItem(getNursingStorageKey(userId)) || '{}'));
-    } catch {
+        const storedWorkspace = localStorage.getItem(getNursingStorageKey(userId));
+        serializedWorkspace = storedWorkspace === null ? '{}' : storedWorkspace;
+        try {
+            const parsedWorkspace = JSON.parse(serializedWorkspace);
+            if (!isValidNursingWorkspaceShape(parsedWorkspace)) throw new TypeError('Invalid Nursing Hub data shape');
+            workspace = sanitizeNursingWorkspace(parsedWorkspace);
+        } catch (error) {
+            workspace = createEmptyNursingWorkspace();
+            workspaceRecoveryRaw = serializedWorkspace;
+            workspaceRecoveryAvailable = true;
+            workspaceLoadIssue = 'The saved workspace could not be read (' + (error?.name || 'data error') + ').';
+        }
+    } catch (error) {
         workspace = createEmptyNursingWorkspace();
+        workspaceRecoveryRaw = '';
+        workspaceRecoveryAvailable = false;
+        workspaceLoadIssue = 'Browser storage could not be read (' + (error?.name || 'storage error') + ').';
     }
     try {
         const result = await supabaseClient.from('courses').select('id, name, code').order('name');
+        if (loadGeneration !== nursingLoadGeneration || !container.isConnected) return;
+        if (getWorkspaceUserId() !== userId) {
+            workspaceUserId = '';
+            container.removeAttribute('aria-busy');
+            container.innerHTML = '<p role="status" class="mx-auto max-w-6xl py-10 text-sm text-zinc-500 dark:text-zinc-400">Your account changed. Reopen the Nursing Hub to load the right workspace.</p>';
+            return;
+        }
         availableCourses = Array.isArray(result && result.data) ? result.data : [];
     } catch {
+        if (loadGeneration !== nursingLoadGeneration || !container.isConnected) return;
+        if (getWorkspaceUserId() !== userId) {
+            workspaceUserId = '';
+            container.removeAttribute('aria-busy');
+            container.innerHTML = '<p role="status" class="mx-auto max-w-6xl py-10 text-sm text-zinc-500 dark:text-zinc-400">Your account changed. Reopen the Nursing Hub to load the right workspace.</p>';
+            return;
+        }
         availableCourses = [];
     }
     if (!container.dataset.nursingBound) {
@@ -692,6 +923,7 @@ export async function loadNursingPage() {
         container.dataset.nursingBound = 'true';
     }
     activeTab = 'overview';
+    container.removeAttribute('aria-busy');
     renderActiveTab();
 }
 

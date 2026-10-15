@@ -3,6 +3,7 @@ import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getLocalDateKey, escapeHtml } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
+import { getWeekStartDayIndex } from './weekPreferences.js';
 
 export let calendarInstance = null;
 let lastEventModalTrigger = null;
@@ -374,6 +375,7 @@ export function initCalendar() {
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         timeZone: 'local',
+        firstDay: getWeekStartDayIndex(),
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
         events: [],
         dayMaxEvents: true,
@@ -390,6 +392,10 @@ export function initCalendar() {
         }
     });
     calendarInstance.render();
+}
+
+export function setCalendarWeekStart(firstDay = getWeekStartDayIndex()) {
+    if (calendarInstance) calendarInstance.setOption('firstDay', firstDay === 0 ? 0 : 1);
 }
 
 export async function loadCalendarCourses() {
@@ -644,3 +650,4 @@ if (typeof document !== 'undefined') {
         }
     });
 }
+

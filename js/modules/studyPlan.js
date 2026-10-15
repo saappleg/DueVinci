@@ -4,6 +4,7 @@ import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
 import { getCourseDateBounds, isDateWithinCourseWindow, isWeeklyPacedCourse } from './courseDates.js';
+import { getWeekStartDayIndex } from './weekPreferences.js';
 
 function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
@@ -513,7 +514,7 @@ function currentWeeklyUnit(course, assignments, baseDate) {
     const today = getLocalDateKey(baseDate);
     const weekday = new Date(`${today}T12:00:00`).getDay();
     const weekStart = new Date(`${today}T12:00:00`);
-    weekStart.setDate(weekStart.getDate() - ((weekday + 6) % 7));
+    weekStart.setDate(weekStart.getDate() - ((weekday - getWeekStartDayIndex() + 7) % 7));
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     const weekStartKey = getLocalDateKey(weekStart);
@@ -600,7 +601,7 @@ export function getCurrentStudyWeekAssignments(courses = [], assignments = [], r
         const dueDate = String(assignment.due_date).slice(0, 10);
         const weekday = new Date(`${todayKey}T12:00:00`).getDay();
         const weekStart = new Date(`${todayKey}T12:00:00`);
-        weekStart.setDate(weekStart.getDate() - ((weekday + 6) % 7));
+        weekStart.setDate(weekStart.getDate() - ((weekday - getWeekStartDayIndex() + 7) % 7));
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
         return dueDate >= getLocalDateKey(weekStart) && dueDate <= getLocalDateKey(weekEnd);
@@ -1576,3 +1577,4 @@ _studyScope.moveStudyPlanBlock = moveStudyPlanBlock;
 _studyScope.moveStudyPlanBlockAndOpenDay = moveStudyPlanBlockAndOpenDay;
 _studyScope.undoStudyPlanMove = undoStudyPlanMove;
 _studyScope.resetManualStudyPlanMoves = resetManualStudyPlanMoves;
+

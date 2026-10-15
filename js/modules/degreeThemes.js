@@ -43,5 +43,6 @@ export function setDegreeTheme(themeId) {
     } catch {
         // The selected colors still apply for this page if storage is unavailable.
     }
+    if (typeof window !== 'undefined') window.syncPreferencesNow?.();
     return applyDegreeTheme(normalized);
 }
