@@ -81,7 +81,7 @@ describe('degree themes', () => {
             expect(artwork[1]).toContain(`stroke="${light}"`);
             expect(artwork[1]).toContain('opacity=".1"');
         }
-        expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="text-indigo-600"]');
+        expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="bg-white"][class~="text-indigo-700"] { color:var(--dv-degree-strong); }');
     });
 
 });
