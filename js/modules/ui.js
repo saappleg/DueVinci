@@ -398,11 +398,9 @@ export function ensureSettingsModalExists() {
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
-                <div class="flex-1 min-h-0 p-4 sm:p-6 relative overflow-y-auto">
-                    <div class="sticky top-0 z-20 -mx-4 -mt-4 mb-3 flex justify-end bg-white/95 px-4 py-2 backdrop-blur dark:bg-brand-800/95 sm:-mx-6 sm:-mt-6 sm:px-6">
-                        <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    </div>
-                    
+                <div class="relative min-h-0 flex-1">
+                    <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
+                    <div class="settings-scroll-pane h-full min-h-0 overflow-y-auto p-4 pt-14 sm:p-6 sm:pt-16">
                     <!-- Tab: Profile -->
                         <div id="content-profile" aria-hidden="false" class="block space-y-6">
                         <div>
@@ -719,8 +717,8 @@ export function ensureSettingsModalExists() {
                         </div>
                     </div>
                     </div>
+                    </div>
                 </div>
-            </div>
         `;
         document.body.appendChild(div);
         div.addEventListener('click', (event) => {
@@ -900,7 +898,7 @@ export function switchSettingsTab(tabName, options = {}) {
             }
         }
     });
-    const scrollPane = document.querySelector('#settingsModal [role="dialog"] > .overflow-y-auto');
+    const scrollPane = document.querySelector('#settingsModal .settings-scroll-pane');
     if (scrollPane) scrollPane.scrollTop = 0;
     document.getElementById(`tab-${tabName}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     // When switching to Canvas tab, refresh its state
@@ -936,11 +934,9 @@ export function ensureSupportModalExists() {
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                     </div>
                 </div>
-                <div class="flex-1 min-h-0 p-6 relative overflow-y-auto">
-                    <div class="sticky top-0 z-20 -mx-6 -mt-6 mb-3 flex justify-end bg-white/95 px-6 py-2 backdrop-blur dark:bg-brand-800/95">
-                        <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    </div>
-                    
+                <div class="relative min-h-0 flex-1">
+                    <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
+                    <div class="support-scroll-pane h-full min-h-0 overflow-y-auto p-6 pt-16">
                     <div id="support-content-contact" aria-hidden="false" class="block space-y-4">
                         <div>
                             <h2 id="supportModalTitle" class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>
@@ -1047,6 +1043,7 @@ export function ensureSupportModalExists() {
                         <p id="supportInboxFeedback" class="text-xs text-red-500"></p>
                         <div id="supportInboxList" class="space-y-3"></div>
                     </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -1097,7 +1094,7 @@ export function switchSupportTab(tabName) {
             }
         }
     });
-    const scrollPane = document.querySelector('#supportModal [role="dialog"] > .overflow-y-auto');
+    const scrollPane = document.querySelector('#supportModal .support-scroll-pane');
     if (scrollPane) scrollPane.scrollTop = 0;
     document.getElementById(`support-tab-${tabName}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
