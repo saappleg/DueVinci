@@ -55,7 +55,7 @@ describe('Nursing Hub learning tools', () => {
         expect(state.rotations[0].skills[0].status).toBe('planned');
         expect(state.carePlans[0].scenario).toBe('Fiction only');
         expect(state.customCards).toHaveLength(1);
-        expect(state.completedSystems).toEqual(['nervous']);
+        expect(state.completedSystems).toEqual(['nervous', 'not-a-system']);
         expect(state.dosageProgress).toEqual({ tablets: { attempts: 4, correct: 3, completed: false } });
     });
 

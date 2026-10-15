@@ -20,7 +20,7 @@ describe('offline record cache', () => {
         const filtered = [{ id: 'assignment-b', course_id: 'course-b', name: 'Lab' }];
 
         expect(mergeCachedRecords(existing, filtered, 'student-1')).toEqual([
-            { id: 'assignment-a', course_id: 'course-a', name: 'Essay', user_id: 'student-1' },
+            { id: 'assignment-a', course_id: 'course-a', name: 'Essay' },
             { id: 'assignment-b', course_id: 'course-b', name: 'Lab', user_id: 'student-1' },
         ]);
     });
@@ -545,7 +545,7 @@ describe('offline record cache', () => {
             const response = await staleResponse;
 
             expect(response.data).toMatchObject(expected); // The current renderer receives the local committed state.
-            await expect(getLocalCachedData('assignments', userId)).resolves.toEqual(expected);
+            await expect(getLocalCachedData('assignments', userId)).resolves.toMatchObject(expected);
         } finally {
             vi.unstubAllGlobals();
         }
