@@ -43,12 +43,15 @@ describe('degree themes', () => {
             const strong = getThemeColor(theme.id, 'strong');
             const soft = getThemeColor(theme.id, 'soft');
             const light = getThemeColor(theme.id, 'light');
+            const darkSoft = getThemeColor(theme.id, 'dark-soft');
 
             // Themed body text and button labels meet WCAG AA for normal text.
             expect(contrastRatio(strong, '#ffffff'), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(strong, soft), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio('#ffffff', accent), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(light, '#1c1c1c'), theme.id).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio(light, darkSoft), theme.id).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio(light, accent), theme.id).toBeGreaterThanOrEqual(4.5);
 
             const artworkRule = degreeThemeCss.split('\n').find((line) =>
                 line.startsWith(`html[data-degree-theme="${theme.id}"] { --dv-degree-pattern-light:`)
