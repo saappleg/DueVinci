@@ -601,7 +601,7 @@ function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
                 : activeTab === 'flashcards' ? renderFlashcardsTab()
                     : activeTab === 'anatomy' ? renderAnatomyTab()
                         : renderOverview();
-    container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="-mx-4 mb-5 flex gap-2 overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-brand-700 dark:bg-brand-900 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">' +
+    container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-brand-700 dark:bg-brand-900/90">' +
         TAB_DEFINITIONS.map((tab) => '<button type="button" ' + (activeTab === tab.id ? 'aria-current="page" ' : '') + 'data-nursing-tab="' + tab.id + '" class="shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 ' + (activeTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + tab.icon + ' <span class="ml-1">' + tab.label + '</span></button>').join('') +
         '</nav>' + body + '</div>';
     container.scrollTop = resetScroll ? 0 : previousScrollTop;
