@@ -85,6 +85,9 @@ export async function handleAuth(session) {
         if ((page === 'tutor' || page === 'tutor.html') && document.getElementById('tutorWorkspace')) {
             if (typeof window.loadTutorPage === 'function') window.loadTutorPage();
         }
+        if ((page === 'nursing' || page === 'nursing.html') && document.getElementById('nursingHub')) {
+            if (typeof window.loadNursingPage === 'function') window.loadNursingPage();
+        }
     } else {
         currentUser = null;
         if (typeof window !== 'undefined') window.currentUser = null;

@@ -1,0 +1,31 @@
+/* Degree themes tune DueVinci's shared accent colors. */
+:root { --dv-degree-accent:#4f46e5; --dv-degree-strong:#4338ca; --dv-degree-soft:#eef2ff; --dv-degree-border:#c7d2fe; --dv-degree-light:#e0e7ff; --dv-degree-dark-soft:#312e81; }
+html[data-degree-theme="nursing"] { --dv-degree-accent:#0f766e; --dv-degree-strong:#115e59; --dv-degree-soft:#ccfbf1; --dv-degree-border:#99f6e4; --dv-degree-light:#ccfbf1; --dv-degree-dark-soft:#134e4a; }
+html[data-degree-theme="software-development"] { --dv-degree-accent:#7c3aed; --dv-degree-strong:#6d28d9; --dv-degree-soft:#f3e8ff; --dv-degree-border:#d8b4fe; --dv-degree-light:#ede9fe; --dv-degree-dark-soft:#2e1065; }
+html[data-degree-theme="it-development"] { --dv-degree-accent:#0e7490; --dv-degree-strong:#155e75; --dv-degree-soft:#cffafe; --dv-degree-border:#a5f3fc; --dv-degree-light:#cffafe; --dv-degree-dark-soft:#164e63; }
+html[data-degree-theme="education-early-childhood"] { --dv-degree-accent:#b45309; --dv-degree-strong:#92400e; --dv-degree-soft:#fef3c7; --dv-degree-border:#fde68a; --dv-degree-light:#fef3c7; --dv-degree-dark-soft:#78350f; }
+html[data-degree-theme="education-elementary"] { --dv-degree-accent:#047857; --dv-degree-strong:#065f46; --dv-degree-soft:#d1fae5; --dv-degree-border:#a7f3d0; --dv-degree-light:#d1fae5; --dv-degree-dark-soft:#064e3b; }
+html[data-degree-theme="education-secondary"] { --dv-degree-accent:#1d4ed8; --dv-degree-strong:#1e40af; --dv-degree-soft:#dbeafe; --dv-degree-border:#bfdbfe; --dv-degree-light:#dbeafe; --dv-degree-dark-soft:#1e3a8a; }
+html[data-degree-theme="education-special"] { --dv-degree-accent:#7e22ce; --dv-degree-strong:#6b21a8; --dv-degree-soft:#f3e8ff; --dv-degree-border:#e9d5ff; --dv-degree-light:#f3e8ff; --dv-degree-dark-soft:#581c87; }
+html[data-degree-theme="education-stem"] { --dv-degree-accent:#0369a1; --dv-degree-strong:#075985; --dv-degree-soft:#e0f2fe; --dv-degree-border:#bae6fd; --dv-degree-light:#e0f2fe; --dv-degree-dark-soft:#0c4a6e; }
+html[data-degree-theme="education-higher-ed"] { --dv-degree-accent:#4338ca; --dv-degree-strong:#3730a3; --dv-degree-soft:#e0e7ff; --dv-degree-border:#c7d2fe; --dv-degree-light:#e0e7ff; --dv-degree-dark-soft:#312e81; }
+html[data-degree-theme="sports"] { --dv-degree-accent:#c2410c; --dv-degree-strong:#9a3412; --dv-degree-soft:#ffedd5; --dv-degree-border:#fed7aa; --dv-degree-light:#ffedd5; --dv-degree-dark-soft:#7c2d12; }
+
+html[data-degree-theme] [class~="bg-indigo-600"] { background-color:var(--dv-degree-accent); }
+html[data-degree-theme] [class~="bg-indigo-700"] { background-color:var(--dv-degree-strong); }
+html[data-degree-theme] [class~="text-indigo-600"], html[data-degree-theme] [class~="text-indigo-700"] { color:var(--dv-degree-strong); }
+html[data-degree-theme] [class~="text-indigo-500"] { color:var(--dv-degree-accent); }
+html[data-degree-theme] [class~="text-indigo-100"], html[data-degree-theme] [class~="text-indigo-200"], html[data-degree-theme] [class~="text-indigo-300"] { color:var(--dv-degree-light); }
+html[data-degree-theme] [class~="border-indigo-500"], html[data-degree-theme] [class~="border-indigo-400"] { border-color:var(--dv-degree-accent); }
+html[data-degree-theme] [class~="border-indigo-300"], html[data-degree-theme] [class~="border-indigo-200"], html[data-degree-theme] [class~="border-indigo-100"] { border-color:var(--dv-degree-border); }
+html[data-degree-theme] [class~="bg-indigo-50"] { background-color:var(--dv-degree-soft); }
+html[data-degree-theme] [class~="hover:bg-indigo-700"]:hover, html[data-degree-theme] [class~="hover:bg-indigo-500"]:hover { background-color:var(--dv-degree-strong); }
+html[data-degree-theme] [class~="hover:bg-indigo-50"]:hover, html[data-degree-theme] [class~="hover:bg-indigo-100"]:hover { background-color:var(--dv-degree-soft); }
+html[data-degree-theme] [class~="hover:border-indigo-300"]:hover, html[data-degree-theme] [class~="dark:hover:border-indigo-600"]:hover { border-color:var(--dv-degree-accent); }
+html[data-degree-theme] [class~="focus:border-indigo-500"]:focus { border-color:var(--dv-degree-accent); }
+html[data-degree-theme] [class~="accent-indigo-600"] { accent-color:var(--dv-degree-accent); }
+html[data-degree-theme].dark [class~="dark:text-indigo-400"], html[data-degree-theme].dark [class~="dark:text-indigo-300"], html[data-degree-theme].dark [class~="dark:text-indigo-200"] { color:var(--dv-degree-light); }
+html[data-degree-theme].dark [class~="dark:bg-indigo-950/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-950/30"], html[data-degree-theme].dark [class~="dark:bg-indigo-900/40"], html[data-degree-theme].dark [class~="dark:bg-indigo-500/20"] { background-color:var(--dv-degree-dark-soft); }
+html[data-degree-theme].dark [class~="dark:border-indigo-900/50"], html[data-degree-theme].dark [class~="dark:border-indigo-800"], html[data-degree-theme].dark [class~="dark:border-indigo-700"] { border-color:var(--dv-degree-dark-soft); }
+html[data-degree-theme] [class~="from-indigo-700"] { background-image:linear-gradient(135deg,var(--dv-degree-strong),var(--dv-degree-accent),var(--dv-degree-strong)); }
+html[data-degree-theme] [class~="from-indigo-50"] { background-image:linear-gradient(135deg,var(--dv-degree-soft),var(--dv-degree-light)); }

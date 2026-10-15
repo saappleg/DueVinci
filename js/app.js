@@ -21,11 +21,13 @@ import { prioritizeTodayTasks, renderTodayWorkspace, renderAdaptiveDailyBrief, c
 import { applySubscriptionCatalog } from './modules/subscription.js';
 import './modules/brightspace.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
+import { loadNursingPage } from './modules/nursing.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
 import { triggerPWAInstall, dismissPWABanner, initPWA } from './modules/pwa.js?v=2.7.0';
 import { initializeErrorReporting } from './modules/errorReporting.js';
-import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, showSettingsMovedNotice, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion } from './modules/ui.js';
+import { changeTheme, toggleGreekTheme, updateDateFormat, toggleMuteAlarm, updateAlarmSound, updateAmbientNoise, updateGpaScale, toggleSidebar, openSettingsModal, closeSettingsModal, showSettingsMovedNotice, switchSettingsTab, openSupportModal, closeSupportModal, switchSupportTab, submitSupportMessage, sendDirectMailto, confirmAccountDeletion, setWorkspaceFeatureVisibility } from './modules/ui.js';
+import { setDegreeTheme } from './modules/degreeThemes.js';
 import { handleCanvasCheckoutReturn } from './modules/canvas.js'; // Canvas LMS Sync — optional add-on, zero impact on free core
 
 // Re-export for external and test suite imports
@@ -194,6 +196,9 @@ export {
     startTodayFocus,
     isTutorAccessActive,
     loadTutorPage,
+    loadNursingPage,
+    setWorkspaceFeatureVisibility,
+    setDegreeTheme,
     submitTutorMessage,
     summarizeWeeklyPlan,
     renderWeeklyReview,
@@ -368,6 +373,7 @@ _rootScope.renderAdaptiveDailyBrief = renderAdaptiveDailyBrief;
 _rootScope.completeTodayTask = completeTodayTask;
 _rootScope.startTodayFocus = startTodayFocus;
 _rootScope.loadTutorPage = loadTutorPage;
+_rootScope.loadNursingPage = loadNursingPage;
 _rootScope.submitTutorMessage = submitTutorMessage;
 _rootScope.renderWeeklyReview = renderWeeklyReview;
 _rootScope.openWeeklyPlan = openWeeklyPlan;
@@ -380,6 +386,7 @@ _rootScope.triggerKonamiEasterEgg = triggerKonamiEasterEgg;
 _rootScope.triggerPWAInstall = triggerPWAInstall;
 _rootScope.dismissPWABanner = dismissPWABanner;
 _rootScope.changeTheme = changeTheme;
+_rootScope.setDegreeTheme = setDegreeTheme;
 _rootScope.toggleGreekTheme = toggleGreekTheme;
 _rootScope.updateDateFormat = updateDateFormat;
 _rootScope.toggleMuteAlarm = toggleMuteAlarm;
@@ -390,6 +397,7 @@ _rootScope.toggleSidebar = toggleSidebar;
 _rootScope.openSettingsModal = openSettingsModal;
 _rootScope.closeSettingsModal = closeSettingsModal;
 _rootScope.switchSettingsTab = switchSettingsTab;
+_rootScope.setWorkspaceFeatureVisibility = setWorkspaceFeatureVisibility;
 _rootScope.openSupportModal = openSupportModal;
 _rootScope.closeSupportModal = closeSupportModal;
 _rootScope.switchSupportTab = switchSupportTab;

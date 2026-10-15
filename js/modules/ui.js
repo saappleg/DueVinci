@@ -1,12 +1,13 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
+import { DEGREE_THEMES, getDegreeTheme } from './degreeThemes.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName, getProfileEasterEgg, setProfileEasterEgg } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 import { applySubscriptionCatalog, clearSubscriptionSnapshot } from './subscription.js';
 import { clearOfflineUserData } from './offlineDb.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'daily_brief', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'nursing_hub', 'academics', 'today_focus', 'daily_brief', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
 const DASHBOARD_WIDGET_ORDER_KEY = 'duevinci_dashboard_widget_order';
 const DASHBOARD_WIDGETS = [
     ['today_focus', 'Today’s focus'],
@@ -65,7 +66,9 @@ function hideAccessibleModal(modal) {
 }
 
 export function isWorkspaceFeatureVisible(feature) {
-    if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
+    if (!WORKSPACE_FEATURES.has(feature)) return true;
+    if (feature === 'nursing_hub') return typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_workspace_nursing_hub') === 'visible';
+    if (typeof localStorage === 'undefined') return true;
     if (feature === 'academics') return localStorage.getItem('duevinci_hide_academics') !== 'true';
     return localStorage.getItem(`duevinci_workspace_${feature}`) !== 'hidden';
 }
@@ -85,6 +88,7 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     if (feature === 'reminders') window.renderReminderDashboard?.();
     if (feature === 'weekly_review') window.renderWeeklyReview?.();
     applyDashboardWidgetLayout();
+    if (feature === 'nursing_hub') window.loadNursingPage?.();
 }
 
 function getDashboardWidgetOrder() {
@@ -204,6 +208,8 @@ export function injectAppearanceSettingsExtras() {
     if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
 
     const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    const currentDegreeTheme = getDegreeTheme();
+    const degreeThemeOptions = DEGREE_THEMES.map((theme) => `<option value="${theme.id}" ${theme.id === currentDegreeTheme ? 'selected' : ''}>${theme.label}</option>`).join('');
     const currentGpaScale = localStorage.getItem('duevinci_gpa_scale') || '4.0';
     const isAcademicsHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
     const hideCompletedCourses = localStorage.getItem('duevinci_hide_completed_courses') === 'true';
@@ -213,6 +219,7 @@ export function injectAppearanceSettingsExtras() {
         ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
         ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
         ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
+        ['nursing_hub', 'Nursing Hub', 'Opt in to clinical tracking, care-plan practice, dosage drills, and anatomy review. Hiding it keeps your drafts saved.'],
         ['academics', 'Academics widget', 'Hide dashboard analytics and progress summaries.'],
         ['today_focus', 'Today’s focus', 'Hide the dashboard focus recommendation.'],
         ['daily_brief', 'Pro Daily Brief', 'Hide your paid daily workload and focus summary.'],
@@ -227,6 +234,10 @@ export function injectAppearanceSettingsExtras() {
     container.id = 'appearanceExtrasContainer';
     container.className = 'max-w-sm space-y-4 pt-4 border-t border-zinc-200 dark:border-brand-700';
     container.innerHTML = `
+        <section class="space-y-2">
+            <div><label for="degreeThemeSelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Degree theme</label><p class="text-[11px] text-zinc-500 dark:text-zinc-400">Choose accent colors for your field of study. This preference syncs with your account.</p></div>
+            <select id="degreeThemeSelect" onchange="setDegreeTheme(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">${degreeThemeOptions}</select>
+        </section>
         <div>
             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format Display</label>
             <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
@@ -245,7 +256,7 @@ export function injectAppearanceSettingsExtras() {
         <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Hide completed classes</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">Keep finished courses out of the Classes lists. Turn this off to show them again.</span></span><input type="checkbox" ${hideCompletedCourses ? 'checked' : ''} onchange="setHideCompletedCourses(this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
             <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter your workspace. Nothing is deleted.</p></div>
-            ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
+            ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" data-feature-toggle="${feature}" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
         </section>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
             <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Dashboard layout</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Use the arrows to arrange dashboard cards. Your order is saved on this device.</p></div>
@@ -746,6 +757,11 @@ export function openSettingsModal() {
     if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
 
     injectAppearanceSettingsExtras();
+    const degreeThemeSelect = document.getElementById('degreeThemeSelect');
+    if (degreeThemeSelect) degreeThemeSelect.value = getDegreeTheme();
+    document.querySelectorAll('[data-feature-toggle]').forEach((input) => {
+        input.checked = isWorkspaceFeatureVisible(input.dataset.featureToggle);
+    });
     injectReminderSettings();
     refreshReminderSettings();
 

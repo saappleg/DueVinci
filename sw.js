@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.26';
+const CACHE_NAME = 'duevinci-v8.27';
 const RUNTIME_CACHE = 'duevinci-runtime-v1';
 const ASSETS_TO_CACHE = [
   './',
@@ -10,10 +10,12 @@ const ASSETS_TO_CACHE = [
   './grades/index.html',
   './calendar/index.html',
   './tutor/index.html',
+  './nursing/index.html',
   './legal/privacy.html',
   './legal/terms.html',
   './assets/css/greek-theme.css',
   './assets/css/renaissance-theme.css',
+  './assets/css/degree-theme.css',
   './manifest.json',
   './assets/images/maestro-logo.svg',
   './assets/images/maestro-logo.png',
@@ -23,6 +25,8 @@ const ASSETS_TO_CACHE = [
   './assets/icons/favicon.ico',
   './js/app.js',
   './js/modules/config.js',
+  './js/modules/degreeThemes.js',
+  './js/modules/nursing.js',
   './js/modules/subscription.js',
   './js/modules/utils.js',
   './js/modules/auth.js',
@@ -121,7 +125,8 @@ self.addEventListener('fetch', (event) => {
           : route.endsWith('/grades') ? './grades/index.html'
             : route.endsWith('/calendar') ? './calendar/index.html'
               : route.endsWith('/tutor') ? './tutor/index.html'
-              : route.endsWith('/legal/privacy') ? './legal/privacy.html'
+              : route.endsWith('/nursing') ? './nursing/index.html'
+                : route.endsWith('/legal/privacy') ? './legal/privacy.html'
                 : route.endsWith('/legal/terms') ? './legal/terms.html'
                   : './index.html';
         const appCache = await caches.open(CACHE_NAME);

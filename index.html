@@ -26,6 +26,7 @@
     </style>
     <link rel="stylesheet" href="assets/css/greek-theme.css" />
     <link rel="stylesheet" href="assets/css/renaissance-theme.css" />
+    <link rel="stylesheet" href="assets/css/degree-theme.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/icon-16x16.png">
@@ -33,7 +34,8 @@
 
     <script src="assets/vendor/canvas-confetti.js"></script>
     <script src="assets/vendor/supabase-js.js"></script>
-    <script type="module" src="js/app.js?v=2.7.0"></script>
+    <script type="module" src="js/app.js?v=2.8.0"></script>
+    <script>document.documentElement.dataset.degreeTheme = localStorage.getItem('duevinci_workspace_degree_theme') || 'classic';</script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans transition-colors duration-200 selection:bg-indigo-500/30">
 
