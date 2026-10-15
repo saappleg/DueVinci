@@ -62,9 +62,13 @@ describe('degree themes', () => {
             expect(contrastRatio(light, darkSoft), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio(light, accent), theme.id).toBeGreaterThanOrEqual(4.5);
             const lightArtworkSurface = blendColor(accent, '#ffffff', 0.18);
-            const darkArtworkSurface = blendColor(light, '#1c1c1c', 0.18);
+            const lightSoftArtworkSurface = blendColor(accent, soft, 0.18);
+            const darkArtworkSurface = blendColor(light, '#1c1c1c', 0.10);
+            const darkSoftArtworkSurface = blendColor(light, darkSoft, 0.10);
             expect(contrastRatio('#52525b', lightArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio('#52525b', lightSoftArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
             expect(contrastRatio('#d4d4d8', darkArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
+            expect(contrastRatio('#d4d4d8', darkSoftArtworkSurface), theme.id).toBeGreaterThanOrEqual(4.5);
 
             const artworkRule = degreeThemeCss.split('\n').find((line) =>
                 line.startsWith(`html[data-degree-theme="${theme.id}"] { --dv-degree-pattern-light:`)
@@ -73,7 +77,9 @@ describe('degree themes', () => {
             const artwork = [...artworkRule.matchAll(/data:image\/svg\+xml,([^"]+)/g)].map(([, source]) => decodeURIComponent(source));
             expect(artwork).toHaveLength(2);
             expect(artwork[0]).toContain(`stroke="${accent}"`);
+            expect(artwork[0]).toContain('opacity=".18"');
             expect(artwork[1]).toContain(`stroke="${light}"`);
+            expect(artwork[1]).toContain('opacity=".1"');
         }
         expect(degreeThemeCss).toContain('html[data-degree-theme].dark [class~="text-indigo-600"]');
     });
