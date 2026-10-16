@@ -1,61 +1,54 @@
 # Calendar & Schedule Sync 📅
 
-DueVinci includes an interactive **Academic Calendar** (`js/modules/calendar.js`) powered by FullCalendar, integrating course schedules, assignment deadlines, office hours, and personal milestones into a unified timeline.
+The calendar (`js/modules/calendar.js`) displays coursework deadlines, custom/imported events, and planned study blocks using FullCalendar.
 
----
+## Views and interaction
 
-## 🗓️ Views & Interaction
+- Use **Month** or **Week**, Previous/Next, and Today.
+- Click coursework to toggle completion. Planned study blocks show when to work without changing the assignment's due date.
+- Click a custom/imported event to open its actions, create an assignment, or delete the event.
 
-- **Month View**: Bird's-eye view of high-level milestone deadlines and major exam dates.
-- **Week / Day Agenda**: Granular hourly schedule displaying class times, study blocks, and due dates.
-- **List / Schedule View**: Chronological agenda view ideal for mobile screens and quick reviews.
-- **Drag-and-Drop Rescheduling**: Drag an assignment or study block to any date/time to instantly update its due date across your entire workspace.
+The current toolbar does not expose Day/List views or drag-and-drop rescheduling. Imported/manual events are stored as dates, not a complete timed-calendar model.
 
----
+## Free .ics import and export
 
-## 📥 RFC 5545 iCalendar (.ics) Import & Export
+Calendar → **Import .ICS** reads a file exported by Google Calendar, Apple Calendar, Outlook, or another compatible tool. The import:
 
-DueVinci allows one-click export of all coursework deadlines and import of calendar files from:
-- **Apple Calendar** (macOS / iOS)
-- **Google Calendar**
-- **Microsoft Outlook**
-- **Notion Calendar / Cron**
+- Expands supported daily/weekly/monthly/yearly recurrence patterns and multi-day ranges within a bounded row count.
+- Honors common `EXDATE` date exceptions.
+- Skips case-insensitive title/date duplicates within the file and existing events.
+- Shows a native confirmation with counts and a preview before saving.
 
-Imports are reviewed before saving. DueVinci expands recurring and multi-day events,
-honors common `EXDATE` exceptions, skips matching title/date duplicates, and keeps
-the free planner usable without provider credentials. Manual events support one-day
-or multi-day date ranges and can use a class color.
+This is support for common calendar exports, not every RFC 5545 feature. Dates are preserved as date-based rows; arbitrary timezone/time-of-day and provider-specific behavior should be reviewed after import.
 
-Live background synchronization with Google, Microsoft, or Apple accounts is a
-separate DueVinci Pro roadmap item. It requires provider OAuth credentials and
-scopes; an exported `.ics` file is not two-way synchronization.
+**Export .ICS** downloads currently loaded coursework, events, and study blocks as all-day entries. A one-day entry uses an exclusive next-day `DTEND`:
 
-```mermaid
-flowchart LR
-    DueVinci[DueVinci Academic DB] --> ICSGenerator[js/modules/calendar.js: generateICS()]
-    ICSGenerator --> ICSFile[academic_calendar.ics]
-    ICSFile --> GCal[Google Calendar]
-    ICSFile --> AppleCal[Apple Calendar]
-    ICSFile --> Outlook[Microsoft Outlook]
-    GCalExport[Google / Apple / Outlook export] --> ICSImport[DueVinci .ics review + dedupe]
-    ICSImport --> DueVinci
-```
-
-### Generated iCalendar Format Example
 ```text
-BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//DueVinci//Academic Workspace//EN
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
 BEGIN:VEVENT
-UID:dv-assignment-9428-cs101
-DTSTAMP:20260821T060000Z
-DTSTART:20260915T235900
-SUMMARY:[CS 101] Problem Set 1
-DESCRIPTION:Algorithms and asymptotic notation review.
-CATEGORIES:Homework Assignments
-STATUS:CONFIRMED
+UID:duevinci-example@duevinci.tech
+DTSTART;VALUE=DATE:20261020
+DTEND;VALUE=DATE:20261021
+SUMMARY:Fictional study review
 END:VEVENT
-END:VCALENDAR
 ```
+
+Files are portable snapshots, not two-way provider synchronization. Direct Google/Microsoft OAuth connections remain [planned](Product-Roadmap).
+
+## Create coursework from an event
+
+1. Open a custom/imported event.
+2. Choose a class whose class/term date window includes the event date.
+3. Select **Create assignment**.
+
+DueVinci keeps the original event, checks matching class/title/date assignments, and uses the source event ID to prevent repeat conversion across devices. Errors leave the event available. The resulting assignment can participate in the free study planner. This explicit action is separate from provider synchronization.
+
+## SNHU Brightspace calendar sync · Pro
+
+In Settings → Subscription, eligible accounts can connect the private HTTPS Calendar Feed from SNHU Brightspace. The backend accepts the supported SNHU calendar URL, encrypts the saved link, and imports calendar events/due dates. It does not automatically create course records or planner assignments. Use the explicit conversion above when appropriate.
+
+- **Sync now** refreshes the saved feed; disconnect removes the saved connection while previously imported entries remain.
+- Successful sync marks older entries from that user's Brightspace feed inactive, including after a valid empty feed.
+- Malformed event/task blocks are rejected before persistence. Fetch/write failures are reported; a write failure prevents retirement of older feed entries. The multi-batch save is not a single database transaction.
+- Manual events and other users/providers are outside the stale-entry update scope.
+
+Treat the private feed URL like a credential; never post it in issues or logs. Calendar sync does not provide clinical documentation or patient-care functionality. Nursing-related examples must stay fictional.

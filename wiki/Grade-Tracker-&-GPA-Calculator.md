@@ -1,50 +1,30 @@
 # Grade Tracker & GPA Calculator 📊
 
-DueVinci's **Grade Tracker & GPA Calculator** (`js/modules/grades.js`) provides real-time visibility into academic performance, course standing, and future GPA projections.
+The Grades page (`js/modules/grades.js`) shows saved percentage grades and a temporary **What-If** simulator. It is a planning aid, not a transcript or institution-specific GPA calculation.
 
----
+## Current calculation
 
-## 🧮 Calculation Engines
+Within each course, the displayed average is the simple arithmetic mean of included, non-empty percentage grades among the coursework shown by the page. **Exclude** removes an item from that calculation. The current view includes lesson-style entries and titles matching lesson/exam/final/midterm/test/review rules; it does not necessarily include every arbitrary task title.
 
-### 1. Weighted Course Average Formula
-For courses with weighted grading categories:
+For the cumulative display, the implementation averages the displayed course percentages (rounded to one decimal place), then scales linearly:
 
-$$\text{Course Average} = \frac{\sum_{i=1}^n \left( \frac{\text{Score}_i}{\text{MaxPoints}_i} \times \text{Weight}_i \right)}{\sum_{i=1}^n \text{Weight}_i}$$
+$$\text{Scaled GPA} = \frac{\text{Mean of course percentages}}{100} \times \text{Selected scale}$$
 
-If not all categories have graded assignments yet, the denominator automatically normalizes to the sum of active category weights.
+Choose 4.0 or 5.0 in Settings → Appearance → **GPA Scale Target**. For example, an 88% mean scales to 3.52 on the 4.0 setting. It does not map 88% to a B+ grade point or weight courses by credits. The current UI has no custom grading-category weights or AP/Honors weighting policy.
 
----
+Use the official school calculation for academic decisions. Courses without included graded work do not contribute to the displayed mean.
 
-### 2. Cumulative GPA Calculation
-Supports both standard **4.0 Scale** (Unweighted) and **5.0 Scale** (Honors / AP Weighted):
+## What-If simulation
 
-$$\text{Cumulative GPA} = \frac{\sum (\text{Grade Points}_c \times \text{Credits}_c)}{\sum \text{Credits}_c}$$
+1. Select **Launch Simulator**.
+2. Enter hypothetical percentages in the displayed grade fields.
+3. Observe the recalculated course/cumulative values.
+4. Use **Reset Sim** or **Exit Simulator** to discard temporary values.
 
-#### Standard 4.0 Scale Mapping
-| Letter Grade | Percentage Range | 4.0 Scale Grade Points |
-| :--- | :--- | :--- |
-| **A+ / A** | 93.0% – 100% | 4.00 |
-| **A-** | 90.0% – 92.9% | 3.70 |
-| **B+** | 87.0% – 89.9% | 3.30 |
-| **B** | 83.0% – 86.9% | 3.00 |
-| **B-** | 80.0% – 82.9% | 2.70 |
-| **C+** | 77.0% – 79.9% | 2.30 |
-| **C** | 73.0% – 76.9% | 2.00 |
-| **C-** | 70.0% – 72.9% | 1.70 |
-| **D** | 60.0% – 69.9% | 1.00 |
-| **F** | Below 60.0% | 0.00 |
+Simulated values remain in page memory and do not overwrite saved grades. Exclude is a separate saved assignment setting; it is not made temporary by the simulator. Outside simulation, changing a grade saves it to the assignment.
 
----
+This is a hypothetical-score editor, not an automatic solver for the final-exam percentage required to achieve a target weighted grade.
 
-## 🔮 "What-If" Final Exam Simulator
+## Input and error behavior
 
-The built-in **What-If Simulator** allows students to determine exactly what score they must achieve on remaining assignments or final exams to secure their target letter grade:
-
-$$\text{Required Final Score} = \frac{\text{Target Average} - (\text{Current Average} \times (1 - W_{\text{final}}))}{W_{\text{final}}}$$
-
-### Example:
-- Current Average: `88%`
-- Final Exam Weight: `30%` (0.30)
-- Target Course Grade: `90%` (A-)
-- **Required Final Exam Score**:
-  $$\frac{90 - (88 \times 0.70)}{0.30} = \frac{90 - 61.6}{0.30} = \mathbf{94.67\%}$$
+Grade fields are named with their class and coursework title, and audited input/Exclude targets are enlarged. A load error offers **Try again** instead of presenting failed reads as an empty workspace. Source tests cover control contracts and recalculation behavior; actual visual alignment, focus, and saved data require browser/account checks.

@@ -1,106 +1,72 @@
 # Getting Started with DueVinci 🚀
 
-This guide walks you through setting up, running, and configuring DueVinci on your local machine or hosting it on the web.
+Run DueVinci as a static site with native browser ES modules. The [production app](https://duevinci.tech) uses configured Supabase authentication and services; a local copy does not create a separate backend automatically.
 
----
+## Prerequisites
 
-## 📋 Prerequisites
+- Node.js 24 and npm match the repository's CI runtime.
+- A modern browser with JavaScript and IndexedDB support.
+- A configured Supabase project for sign-in and cloud-backed data.
+- Optional server-side Gemini, Canvas, Stripe, and push configuration for the integrations you intend to operate.
 
-Before running DueVinci, ensure you have:
-- **Node.js** (v18.0.0 or higher) & **npm** (for running test suites and syntax validators).
-- Any modern web browser (Google Chrome, Mozilla Firefox, Apple Safari, or Microsoft Edge) with JavaScript and IndexedDB support.
-- *(Optional)* A **Supabase** account for authentication and cloud-backed data.
-- *(Optional)* A **Google Gemini API Key** for AI syllabus parsing and automated quiz generation.
+## Installation and local setup
 
----
+### 1. Clone the repository
 
-## 📥 Installation & Local Setup
-
-### 1. Clone the Repository
 ```bash
 git clone https://github.com/saappleg/DueVinci.git
 cd DueVinci
 ```
 
-### 2. Install Development Dependencies
-DueVinci uses standard Vanilla ES6 modules natively in the browser, so no heavy bundler is required. Dev dependencies are used for automated testing:
+### 2. Install development dependencies
+
 ```bash
 npm install
 ```
 
-### 3. Verify Code Integrity
-Run the test suite and syntax verification checks:
+The application itself does not require a production bundling step. Development dependencies support repository checks.
+
+### 3. Verify code integrity
+
 ```bash
 npm test
 npm run check:syntax
 ```
 
-### 4. Start Local Development Server
-DueVinci can be served using any static web server:
+### 4. Serve the repository over HTTP
 
-**Option A: Using `npx serve`**
-```bash
-npx serve . -l 3000
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+For example, with Python 3:
 
-**Option B: Using VS Code Live Server**
-- Open the project directory in VS Code.
-- Right click `index.html` and select **"Open with Live Server"**.
-
-**Option C: Using Python 3**
 ```bash
 python3 -m http.server 3000
 ```
 
----
+Open [http://localhost:3000](http://localhost:3000). VS Code Live Server or another static server can also serve the repository. Open the actual checkout, including `index.html`, `js/`, and `assets/`.
 
-## ⚙️ Configuration
+DueVinci does not register its application-shell service worker on `localhost`, `127.0.0.1`, or IPv6 loopback. It unregisters a previously installed DueVinci worker for that manifest directory while preserving unrelated workers. Reload an already controlled preview after cleanup. Local preview is therefore not an offline-installation test; use a suitable hosted environment for PWA verification.
 
-### Supabase Setup (Cloud Sync & Auth)
+## Configuration
 
-To enable authenticated cloud persistence:
-1. Create a free project at [supabase.com](https://supabase.com).
-2. Create `courses`, `assignments`, and `custom_events` tables with a `user_id` column.
-3. Enable Row Level Security and add select, insert, update, and delete policies scoped to `auth.uid() = user_id` for each operation the table supports.
-4. Open `js/modules/config.js` and set the project URL and **publishable** key:
-   ```javascript
-   export const SUPABASE_URL = 'https://your-project-id.supabase.co';
-   export const SUPABASE_ANON_KEY = 'your-anon-public-key';
-   ```
+### Supabase, authentication, and migrations
 
-> [!NOTE]
-> Do not put a service-role key or Gemini API key in the browser. The production application uses an authenticated Supabase Edge Function for optional Gemini parsing.
+`js/modules/config.js` contains the browser project URL and publishable key. Never put a service-role key or provider secret in browser code. To operate an independent environment, review the checked-in [migrations](https://github.com/saappleg/DueVinci/tree/main/supabase/migrations), [Edge Functions](https://github.com/saappleg/DueVinci/tree/main/supabase/functions), and [release checklist](https://github.com/saappleg/DueVinci/blob/main/docs/RELEASE_CHECKLIST.md). Three manually created academic tables are not the complete current schema.
 
----
+Use a separate development project and disposable accounts. Review migrations and owner-scoped RLS before applying changes; database migrations and deployment are explicit release actions. Configure provider credentials and authorized authentication return URLs for the environment you serve. A Google sign-in return uses that page's `index.html` URL; a browser login from the live origin is not automatically shared with localhost.
 
-### Google Gemini API Integration
+Email/password and Google sign-in are available in the current UI. Initial authentication needs connectivity; a cached planner session is not a public guest-account flow.
 
-DueVinci utilizes Google Gemini 1.5 for intelligent document extraction (syllabi, schedules, rubrics).
+### Optional AI and Pro integrations
 
-To configure the Supabase Edge Function:
-1. Install Supabase CLI:
-   ```bash
-   npm install -g supabase
-   ```
-2. Link your Supabase project:
-   ```bash
-   supabase link --project-ref your-project-id
-   ```
-3. Set your Gemini API key:
-   ```bash
-   supabase secrets set GEMINI_API_KEY=your_gemini_api_key
-   ```
-4. Deploy the edge function:
-   ```bash
-   supabase functions deploy gemini-parser
-   ```
+Syllabus parsing runs through `gemini-parser`; the Study Companion uses `tutor`. Their Gemini models are configurable with server-side fallbacks. Keep API keys in the backend secret vault. The current implementation and required settings are documented in [Architecture & Tech Stack](Architecture-&-Tech-Stack), [AI Syllabus Parser](AI-Syllabus-&-Document-Parser), and the [production runbook](https://github.com/saappleg/DueVinci/blob/main/docs/OPERATIONS.md).
 
----
+Canvas, Brightspace, billing, push delivery, and Tutor require their corresponding deployed functions and configuration. Showing an entry point or passing a static test does not prove those external services are configured.
 
-## 📱 Progressive Web App (PWA) Installation
+## PWA installation
 
-DueVinci is PWA-enabled with service-worker caching for the application shell and manifest support. Sign-in, cloud data, and AI parsing require a network connection.
-- **Desktop (Chrome / Edge / Safari)**: Click the "Install" icon in the browser address bar.
-- **iOS (Safari)**: Tap the Share button and select **"Add to Home Screen"**.
-- **Android (Chrome)**: Tap the browser menu and select **"Install App"**.
+Production supports service-worker caching and installation where the browser offers it. Sign in online and visit the pages you intend to use before checking offline behavior.
+
+- Desktop Chrome/Edge: use the browser's install control when offered.
+- iOS Safari: Share → Add to Home Screen.
+- Android Chrome: use Install App or Add to Home Screen when offered.
+
+See [Offline Support & PWA](Offline-Support-&-PWA) for supported offline operations and [FAQ & Troubleshooting](FAQ-&-Troubleshooting) for Settings and sign-in help.

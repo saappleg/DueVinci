@@ -4,7 +4,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 
 > **Our Mission:** Empower students and lifelong learners with an intelligent, ambient, and frictionless academic hub—unifying course management, cognitive science (SM-2 spaced repetition), AI document analysis, and focus mastery in a beautiful, privacy-first interface.
 
-> **Free Core Commitment:** Course and lesson setup, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
+> **Free Core Commitment:** Course and lesson setup, course-only term rollover, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar-event-to-assignment conversion, calendar import/export, timers, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
 
 ---
 
@@ -27,30 +27,32 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - [x] **SuperMemo SM-2 Spaced Repetition** – Flashcard mastery engine with ease factor calculation and active recall intervals.
 - [x] **Smart Study Planner & Balancer** – Automated study block distribution, exam countdowns, and cognitive workload balancing.
 - [x] **Due-Date Safety & 7-Day Workload Radar** – Deadline-first scheduling, rest-day handling, timestamp-aware workload counts, and exam-day alerts.
-- [x] **Interactive Quiz Generator** – Instant multiple-choice and true/false quiz creation from markdown notes and syllabi.
-- [x] **Academic GPA & Grade Calculator** – Real-time weighted course average and cumulative GPA simulation (4.0 / 5.0 scales).
-- [x] **Pomodoro & Focus Timer** – Floating widget, custom intervals, Web Audio alarms, and ambient background sound synthesizer (Zen singing bowl, rain, cafe).
+- [x] **Interactive Quiz Generator** – Note-derived multiple-choice practice quizzes and flashcards.
+- [x] **Academic GPA & Grade Calculator** – Percentage course averages, linear 4.0 / 5.0 scaling, and temporary hypothetical-score simulation; no custom grading-category or credit weighting.
+- [x] **Pomodoro & Focus Timer** – Floating widget, custom countdown intervals, configurable Web Audio alarms, and ambient white/brown noise.
 - [x] **Interactive Master Calendar** – FullCalendar integration, deadline filtering, and `.ics` feed export for Apple/Google Calendar.
-- [x] **Offline-First PWA & IndexedDB Storage** – Full offline functionality, Service Worker caching, and desktop/mobile installation.
+- [x] **Offline-First PWA & IndexedDB Storage** – Cached application pages and supported per-user planner changes after an online load; authentication and provider services still require connectivity. Hosted installation support is separate from loopback previews, which skip DueVinci's worker.
 - [x] **Command Palette (`Cmd+K`) & Easter Eggs** – Quick action navigator, WGU Night Owl flyover, and Da Vinci theme triggers.
 - [x] **Data Sovereignty & Portability** – Plain JSON backup/restore and zero vendor lock-in.
+
+### DueVinci 2.8.0 (2026-10-16) ✅
+- [x] **Nursing Hub and field themes** – Optional Nursing rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, flashcards, anatomy review, and a quick-review queue based on existing saved progress; field-specific accent palettes and artwork. Keep nursing practice fictional and never enter real patient information.
+- [x] **Study-plan calibration** – Pro users can opt in to estimates based on recent completed study tasks and focus sessions. The estimate uses records from the previous 90 days; that calculation window is not a data-retention period.
+- [x] **Canvas assignment change alerts** – Pro users can opt in to alerts for new assignments and changed due dates after a Canvas sync, with browser notification permission enabled on each device.
+- [x] **Term rollover and calendar conversion** – Free course-only rollover copies course setup into a new term without copying assignments or lesson progress. Students can manually turn a calendar event into a linked assignment while keeping the original event.
+- [x] **SNHU Brightspace calendar feed** – Pro users can sync events and due dates from a private Brightspace calendar feed. This does not import course records or automatically create planner assignments.
 
 ---
 
 ## 🎯 Current Initiatives & Near-Term Releases
 
-### Nursing Hub and field themes 🚧
-- [ ] Complete review and release of the opt-in Nursing Hub and field-specific degree themes (tracked in PR #7).
-- The Hub includes rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, spaced-repetition flashcards, anatomy review, and a quick queue that uses existing saved study progress.
-- Keep the Hub hidden until enabled, preserve drafts when disabled, and verify readable light/dark themes, narrow screens, Settings navigation, and fictional-only privacy boundaries before marking this shipped.
-
 ### Subscription packaging
-- **DueVinci Pro (current offer):** Canvas course sync, SNHU Brightspace calendar sync, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
-- **SNHU Brightspace calendar sync:** Pro users can connect the private Brightspace Calendar Feed to bring SNHU calendar events and due dates into DueVinci. This is calendar-only; importing course records and planner assignments requires an approved Brightspace API integration.
+- **DueVinci Pro (current offer):** Canvas sync for selected courses and assignments with due dates, SNHU Brightspace calendar sync, opt-in study-plan calibration, opt-in Canvas assignment change alerts, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
+- **SNHU Brightspace calendar sync:** Pro users can connect the private Brightspace Calendar Feed to bring SNHU calendar events and due dates into DueVinci. The feed does not automatically create classes or planner assignments. A student can explicitly convert an imported event into an assignment for an existing class; automatic course/task import would require a separately approved integration.
 - **Current checkout copy:** $5 monthly or $45 yearly, with a 30-day trial. Confirm Stripe price IDs and trial policy in each environment before release.
 - **Tutor cost controls:** default allowance is 8 requests/day and 40/month during trial, and 30/day and 250/month on an active paid plan. Edge Function secrets can override these limits.
 - **Next Pro addition — connected calendars:** build read-only Google Calendar and Microsoft Outlook/Graph OAuth connections, with encrypted refresh tokens, clear disconnect controls, refresh history, and event de-duplication. Configure provider client IDs, secrets, and exact redirect URIs before enabling the connector. Apple/iCloud remains supported through the existing `.ics` import/export until a suitable web authorization path is available.
-- **Following Pro addition — Canvas alerts:** use a scheduled server-side refresh for already-connected Canvas accounts, compare assignment dates and posted grades with the last successful sync, and send opt-in browser push alerts without duplicates. Configure the scheduler, encryption key, push secrets, notification preferences, and retry/retention rules before enabling it.
+- **Next Pro addition — scheduled Canvas refresh and grade alerts:** extend the existing opt-in alerts for new assignments and changed due dates, which are sent after a Canvas sync, with scheduled refresh and posted-grade alerts. Configure the scheduler, encryption key, push secrets, notification preferences, and retry/retention rules before enabling those additions.
 
 ### Phase 2: Socratic AI & Intelligent Study Workflows (v1.3 – v2.0) 🚧
 - [x] **Socratic AI Study Companion (`/tutor`)** ✅
@@ -66,8 +68,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
   - Persist review progress across devices and include it in portable backups while keeping the planner free.
 - [ ] **Connected Calendar Sync (Google / Microsoft)** 🚧
   - Pro read-only Google and Microsoft sync with encrypted token storage, revocation, refresh history, and duplicate detection. Apple calendars remain importable/exportable as `.ics` until direct web authorization is supported.
-- [ ] **LMS Refresh & Grade Alerts (Canvas / Blackboard / Moodle)** 📋
-  - Start with scheduled Canvas refresh and opt-in alerts for new coursework, changed due dates, and posted grades; add Blackboard/Moodle only after provider authorization and data mapping are defined.
+- [ ] **Scheduled LMS Refresh & Grade Alerts (Canvas / Blackboard / Moodle)** 📋
+  - Add scheduled Canvas refresh and posted-grade alerts to the current opt-in notifications for new assignments and changed due dates after a Canvas sync; add Blackboard/Moodle only after provider authorization and data mapping are defined.
 - [ ] **Rich Media Flashcards** 📋
   - Image attachments, diagram occlusion, and KaTeX visual formula editor.
   - Two-way Anki package (`.apkg`) import and export.
@@ -113,9 +115,9 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 
 We build DueVinci in the open with student and developer feedback!
 
-- 💡 **Have a feature idea?** Open a proposal in [GitHub Discussions](https://github.com/saappleg/DueVinci/discussions) or submit an [Issue](https://github.com/saappleg/DueVinci/issues).
+- 💡 **Have a feature idea?** Open a [Feature Request](https://github.com/saappleg/DueVinci/issues/new?template=feature_request.md).
 - 🐛 **Found a bug?** Check our [Issue Tracker](https://github.com/saappleg/DueVinci/issues) and submit a bug report.
 - 🤝 **Want to contribute?** Read our [Contributing Guide](docs/CONTRIBUTING.md) to get started!
 
 ---
-*Last updated: September 2026 • Maintained by [@saappleg](https://github.com/saappleg) and the DueVinci Open Source Community.*
+*Last updated: October 2026 • Maintained by [@saappleg](https://github.com/saappleg) and the DueVinci Open Source Community.*

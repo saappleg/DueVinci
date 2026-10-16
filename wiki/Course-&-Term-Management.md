@@ -1,37 +1,37 @@
 # Course & Term Management 📂
 
-The **Course & Term Management** module (`js/modules/academics.js` and `js/modules/courses.js`) is the organizational foundation of DueVinci. It manages the academic hierarchy from multi-year terms down to individual assignment rubrics.
+Classes, terms, units, lessons, and assignments are managed by `js/modules/courses.js` and the academic/planning modules.
 
----
-
-## 🏛️ Academic Hierarchy
+## Academic organization
 
 ```text
-Terms (e.g., Fall 2026, Spring 2027)
- └── Courses (e.g., CS 101, MATH 201)
-      ├── Metadata (Professor, Office Hours, Location, Credits)
-      ├── Grading Categories & Weights (Exams: 40%, Homework: 30%, Labs: 30%)
-      ├── Assignments & Deadlines
-      ├── Course Notes & Markdown Summaries
-      └── SM-2 Flashcard Decks
+Named term and optional date window
+ └── Class, pacing profile, and optional date window
+      ├── Units, lessons, reviews, exams, and assignments
+      ├── Due dates, priority, effort estimates, and completion
+      ├── Percentage grades and GPA exclusion
+      ├── Notes, resources, description, and objectives
+      └── Note-derived quizzes and flashcards
 ```
 
----
+## Find and organize classes
 
-## 🎨 Customization & Organization Features
+- Give classes a code, icon, and color; use term folders or the alphabetical list.
+- Search classes/terms, select classes for a bulk term move, and choose whether completed classes are visible.
+- Set class and term start/end dates. Planning and imports use their effective date window; terms can archive after their end date.
+- Show archived terms to find or restore older folders. Hiding or archiving a folder does not mean its coursework was deleted.
+- Choose manual or supported weekly pacing profiles. Weekly progress follows the current coursework week rather than assuming all overdue work belongs today.
 
-- **Term Organization**: Easily switch between Active, Future, and Archived academic terms.
-- **Custom Course Palettes & Emojis**: Assign unique theme colors and emoji icons to each class (e.g. 💻 `CS 101` in Emerald, 📐 `MATH 201` in Indigo) for quick visual scanning throughout the calendar and dashboard.
-- **Credit Hour Tracking**: Monitor total registered credit hours per semester to ensure academic requirements are met.
-- **Drag-and-Drop Sorting**: Reorder courses or rearrange assignments between categories with smooth drag-and-drop interactions.
+## Start a new term
 
----
+Open a named term, choose **Start a new term**, enter a distinct name and optional dates, then create it.
 
-## 📝 Assignment Management
+Rollover copies class shells: name/code, icon/color, and pacing type. Old coursework stays in the original term. The copies start incomplete with empty class dates and without old assignments, grades, notes, or LMS identities. Source-course keys prevent duplicate copies from a retried rollover. A new term is not a live duplicate of the old term; review dates and add/import the new coursework separately.
 
-Each assignment record supports:
-- **Title & Description**: Detailed instructions with formatted Markdown support.
-- **Category Association**: Assigned to custom weighted categories (e.g., Homework, Quiz, Project).
-- **Due Date & Time**: Timestamp with timezone awareness and countdown alerts.
-- **Status Toggles**: `Pending`, `In Progress`, `Completed`, or `Graded`.
-- **Score & Max Points**: Earned score vs total points possible for real-time grade calculations.
+## Assignment management
+
+Coursework supports a title, unit, date, task type, priority, effort estimate, and completion state. Dates can be planned in curriculum order or rescheduled using the existing controls. Grades accepts percentage values and an Exclude choice; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains the calculation limits.
+
+The current UI does not provide custom weighted grading categories, credit-hour accounting, a Pending/In Progress/Graded status workflow, or drag-and-drop category sorting. Use the existing manual fields and [syllabus import](AI-Syllabus-&-Document-Parser) for the supported workflow.
+
+Calendar events can be explicitly [converted to assignments](Calendar-&-Schedule-Sync), preserving the original event. DueVinci Pro adds connected Canvas imports; the free course/task workflow remains available without a subscription.

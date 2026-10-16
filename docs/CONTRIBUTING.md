@@ -56,7 +56,7 @@ Please be respectful, constructive, and considerate when interacting with other 
 
 ## Development Guidelines
 
-- **Vanilla Stack**: DueVinci uses Vanilla JS and CDN-loaded libraries (Tailwind, FullCalendar, PDF.js, Canvas-Confetti). Keep external dependencies lightweight.
+- **Vanilla Stack**: DueVinci uses Vanilla JavaScript and semantic HTML. Tailwind and browser libraries are served as local, pre-cached vendor assets to support reliable PWA startup; follow the existing asset and versioning patterns when changing them.
 - **Privacy & Security**: Never store unhashed sensitive credentials in local storage or client-side code.
 - **Edge Functions**: Edge functions live in Supabase and should be tested with Deno.
 

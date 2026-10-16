@@ -1,43 +1,46 @@
 # Smart Study Plan & Workload Balancer 🎯
 
-The Smart Study Plan is DueVinci’s free planning core. It turns incomplete, dated coursework into a short daily plan without requiring AI or a paid integration.
+The free Smart Study Plan turns incomplete, dated coursework into daily study blocks. It does not require AI or a paid integration.
 
 ## What it uses
 
-- Incomplete assignments with a valid due date
-- Course, unit, and lesson metadata
-- The next seven planning days (five days in the dashboard preview)
-- Optional rest days selected by the student
+- Incomplete assignments with valid dates and course/unit/lesson metadata.
+- Task effort estimates and the selected planning window; dashboard previews and calendar overlays can use different window lengths.
+- Rest-day preferences, protected study dates, and class/term date windows.
+- Optional saved study-plan moves, which are separate from assignment deadlines.
 
 ## Scheduling rules
 
-1. **Deadlines are hard constraints.** A task is scheduled on or before its due date whenever it is inside the planning window. Overdue work is surfaced today.
-2. **Earlier deadlines win.** If a later-numbered unit is due first, the planner prioritizes its deadline over unit numbering.
-3. **Lessons keep their order.** Within a unit, Lesson 1 is scheduled before Lesson 2, and units with the same deadline keep numerical order.
-4. **Work is spread across available days.** Lessons are distributed through active days leading to the unit deadline instead of being dumped onto the first day.
-5. **Rest days are respected when possible.** If the only remaining day before a deadline is a rest day, the deadline takes precedence and the task is shown that day.
+1. **Deadlines constrain the plan.** Due work stays on or before its deadline within a usable date window; overdue work is surfaced rather than silently given a later deadline.
+2. **Earlier deadlines take priority.** Unit numbering does not override an earlier due date.
+3. **Lessons keep curriculum order.** Unit and lesson metadata help sequence blocks.
+4. **Work spreads across available days.** Rest days are preferences when a deadline leaves no other feasible day; protected dates and course windows also constrain placement.
+5. **Study dates differ from due dates.** Moving a study block does not itself rewrite the assignment deadline. Review warnings when dates leave no feasible placement.
 
 ## 7-Day Workload & Stress Radar
 
-The dashboard radar counts incomplete work due on each of the next seven local calendar days.
+The radar counts incomplete coursework due on each local calendar day, not measured stress or medical risk.
 
 | Signal | Meaning |
 | --- | --- |
-| Green / Chill | No due coursework that day |
+| Green / Chill | No due coursework |
 | Indigo | One task |
 | Amber | Two or three tasks |
 | Red | Four or more tasks |
-| Pulsing exam badge | At least one exam, test, quiz, final, or midterm is due |
+| Exam badge | An exam/test/quiz/final/midterm is due |
 
-Both date-only values (`YYYY-MM-DD`) and ISO timestamps are normalized to the deadline’s calendar date, so imported timestamp deadlines appear correctly.
+Date-only values and ISO timestamp deadlines use their stored calendar-date component for these counts.
 
-## Using it
+## Personalized estimates · Pro, opt-in
 
-1. Add a course, then add units or lessons with due dates.
-2. Use clear titles such as `Unit 2` and `Lesson 3` for the strongest sequence detection; explicit unit and lesson fields are preferred when available.
-3. On the dashboard, choose rest days and open a day card to see every scheduled block, study recommendation, and timer shortcut.
-4. Mark coursework complete to remove it from future plans and radar counts.
+Settings → Study & Reminders → **Personalized study plan** can use completed focus sessions linked to study-plan tasks and subsequent task completions to adjust future duration estimates. The base free planner remains available with default/manual estimates.
 
-## Implementation
+After enabling, start a task's study-plan timer, finish focus sessions, and mark the task done. The calculation uses recent history from the last 90 days, bounded adjustments, and fallback estimates when history or entitlement is unavailable. It is an estimate, not a measured guarantee of completion time.
 
-The pure scheduler is `generateBalancedStudyPlan(courses, assignments, startDate, daysAhead, restDays)` in `js/modules/studyPlan.js`. Workload-radar data is built by `getSevenDayWorkload(...)` in `js/modules/academics.js`. Both are covered by automated regression tests.
+Turning personalization off pauses its use and retains history. **Clear history** removes the local history and synchronizes removal through account preferences. Keep all study context fictional where nursing practice is involved; never enter patient information.
+
+## Using and verifying the plan
+
+Add dated coursework, review the proposed days, use timer shortcuts, and mark completed work. Check protected dates, narrow layouts, and warnings before relying on a plan.
+
+The scheduler is `generateBalancedStudyPlan(...)` in `js/modules/studyPlan.js`; calibration is in `js/modules/studyCalibration.js`, and radar data is in `js/modules/academics.js`. Unit regressions verify scheduling boundaries; actual layout, timers, account synchronization, and external services require their own checks.
