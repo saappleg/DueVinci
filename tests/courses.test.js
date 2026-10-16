@@ -4,8 +4,24 @@ import {
     buildSequencePlanUpdates,
     compareCourseworkOrder,
     getCoursePacingProfile,
-    getCoursePacingUpdates
+    getCoursePacingUpdates,
+    renderAssignmentCompletionControl
 } from '../js/modules/courses.js';
+
+describe('Coursework completion control', () => {
+    it('names the assignment, exposes completion state, and preserves the correct toggle arguments', () => {
+        const control = renderAssignmentCompletionControl({
+            id: 'assignment-7',
+            title: 'Lesson 7: <Loops & Logic>',
+            is_completed: true
+        }, 'course-3');
+
+        expect(control).toContain('aria-label="Complete Lesson 7: &lt;Loops &amp; Logic&gt;"');
+        expect(control).toContain('aria-pressed="true"');
+        expect(control).toContain("toggleAssignment('assignment-7', true, 'course-3')");
+        expect(control).toContain('h-11 w-11');
+    });
+});
 
 describe('Coursework ordering', () => {
     it('keeps curriculum order ahead of priority and database row order', () => {

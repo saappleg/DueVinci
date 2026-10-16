@@ -33,6 +33,18 @@ function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
 }
 
+export function renderAssignmentCompletionControl(assignment, courseId = null) {
+    const assignmentId = inlineArg(assignment?.id ?? '');
+    const assignmentTitle = escapeHtml(assignment?.title || 'Coursework item');
+    const isCompleted = Boolean(assignment?.is_completed);
+    const courseIdArg = courseId == null ? 'null' : `'${inlineArg(courseId)}'`;
+    const stateClasses = isCompleted
+        ? 'border-indigo-500 bg-indigo-500 text-white'
+        : 'border-zinc-300 text-transparent hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-500 dark:border-brand-600 dark:hover:bg-brand-700';
+
+    return `<button type="button" aria-label="Complete ${assignmentTitle}" aria-pressed="${isCompleted}" onclick="toggleAssignment('${assignmentId}', ${isCompleted}, ${courseIdArg})" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900"><span aria-hidden="true" class="flex h-5 w-5 items-center justify-center rounded border transition ${stateClasses}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span></button>`;
+}
+
 function safeCourseColor(value) {
     const color = String(value || '');
     return /^#[\da-f]{6}$/i.test(color) ? color : '#4f46e5';
@@ -323,8 +335,6 @@ export async function loadDashboardStats() {
                 if (!course) return;
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${isWeeklyCourse(course) ? 'Wk' : 'Unit'} ${assign.unit_number}</span>` : '';
-                const assignmentArg = inlineArg(assign.id);
-                
                 const priority = assign.priority || 'medium';
                 let priorityBadge = '';
                 if (priority === 'high') {
@@ -336,7 +346,7 @@ export async function loadDashboardStats() {
                 upNextListEl.innerHTML += `
                     <div class="flex items-center justify-between p-3 bg-white dark:bg-brand-900 rounded-lg border border-zinc-200 dark:border-brand-700 hover:border-indigo-500/40 transition">
                         <div class="flex items-center gap-3 min-w-0">
-                            <button onclick="toggleAssignment('${assignmentArg}', false, null)" class="w-5 h-5 rounded border border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-brand-700 transition flex items-center justify-center text-transparent hover:text-indigo-500 shrink-0"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>
+                            ${renderAssignmentCompletionControl(assign)}
                             <div class="truncate">
                                 <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${escapeHtml(course.emoji)} ${unitBadge}${escapeHtml(assign.title)}</p>
                                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(course.code)} • Target: ${escapeHtml(formattedDate)}</p>
@@ -2327,8 +2337,7 @@ export async function loadAssignments(courseId, page = 1) {
 
         let checkboxHtml = '';
         if (isSubItem) {
-            const cClass = assign.is_completed ? "bg-indigo-500 text-white border-indigo-500" : "text-transparent border-zinc-300 dark:border-brand-600 hover:border-indigo-500 hover:text-indigo-500";
-            checkboxHtml = `<button type="button" onclick="toggleAssignment('${assignmentArg}', ${assign.is_completed}, '${courseArg}')" class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${cClass}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>`;
+            checkboxHtml = renderAssignmentCompletionControl({ ...assign, title: displayTitle }, courseId);
         } else {
             const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && (a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a))));
             const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);

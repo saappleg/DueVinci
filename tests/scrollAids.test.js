@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findForegroundModalScrollRoot, findForegroundModalShell, findModalScrollRoot, shouldShowScrollProgress } from '../js/modules/scrollAids.js';
+import { createScrollAidCandidateBounds, findForegroundModalScrollRoot, findForegroundModalShell, findModalScrollRoot, findScrollAidBottomOffset, findScrollAidLeft, shouldShowScrollProgress } from '../js/modules/scrollAids.js';
 
 describe('modal scroll aids', () => {
     it('finds the nested Settings scroll pane', () => {
@@ -103,5 +103,81 @@ describe('modal scroll aids', () => {
             scrollHeight: 900,
             clientHeight: 600
         })).toBe(true);
+    });
+
+    it('moves Back to top above a bottom control it would otherwise cover', () => {
+        const button = { left: 330, right: 374, top: 784, bottom: 828, width: 44, height: 44 };
+        const tutorSend = { left: 294.8, right: 370, top: 758, bottom: 824 };
+        const adjustedBottom = findScrollAidBottomOffset({
+            buttonBounds: button,
+            controlBounds: [tutorSend],
+            viewportHeight: 844,
+            areaBounds: { top: 64, bottom: 844 },
+            defaultOffset: 16,
+        });
+
+        expect(adjustedBottom).toBe(94);
+        expect(844 - adjustedBottom).toBeLessThanOrEqual(tutorSend.top - 8);
+    });
+
+    it('keeps the default Back to top position when no visible control overlaps it', () => {
+        const button = { left: 330, right: 374, top: 784, bottom: 828, width: 44, height: 44 };
+        const tutorInput = { left: 20, right: 286.8, top: 758, bottom: 824 };
+
+        expect(findScrollAidBottomOffset({
+            buttonBounds: button,
+            controlBounds: [tutorInput],
+            viewportHeight: 844,
+            defaultOffset: 16,
+        })).toBe(16);
+    });
+
+    it('hides Back to top if moving above a control would cross the active pane header', () => {
+        const button = { left: 330, right: 374, top: 784, bottom: 828, width: 44, height: 44 };
+        const saveButton = { left: 300, right: 370, top: 758, bottom: 824 };
+
+        expect(findScrollAidBottomOffset({
+            buttonBounds: button,
+            controlBounds: [saveButton],
+            viewportHeight: 844,
+            areaBounds: { top: 730, bottom: 844 },
+            defaultOffset: 16,
+        })).toBeNull();
+    });
+
+    it('keeps Back to top inside the active pane when its bottom is above the viewport edge', () => {
+        const button = { left: 330, right: 374, top: 784, bottom: 828, width: 44, height: 44 };
+        const bottom = findScrollAidBottomOffset({
+            buttonBounds: button,
+            controlBounds: [],
+            viewportHeight: 844,
+            areaBounds: { top: 64, bottom: 760 },
+            defaultOffset: 16,
+        });
+
+        expect(bottom).toBe(92);
+        expect(844 - bottom - button.height).toBeGreaterThanOrEqual(72);
+        expect(844 - bottom).toBeLessThanOrEqual(752);
+    });
+
+    it('chooses the scroll aid x position inside a centered dialog before checking collisions', () => {
+        const area = { left: 360, right: 1000 };
+        const left = findScrollAidLeft(area, 1200, 44);
+        const domRectLike = Object.create({
+            get width() { return 44; },
+            get height() { return 44; },
+        });
+        const button = createScrollAidCandidateBounds(domRectLike, left);
+        const footerControl = { left: 950, right: 1000, top: 784, bottom: 828, width: 50, height: 44 };
+
+        expect(left).toBe(948);
+        expect(button).toEqual({ left: 948, right: 992, width: 44, height: 44 });
+        expect(findScrollAidBottomOffset({
+            buttonBounds: button,
+            controlBounds: [footerControl],
+            viewportHeight: 844,
+            areaBounds: { ...area, top: 64, bottom: 844 },
+            defaultOffset: 16,
+        })).toBe(68);
     });
 });

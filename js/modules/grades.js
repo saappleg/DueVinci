@@ -5,6 +5,25 @@ import { escapeHtml } from './utils.js';
 export let isSimulatingGrades = false;
 export let simulatedGradesMap = {};
 
+export function renderGradeControlInputs({ item, course, activeGrade, isSimulatingGrades: isSimulating = false, isSimulatedVal = false }) {
+    const assignmentId = escapeHtml(item?.id ?? '');
+    const courseId = escapeHtml(course?.id ?? '');
+    const courseCode = escapeHtml(course?.code || 'Course');
+    const assignmentTitle = escapeHtml(item?.title || 'Coursework item');
+    const inputHandler = isSimulating
+        ? 'oninput="simulateAssignmentGrade(this.dataset.assignmentId, this.value)"'
+        : 'onchange="updateAssignmentGrade(this.dataset.assignmentId, this.value)"';
+    const inputValue = activeGrade !== null && activeGrade !== undefined ? escapeHtml(activeGrade) : '';
+    return `
+        <label class="flex min-h-11 min-w-11 items-center gap-1.5 px-2 text-[11px] text-zinc-400 cursor-pointer">
+            <input type="checkbox" data-grade-exclude data-assignment-id="${assignmentId}" aria-label="Exclude ${courseCode} ${assignmentTitle} from GPA" ${item?.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa(this.dataset.assignmentId, this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
+        </label>
+        <div class="flex items-center gap-1">
+            <input type="number" min="0" max="100" data-sim-grade-input="${isSimulating ? 'true' : 'false'}" data-course-id="${courseId}" data-assignment-id="${assignmentId}" aria-label="${courseCode} ${assignmentTitle} grade" value="${inputValue}" placeholder="--" ${inputHandler} class="min-h-11 w-16 text-center text-xs font-bold p-1 rounded border ${isSimulatedVal ? 'border-indigo-500 bg-indigo-50 dark:bg-brand-800 text-indigo-600 font-black' : 'dark:bg-brand-800 dark:border-brand-600'} focus:outline-none focus:border-indigo-500">
+            <span class="text-zinc-400">%</span>
+        </div>`;
+}
+
 export function toggleGradeSimulator() {
     isSimulatingGrades = !isSimulatingGrades;
     if (!isSimulatingGrades) {
@@ -163,22 +182,11 @@ export async function loadGradesPage(isFastRecalc = false) {
                     courseGraded++;
                 }
 
-                const assignmentId = escapeHtml(item.id);
-                const inputHandler = isSimulatingGrades
-                    ? 'oninput="simulateAssignmentGrade(this.dataset.assignmentId, this.value)"'
-                    : 'onchange="updateAssignmentGrade(this.dataset.assignmentId, this.value)"';
-
                 lessonsHtml += `
                     <div data-grade-row class="flex items-center justify-between p-3 bg-zinc-50 dark:bg-brand-900 rounded-lg border ${isSimulatedVal ? 'border-indigo-400 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} text-xs">
                         <span class="font-bold truncate flex-1 ${isSimulatedVal ? 'text-indigo-600 dark:text-indigo-400' : ''}">${escapeHtml(item.title)}</span>
                         <div class="flex items-center gap-3">
-                            <label class="flex items-center gap-1.5 text-[11px] text-zinc-400 cursor-pointer">
-                                <input type="checkbox" data-grade-exclude data-assignment-id="${assignmentId}" ${item.exclude_from_gpa ? 'checked' : ''} onchange="toggleExcludeGpa(this.dataset.assignmentId, this.checked)" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Exclude
-                            </label>
-                            <div class="flex items-center gap-1">
-                                <input type="number" min="0" max="100" data-sim-grade-input="${isSimulatingGrades ? 'true' : 'false'}" data-course-id="${escapeHtml(course.id)}" data-assignment-id="${assignmentId}" value="${escapeHtml(activeGrade !== null && activeGrade !== undefined ? activeGrade : '')}" placeholder="--" ${inputHandler} class="w-16 text-center text-xs font-bold p-1 rounded border ${isSimulatedVal ? 'border-indigo-500 bg-indigo-50 dark:bg-brand-800 text-indigo-600 font-black' : 'dark:bg-brand-800 dark:border-brand-600'} focus:outline-none focus:border-indigo-500">
-                                <span class="text-zinc-400">%</span>
-                            </div>
+                            ${renderGradeControlInputs({ item, course, activeGrade, isSimulatingGrades, isSimulatedVal })}
                         </div>
                     </div>
                 `;

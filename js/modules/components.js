@@ -18,6 +18,27 @@ const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
 class DueVinciSidebar extends BaseElement {
     connectedCallback() {
         this.refresh();
+        if (typeof window !== 'undefined' && !this._sidebarA11yResizeHandler) {
+            this._sidebarA11yResizeHandler = () => this.syncSidebarA11yState();
+            window.addEventListener('resize', this._sidebarA11yResizeHandler, { passive: true });
+        }
+    }
+
+    disconnectedCallback() {
+        if (typeof window !== 'undefined' && this._sidebarA11yResizeHandler) {
+            window.removeEventListener('resize', this._sidebarA11yResizeHandler);
+            this._sidebarA11yResizeHandler = null;
+        }
+    }
+
+    syncSidebarA11yState() {
+        const aside = this.querySelector('#appSidebar');
+        if (!aside) return;
+        const isMobile = typeof window !== 'undefined'
+            && window.matchMedia('(max-width: 1023px)').matches;
+        const isHidden = isMobile && aside.classList.contains('-translate-x-full');
+        aside.inert = isHidden;
+        aside.setAttribute('aria-hidden', String(isHidden));
     }
 
     refresh() {
@@ -134,6 +155,7 @@ class DueVinciSidebar extends BaseElement {
             </div>
         </aside>
         `;
+        this.syncSidebarA11yState();
     }
 }
 
