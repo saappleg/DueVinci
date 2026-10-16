@@ -26,6 +26,8 @@
 - **Smart Study Plan & Workload Balancer** — Sequences lessons within units, spreads work over available study days, respects chosen rest days where possible, and keeps deadlines as hard constraints.
 - **7-Day Workload & Stress Radar** — Highlights upcoming task volume and exam days so students can spot pressure before it becomes cramming.
 - **Grades, GPA, calendar, timers, and backups** — Track academic progress, export `.ics` calendars, run focus sessions, and export/import JSON data.
+- **Optional Nursing Hub** — Turn on the free Hub in Settings → Appearance to track rotations and skills, practice fictional care plans and synthetic arithmetic, review flashcards and anatomy, and start a quick review queue. It stays hidden until enabled. See the [Nursing Hub guide](wiki/Nursing-Hub.md); never enter real patient information.
+- **Degree themes** — Choose a field-specific accent palette and decorative background artwork in Settings → Appearance; light and dark modes keep readable text contrast.
 - **PWA and accessibility-minded UI** — Installable offline-first web app: planner data is cached locally and free-core changes sync after reconnecting, with dark mode and responsive layouts.
 
 ### Optional integrations
@@ -36,7 +38,7 @@
 
 ## Free Core Promise
 
-DueVinci’s essential planning workflow—course setup, lesson and due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar events, `.ics` import/export, timers, and data portability—will remain free to use. Optional third-party services may have their own limits or pricing, but they are never required for the core planning experience. Live provider sync, Canvas automation, and the Socratic Study Companion are optional DueVinci Pro features.
+DueVinci’s essential planning workflow—course setup, lesson and due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar events, `.ics` import/export, timers, and data portability—will remain free to use. The optional Nursing Hub and degree themes are also free. Optional third-party services may have their own limits or pricing, but they are never required for the core planning experience. Live provider sync, Canvas automation, and the Socratic Study Companion are optional DueVinci Pro features.
 
 ---
 ## Tech Stack 🛠️
@@ -93,6 +95,8 @@ DueVinci/
 │   └── index.html               # Grade tracking & GPA simulator
 ├── calendar/
 │   └── index.html               # FullCalendar view & .ics export
+├── nursing/
+│   └── index.html               # Optional Nursing Hub
 ├── legal/
 │   ├── terms.html               # Terms of Use
 │   └── privacy.html             # Privacy & Data Retention Policy
@@ -106,7 +110,7 @@ DueVinci/
 ├── scripts/
 │   └── release-smoke.mjs        # Post-deploy production smoke test
 ├── supabase/                    # Migrations and Edge Functions
-├── assets/                      # CSS themes, icons, and image assets
+├── assets/                      # CSS themes, icons, and image assets (including degree-theme artwork)
 ├── js/
 │   ├── app.js                   # Application orchestrator
 │   └── modules/                 # Modular ES6 feature engines

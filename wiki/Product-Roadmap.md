@@ -38,6 +38,11 @@ Welcome to the **DueVinci** product and engineering roadmap! This page outlines 
 
 ## 🎯 Current Initiatives & Near-Term Releases
 
+### Nursing Hub and field themes 🚧
+- [ ] Complete review and release of the opt-in Nursing Hub and field-specific degree themes (tracked in PR #7).
+- The Hub includes rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, spaced-repetition flashcards, anatomy review, and a quick queue that uses existing saved study progress.
+- Keep the Hub hidden until enabled, preserve drafts when disabled, and verify readable light/dark themes, narrow screens, Settings navigation, and fictional-only privacy boundaries before marking this shipped.
+
 ### Phase 2: Socratic AI & Intelligent Study Workflows (v1.3 – v2.0) 🚧
 - [ ] **Socratic AI Study Companion (`/tutor`)** 🚧
   - Context-aware study partner that quizzes you on course concepts rather than just giving answers.

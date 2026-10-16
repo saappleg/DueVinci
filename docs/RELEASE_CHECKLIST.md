@@ -20,3 +20,13 @@
 - Check Supabase function logs and Stripe webhook deliveries for errors after each test.
 - Validate RLS with two accounts: neither account can view the other's courses, profile, or Canvas connection.
 - Keep the free planner usable when a subscription is inactive, expired, canceled, or past due.
+
+
+## Nursing Hub and theme checks
+
+- Confirm the Nursing Hub stays hidden until a student enables it in Settings → Appearance; turning it off must preserve saved drafts.
+- Build a quick-review session and verify it includes due flashcards, unfinished dosage arithmetic, and anatomy topics not yet marked reviewed. Confirm completion updates the existing study records and that progress is saved locally and synced to the signed-in account when online.
+- Verify fictional-only privacy warnings remain visible. Do not add real patient details during testing.
+- Open Settings from both the dashboard and Nursing page. Check section switching, Escape-to-close, focus return, modal scrolling, and progress indicators.
+- Review the Nursing Hub and degree themes in light and dark modes at desktop and narrow mobile widths; check text, input, link, button, and focus-ring contrast before release.
+- Run `npm test -- tests/nursing.test.js tests/scrollAids.test.js` and the full `npm test` suite before publishing.

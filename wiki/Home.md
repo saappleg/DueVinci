@@ -9,7 +9,7 @@ Welcome to the official **DueVinci** Wiki! DueVinci is a modern, student-first a
 | Section | Description | Key Links |
 | :--- | :--- | :--- |
 | **🏁 Getting Started** | Installation, environment setup & configuration | • [Getting Started](Getting-Started)<br>• [Architecture & Tech Stack](Architecture-&-Tech-Stack) |
-| **💡 Core Features** | In-depth guides for every module | • [AI Syllabus Parser](AI-Syllabus-&-Document-Parser)<br>• [Smart Study Planner](Smart-Study-Planner)<br>• [SM-2 Flashcards](SM-2-Spaced-Repetition-&-Flashcards)<br>• [Course Management](Course-&-Term-Management)<br>• [Grade Tracker & GPA](Grade-Tracker-&-GPA-Calculator)<br>• [Pomodoro & Timers](Pomodoro-Timer-&-Focus-Modes)<br>• [Calendar & .ICS Sync](Calendar-&-Schedule-Sync) |
+| **💡 Core Features** | In-depth guides for every module | • [AI Syllabus Parser](AI-Syllabus-&-Document-Parser)<br>• [Smart Study Planner](Smart-Study-Planner)<br>• [SM-2 Flashcards](SM-2-Spaced-Repetition-&-Flashcards)<br>• [Course Management](Course-&-Term-Management)<br>• [Grade Tracker & GPA](Grade-Tracker-&-GPA-Calculator)<br>• [Pomodoro & Timers](Pomodoro-Timer-&-Focus-Modes)<br>• [Calendar & .ICS Sync](Calendar-&-Schedule-Sync)<br>• [Nursing Hub](Nursing-Hub) |
 | **🌐 Offline & Cloud** | Data persistence, PWA & offline synchronization | • [Offline Support & PWA](Offline-Support-&-PWA)<br>• [Data Backup & Cloud Sync](Data-Backup-&-Cloud-Sync) |
 | **💻 Developer Center** | Engineering workflows, code conventions & testing | • [Developer Guide & Contributing](Developer-Guide-&-Contributing)<br>• [Testing & CI/CD](Testing-&-CI-CD)<br>• [Wiki Sync Guide](Wiki-Sync-Guide) |
 | **❓ Support & Help** | FAQ, tips, and troubleshooting common issues | • [FAQ & Troubleshooting](FAQ-&-Troubleshooting) |
@@ -24,6 +24,7 @@ DueVinci’s course setup, due-date tracking, Smart Study Plan, 7-Day Workload &
 - 🎯 **Smart Study Plan & Workload Balancer**: Orders lessons, balances work before due dates, honors rest-day preferences when feasible, and never silently moves remaining deadline work late.
 - 📊 **7-Day Workload & Stress Radar**: Shows daily due-task volume and elevates exam days across the upcoming week.
 - 🃏 **SM-2 Spaced Repetition**: SuperMemo-2 flashcards algorithm with active recall quiz modes and automated flashcard generation.
+- 🩺 **Optional Nursing Hub**: Track rotations and skills, practice fictional cases and synthetic arithmetic, review anatomy and flashcards, and build a quick queue from work already due. It is hidden until enabled and is for coursework organization only.
 - 📊 **GPA & Grade Simulator**: Live weighted course average calculations supporting standard 4.0 and weighted 5.0 GPA scales with "What-If" final grade projections.
 - ⏱️ **Integrated Pomodoro Timer**: Ambient sounds, custom interval lengths, Web Audio alerts, and productivity stats.
 - 📱 **Progressive Web App**: Installable application shell with cached static assets. Network-dependent services, including sign-in and cloud sync, still require connectivity.

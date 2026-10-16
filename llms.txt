@@ -1,7 +1,9 @@
 # DueVinci
 
 DueVinci is a privacy-minded academic planner for organizing classes, lessons,
-assignments, study plans, grades, focus sessions, and calendars.
+assignments, study plans, grades, focus sessions, and calendars. The optional,
+free Nursing Hub adds rotation and skills tracking, fictional case organization,
+synthetic arithmetic practice, flashcards, anatomy review, and quick review.
 
 ## Public pages
 
@@ -9,8 +11,10 @@ assignments, study plans, grades, focus sessions, and calendars.
 - [Privacy policy](https://duevinci.tech/legal/privacy.html)
 - [Terms of use](https://duevinci.tech/legal/terms.html)
 - [Calendar and schedule documentation](https://duevinci.tech/wiki/Calendar-%26-Schedule-Sync.html)
+- [Nursing Hub entry point](https://duevinci.tech/nursing/)
 
 The permanent free core includes manual planning, calendar events, `.ics`
 import/export, grades, timers, study planning, and data portability. Optional
 DueVinci Pro features include connected learning integrations and guided study
-support.
+support. Nursing Hub practice is coursework support only; never enter real
+patient information.

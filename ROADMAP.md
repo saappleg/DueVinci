@@ -39,6 +39,11 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 
 ## 🎯 Current Initiatives & Near-Term Releases
 
+### Nursing Hub and field themes 🚧
+- [ ] Complete review and release of the opt-in Nursing Hub and field-specific degree themes (tracked in PR #7).
+- The Hub includes rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, spaced-repetition flashcards, anatomy review, and a quick queue that uses existing saved study progress.
+- Keep the Hub hidden until enabled, preserve drafts when disabled, and verify readable light/dark themes, narrow screens, Settings navigation, and fictional-only privacy boundaries before marking this shipped.
+
 ### Subscription packaging
 - **DueVinci Pro (current offer):** Canvas course sync, SNHU Brightspace calendar sync, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
 - **SNHU Brightspace calendar sync:** Pro users can connect the private Brightspace Calendar Feed to bring SNHU calendar events and due dates into DueVinci. This is calendar-only; importing course records and planner assignments requires an approved Brightspace API integration.

@@ -1,6 +1,12 @@
 // Small navigation aids for DueVinci's independent page scroll areas.
 let initialized = false;
 
+export function findModalScrollRoot(shell) {
+    if (!shell || typeof shell.querySelector !== 'function') return null;
+    return shell.querySelector('.settings-scroll-pane')
+        || shell.querySelector('[role="dialog"] .overflow-y-auto');
+}
+
 function reducedMotionRequested() {
     return typeof window !== 'undefined'
         && typeof window.matchMedia === 'function'
@@ -42,7 +48,7 @@ export function initScrollAids() {
     const getModalScrollRoot = () => {
         const shells = [...document.querySelectorAll('#settingsModal, #supportModal')].filter((shell) => !shell.classList.contains('hidden'));
         for (const shell of shells) {
-            const root = shell.querySelector('[role="dialog"] > .overflow-y-auto');
+            const root = findModalScrollRoot(shell);
             if (root && root.clientHeight > 0) return root;
         }
         return null;
@@ -60,9 +66,10 @@ export function initScrollAids() {
         progress.hidden = !canScroll;
         fill.style.transform = 'scaleX(' + percent + ')';
         if (modalRoot) {
-            progress.style.top = '0px';
-            progress.style.left = '0px';
-            progress.style.width = window.innerWidth + 'px';
+            const bounds = modalRoot.getBoundingClientRect();
+            progress.style.top = Math.round(bounds.top) + 'px';
+            progress.style.left = Math.round(bounds.left) + 'px';
+            progress.style.width = Math.round(bounds.width) + 'px';
         } else {
             const headerBottom = app.querySelector('header')?.getBoundingClientRect().bottom || 0;
             const sidebarRight = app.querySelector('#appSidebar')?.getBoundingClientRect().right || 0;
@@ -104,7 +111,7 @@ export function initScrollAids() {
                     const shellObserver = new MutationObserver(scheduleUpdate);
                     shellObserver.observe(shell, { attributes: true, attributeFilter: ['class'] });
                 }
-                const root = shell.querySelector('[role="dialog"] > .overflow-y-auto');
+                const root = findModalScrollRoot(shell);
                 if (root && !observedScrollRoots.has(root)) {
                     observedScrollRoots.add(root);
                     root.addEventListener('scroll', scheduleUpdate, { passive: true });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     ANATOMY_SYSTEMS,
     DOSAGE_PROBLEMS,
+    buildNursingReviewQueue,
     calculateDosagePracticeAnswer,
     createEmptyNursingWorkspace,
     getNursingStorageKey,
@@ -22,12 +23,44 @@ describe('Nursing Hub learning tools', () => {
 
     it('accepts the correct numeric answer with an optional matching unit', () => {
         expect(isDosageAnswerCorrect('2 tablets', 2)).toBe(true);
+        expect(isDosageAnswerCorrect('2 tablet', 2, 'tablets')).toBe(true);
+        expect(isDosageAnswerCorrect('2 tab', 2, 'tablets')).toBe(true);
+        expect(isDosageAnswerCorrect('2 tabs', 2, 'tablets')).toBe(true);
+        expect(isDosageAnswerCorrect('2 mL', 2, 'tablets')).toBe(false);
         expect(isDosageAnswerCorrect('10 mL', 10)).toBe(true);
         expect(isDosageAnswerCorrect('125 mL/hr', 125)).toBe(true);
         expect(isDosageAnswerCorrect('125 tablets', 125, 'mL/hr')).toBe(false);
         expect(isDosageAnswerCorrect('10 gtt/min', 10, 'mL')).toBe(false);
         expect(isDosageAnswerCorrect('41 gtt/min', 42)).toBe(false);
         expect(isDosageAnswerCorrect('ten', 10)).toBe(false);
+    });
+
+    it('builds a balanced quick-review queue from due cards and unfinished practice', () => {
+        const queue = buildNursingReviewQueue({
+            cards: [
+                { id: 'due-card', topic: 'Anatomy', front: 'Review this now' },
+                { id: 'future-card', topic: 'Later', front: 'Not due yet' }
+            ],
+            cardMastery: { 'future-card': { nextReviewDate: '2026-10-17' } },
+            dosageProgress: { tablets: { completed: true } },
+            completedSystems: ['skeletal'],
+            today: '2026-10-16',
+            limit: 10
+        });
+
+        expect(queue.some((item) => item.type === 'flashcard' && item.id === 'due-card')).toBe(true);
+        expect(queue.some((item) => item.id === 'future-card')).toBe(false);
+        expect(queue.some((item) => item.type === 'dosage' && item.id === 'tablets')).toBe(false);
+        expect(queue.some((item) => item.type === 'anatomy' && item.id === 'skeletal')).toBe(false);
+        expect(new Set(queue.map((item) => item.type))).toEqual(new Set(['flashcard', 'dosage', 'anatomy']));
+    });
+
+    it('interleaves review types and caps the quick queue at twelve items', () => {
+        const cards = Array.from({ length: 30 }, (_, index) => ({ id: 'card-' + index, topic: 'Topic', front: 'Prompt' }));
+        const queue = buildNursingReviewQueue({ cards, limit: 99, today: '2026-10-16' });
+
+        expect(queue).toHaveLength(12);
+        expect(queue.slice(0, 6).map((item) => item.type)).toEqual(['flashcard', 'dosage', 'anatomy', 'flashcard', 'dosage', 'anatomy']);
     });
 
     it('rejects unsafe or malformed calculation inputs', () => {

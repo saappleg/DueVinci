@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- Added an opt-in Nursing Hub with rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, flashcards, anatomy review, and a focused quick-review queue built from existing study progress.
+- Added field-specific degree palettes and decorative themes, Sunday/Monday week-start preferences, and responsive dashboard scroll aids.
+
+### Fixed
+- Accepted valid singular and abbreviated tablet units in dosage practice while still rejecting mismatched units.
+- Opened Settings before optional preference hydration and aligned modal scroll progress with nested Settings and Support panes.
+- Kept Nursing Hub practice content visible and readable in light and dark degree themes.
+
 ## [2.7.0] - 2026-10-12
 
 ### Added

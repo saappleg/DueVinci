@@ -775,69 +775,77 @@ export function ensureSettingsModalExists() {
 }
 
 export function openSettingsModal() {
+    if (typeof document === 'undefined') return;
     ensureSettingsModalExists();
-    applySubscriptionCatalog(document);
-    if (currentUser) {
-        const emailInput = document.getElementById('profileEmail');
-        if (emailInput) emailInput.value = currentUser.email;
-        const displayNameInput = document.getElementById('profileDisplayName');
-        if (displayNameInput) {
-            getProfileDisplayName(currentUser).then((displayName) => {
-                displayNameInput.value = displayName || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
-            });
-        }
-        const avatarInput = document.getElementById('profileAvatarInput');
-        if (avatarInput && !avatarInput.dataset.bound) {
-            avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
-            avatarInput.dataset.bound = 'true';
-        }
-        const badgeSelect = document.getElementById('profileAvatarBadgeSelect');
-        if (badgeSelect) {
-            badgeSelect.value = getProfileEasterEgg(currentUser) || '';
-            if (!badgeSelect.dataset.bound) {
-                badgeSelect.addEventListener('change', () => {
-                    const saved = setProfileEasterEgg(badgeSelect.value, currentUser);
-                    const message = document.getElementById('profileBadgeMsg');
-                    if (message) {
-                        message.textContent = saved
-                            ? (badgeSelect.value ? 'Profile badge updated.' : 'Profile badge removed.')
-                            : 'Could not update the profile badge.';
-                        message.classList.remove('hidden');
-                    }
-                });
-                badgeSelect.dataset.bound = 'true';
+    const modal = document.getElementById('settingsModal');
+    if (!modal) return;
+    // Reveal the dialog before loading optional subscription/profile/preferences data. A
+    // slow or unavailable enhancement should never make the Settings panel appear broken.
+    showAccessibleModal(modal, closeSettingsModal);
+    try {
+        applySubscriptionCatalog(document);
+        if (currentUser) {
+            const emailInput = document.getElementById('profileEmail');
+            if (emailInput) emailInput.value = currentUser.email;
+            const displayNameInput = document.getElementById('profileDisplayName');
+            if (displayNameInput) {
+                getProfileDisplayName(currentUser).then((displayName) => {
+                    displayNameInput.value = displayName || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
+                }).catch((error) => console.warn('Settings profile name could not be loaded:', error));
+            }
+            const avatarInput = document.getElementById('profileAvatarInput');
+            if (avatarInput && !avatarInput.dataset.bound) {
+                avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
+                avatarInput.dataset.bound = 'true';
+            }
+            const badgeSelect = document.getElementById('profileAvatarBadgeSelect');
+            if (badgeSelect) {
+                badgeSelect.value = getProfileEasterEgg(currentUser) || '';
+                if (!badgeSelect.dataset.bound) {
+                    badgeSelect.addEventListener('change', () => {
+                        const saved = setProfileEasterEgg(badgeSelect.value, currentUser);
+                        const message = document.getElementById('profileBadgeMsg');
+                        if (message) {
+                            message.textContent = saved
+                                ? (badgeSelect.value ? 'Profile badge updated.' : 'Profile badge removed.')
+                                : 'Could not update the profile badge.';
+                            message.classList.remove('hidden');
+                        }
+                    });
+                    badgeSelect.dataset.bound = 'true';
+                }
             }
         }
+        const themeSelect = document.getElementById('themeSelect');
+        if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
+
+        injectAppearanceSettingsExtras();
+        const degreeThemeSelect = document.getElementById('degreeThemeSelect');
+        if (degreeThemeSelect) degreeThemeSelect.value = getDegreeTheme();
+        document.querySelectorAll('[data-feature-toggle]').forEach((input) => {
+            input.checked = isWorkspaceFeatureVisible(input.dataset.featureToggle);
+        });
+        injectReminderSettings();
+        refreshReminderSettings();
+
+        const dfSelect = document.getElementById('dateFormatSelect');
+        if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+        const weekStartDaySelect = document.getElementById('weekStartDaySelect');
+        if (weekStartDaySelect) weekStartDaySelect.value = getWeekStartDay();
+
+        const muteSwitch = document.getElementById('muteAlarmSwitch');
+        if (muteSwitch) muteSwitch.checked = localStorage.getItem('duevinci_mute_alarm') === 'true';
+
+        const gpaSelect = document.getElementById('gpaScaleSelect');
+        if (gpaSelect) gpaSelect.value = localStorage.getItem('duevinci_gpa_scale') || '4.0';
+
+        const acadSwitch = document.getElementById('academicsSwitch');
+        if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
+
+        applyDashboardWidgetLayout();
+    } catch (error) {
+        console.error('Settings opened, but some preferences could not be loaded:', error);
     }
-    const themeSelect = document.getElementById('themeSelect');
-    if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
-
-    injectAppearanceSettingsExtras();
-    const degreeThemeSelect = document.getElementById('degreeThemeSelect');
-    if (degreeThemeSelect) degreeThemeSelect.value = getDegreeTheme();
-    document.querySelectorAll('[data-feature-toggle]').forEach((input) => {
-        input.checked = isWorkspaceFeatureVisible(input.dataset.featureToggle);
-    });
-    injectReminderSettings();
-    refreshReminderSettings();
-
-    const dfSelect = document.getElementById('dateFormatSelect');
-    if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
-    const weekStartDaySelect = document.getElementById('weekStartDaySelect');
-    if (weekStartDaySelect) weekStartDaySelect.value = getWeekStartDay();
-
-    const muteSwitch = document.getElementById('muteAlarmSwitch');
-    if (muteSwitch) muteSwitch.checked = localStorage.getItem('duevinci_mute_alarm') === 'true';
-
-    const gpaSelect = document.getElementById('gpaScaleSelect');
-    if (gpaSelect) gpaSelect.value = localStorage.getItem('duevinci_gpa_scale') || '4.0';
-
-    const acadSwitch = document.getElementById('academicsSwitch');
-    if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
-
-    const modal = document.getElementById('settingsModal');
-    showAccessibleModal(modal, closeSettingsModal);
-    applyDashboardWidgetLayout();
 }
 
 export function closeSettingsModal() {

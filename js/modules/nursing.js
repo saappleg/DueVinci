@@ -83,6 +83,52 @@ export const NURSING_STARTER_CARDS = [
     { id: 'starter-clinical-judgment', topic: 'Clinical judgment', front: 'After checking whether a learning outcome was met, what is a useful next step?', back: 'Compare the result with the goal, then decide what to keep practicing or discuss with your instructor.', source: 'DueVinci original practice prompt' }
 ];
 
+export function buildNursingReviewQueue({ cards = [], cardMastery = {}, dosageProgress = {}, completedSystems = [], today = '', limit = 10 } = {}) {
+    const reviewDate = safeDate(today) || getLocalDateKey();
+    const maximum = Math.floor(boundedNumber(limit, 10, 1, 12));
+    const mastery = cardMastery && typeof cardMastery === 'object' ? cardMastery : {};
+    const progress = dosageProgress && typeof dosageProgress === 'object' ? dosageProgress : {};
+    const completed = new Set(Array.isArray(completedSystems) ? completedSystems : []);
+    const cardItems = (Array.isArray(cards) ? cards : []).filter((card) => {
+        if (!card || typeof card.id !== 'string' || !card.id) return false;
+        const nextReviewDate = safeDate(mastery[card.id]?.nextReviewDate);
+        return !nextReviewDate || nextReviewDate <= reviewDate;
+    }).map((card) => ({
+        type: 'flashcard',
+        id: card.id,
+        title: safeText(card.topic, 60) || 'Study card',
+        description: safeText(card.front, 180)
+    }));
+    const dosageItems = DOSAGE_PROBLEMS.filter((problem) => !progress[problem.id]?.completed).map((problem) => ({
+        type: 'dosage',
+        id: problem.id,
+        title: problem.title,
+        description: problem.prompt
+    }));
+    const anatomyItems = ANATOMY_SYSTEMS.filter((system) => !completed.has(system.id)).map((system) => ({
+        type: 'anatomy',
+        id: system.id,
+        title: system.name,
+        description: system.check
+    }));
+    const groups = [cardItems, dosageItems, anatomyItems];
+    const positions = groups.map(() => 0);
+    const queue = [];
+
+    while (queue.length < maximum) {
+        let added = false;
+        for (let groupIndex = 0; groupIndex < groups.length && queue.length < maximum; groupIndex += 1) {
+            const item = groups[groupIndex][positions[groupIndex]];
+            if (!item) continue;
+            queue.push(item);
+            positions[groupIndex] += 1;
+            added = true;
+        }
+        if (!added) break;
+    }
+    return queue;
+}
+
 function safeText(value, max = 500) {
     return String(value == null ? '' : value).trim().slice(0, max);
 }
@@ -254,7 +300,7 @@ export function isDosageAnswerCorrect(value, expected, expectedUnit = '', tolera
     if (!match) return false;
     const numeric = Number(match[1]);
     const enteredUnit = (normalized.match(/(?:tablets?|tabs?|ml(?:\/hr)?|gtt(?:\/min)?|drops?(?:\/min)?)$/i) || [''])[0].toLowerCase().replace(/\s+/g, '');
-    const unitAliases = { tablet: ['tablet', 'tablets', 'tab', 'tabs'], ml: ['ml'], 'ml/hr': ['ml/hr'], 'gtt/min': ['gtt/min', 'drops/min'] };
+    const unitAliases = { tablet: ['tablet', 'tablets', 'tab', 'tabs'], tablets: ['tablet', 'tablets', 'tab', 'tabs'], ml: ['ml'], 'ml/hr': ['ml/hr'], 'gtt/min': ['gtt/min', 'drops/min'] };
     const requiredUnit = String(expectedUnit || '').toLowerCase();
     if (enteredUnit && requiredUnit && !(unitAliases[requiredUnit] || [requiredUnit]).includes(enteredUnit)) return false;
     return Number.isFinite(numeric) && Math.abs(numeric - Number(expected)) <= Math.max(0, Number(tolerance) || 0);
@@ -286,6 +332,9 @@ let activeTab = 'overview';
 let activeSystemId = 'cardiovascular';
 let showAnatomyAnswer = false;
 let showCardAnswer = false;
+let activeFlashcardId = '';
+let activeReviewQueue = null;
+let activeReviewDate = '';
 let dosageFeedback = null;
 let availableCourses = [];
 let workspaceSaveSequence = 0;
@@ -416,10 +465,14 @@ function renderOverview() {
     const activeRotations = workspace.rotations.filter((rotation) => !rotation.endDate || rotation.endDate >= getLocalDateKey()).length;
     const trackedSkills = workspace.rotations.reduce((total, rotation) => total + rotation.skills.length, 0);
     const checkedSkills = workspace.rotations.reduce((total, rotation) => total + rotation.skills.filter((skill) => skill.status === 'checked').length, 0);
-    const dueCards = getAllCards().filter((card) => {
-        const due = workspace.cardMastery[card.id] && workspace.cardMastery[card.id].nextReviewDate;
-        return !due || due <= getLocalDateKey();
-    }).length;
+    const dueCards = getAllCards().filter(isCardDue).length;
+    const reviewQueue = buildNursingReviewQueue({
+        cards: getAllCards(),
+        cardMastery: workspace.cardMastery,
+        dosageProgress: workspace.dosageProgress,
+        completedSystems: workspace.completedSystems,
+        limit: 10
+    });
     const correctCount = Object.values(workspace.dosageProgress).reduce((sum, item) => sum + (item.correct || 0), 0);
     const conflicts = workspace.syncConflicts || [];
     const recoveryNotice = workspaceLoadIssue
@@ -435,6 +488,7 @@ function renderOverview() {
     const tile = (title, value, note, icon, tab) => '<button type="button" data-nursing-tab="' + tab + '" class="rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:hover:border-indigo-600"><span class="text-xl">' + icon + '</span><span class="mt-3 block text-2xl font-black text-zinc-900 dark:text-white">' + value + '</span><span class="block text-sm font-bold">' + title + '</span><span class="mt-1 block text-xs text-zinc-500 dark:text-zinc-400">' + note + '</span></button>';
     return '<section class="mx-auto max-w-6xl">' +
         '<div class="rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-6 text-white shadow-lg sm:p-8"><p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-100">Nursing school, organized</p><h2 class="mt-2 max-w-2xl text-2xl font-black sm:text-3xl">A place to prepare, practice, and keep track of your progress.</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-indigo-100">Connect your clinical rotations to your classes, work through dosage math, build study cards, and review body systems.</p><button type="button" data-nursing-tab="clinical" class="degree-theme-white-control mt-5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 shadow-sm hover:bg-indigo-50">Set up a rotation</button></div>' +
+        '<section class="mt-5 flex flex-col gap-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-900/60 dark:bg-brand-800 sm:flex-row sm:items-center sm:justify-between"><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">A little practice goes a long way</p><h3 class="mt-1 text-lg font-bold text-zinc-900 dark:text-white">Quick nursing review</h3><p class="mt-1 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">Build a short queue from due flashcards, unsolved dosage math, and anatomy topics you have not marked reviewed. Progress uses your existing study tools.</p><p class="mt-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">' + reviewQueue.length + ' practice item' + (reviewQueue.length === 1 ? '' : 's') + ' ready</p></div><button type="button" data-nursing-tab="review" class="shrink-0 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-800">Open review session</button></section>' +
         recoveryNotice + conflictNotice +
         '<div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">' +
         tile('Active rotations', activeRotations, workspace.rotations.length + ' tracked', '🩺', 'clinical') +
@@ -524,7 +578,7 @@ function isCardDue(card) {
 function renderFlashcardsTab() {
     const cards = getAllCards();
     const due = cards.filter(isCardDue);
-    const card = (due.length ? due : cards)[0];
+    const card = (activeFlashcardId && cards.find((item) => item.id === activeFlashcardId)) || (due.length ? due : cards)[0];
     const mastery = card && workspace.cardMastery[card.id];
     const deckText = due.length ? due.length + ' due now' : 'Nothing due today — practice any card';
     const customRows = workspace.customCards.length
@@ -564,8 +618,63 @@ function renderAnatomyTab() {
         '<p id="nursingSaveStatus" class="mt-3 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite"></p></section>';
 }
 
+function isReviewItemComplete(item) {
+    if (!item) return false;
+    if (item.type === 'flashcard') {
+        return Boolean(activeReviewDate && workspace.cardMastery[item.id]?.lastReviewed === activeReviewDate);
+    }
+    if (item.type === 'dosage') return Boolean(workspace.dosageProgress[item.id]?.completed);
+    if (item.type === 'anatomy') return workspace.completedSystems.includes(item.id);
+    return false;
+}
+
+function renderReviewTab() {
+    if (activeReviewQueue && activeReviewDate && activeReviewDate !== getLocalDateKey()) {
+        activeReviewQueue = null;
+        activeReviewDate = '';
+    }
+    const sessionStarted = Array.isArray(activeReviewQueue);
+    const queue = sessionStarted ? activeReviewQueue : buildNursingReviewQueue({
+        cards: getAllCards(),
+        cardMastery: workspace.cardMastery,
+        dosageProgress: workspace.dosageProgress,
+        completedSystems: workspace.completedSystems,
+        limit: 10
+    });
+    const completedCount = sessionStarted ? queue.filter(isReviewItemComplete).length : 0;
+    const allComplete = sessionStarted && queue.length > 0 && completedCount === queue.length;
+    const progressText = sessionStarted
+        ? '<p class="mt-2 text-sm font-semibold text-indigo-800 dark:text-indigo-200" role="status" aria-live="polite">' + completedCount + ' of ' + queue.length + ' activities completed</p><div class="mt-3 h-2 overflow-hidden rounded-full bg-indigo-100 dark:bg-brand-700" role="progressbar" aria-label="Review session progress" aria-valuemin="0" aria-valuemax="' + queue.length + '" aria-valuenow="' + completedCount + '"><div class="h-full rounded-full bg-indigo-600 transition-all" style="width:' + Math.round(completedCount / Math.max(queue.length, 1) * 100) + '%"></div></div>'
+        : '';
+    const rows = queue.map((item, index) => {
+        const complete = sessionStarted && isReviewItemComplete(item);
+        const label = item.type === 'flashcard' ? 'Flashcard' : item.type === 'dosage' ? 'Dosage practice' : 'Anatomy review';
+        const buttonText = item.type === 'flashcard' ? 'Open flashcard' : item.type === 'dosage' ? 'Open math problem' : 'Open anatomy topic';
+        return '<li class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-brand-700 dark:bg-brand-800 sm:flex-row sm:items-center sm:justify-between"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">' + escapeHtml(label) + '</span><span class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">' + (complete ? 'Completed' : 'Item ' + (index + 1)) + '</span></div><h3 class="mt-1 font-bold text-zinc-900 dark:text-white">' + escapeHtml(item.title) + '</h3><p class="mt-1 text-sm leading-5 text-zinc-600 dark:text-zinc-300">' + escapeHtml(item.description) + '</p></div><button type="button" data-action="open-review-item" data-review-type="' + item.type + '" data-review-id="' + escapeHtml(item.id) + '" class="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-indigo-800 dark:bg-brand-900 dark:text-indigo-200 dark:hover:bg-brand-700">' + buttonText + '</button></li>';
+    }).join('');
+    const startButton = !sessionStarted && queue.length
+        ? '<button type="button" data-action="start-review" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-800">Start quick review</button>'
+        : '';
+    const resetButton = sessionStarted
+        ? '<button type="button" data-action="reset-review" class="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-700">Build a new queue</button>'
+        : '';
+    const headingText = allComplete ? 'Review complete' : sessionStarted ? 'Your review session' : 'Build a short review session';
+    const introText = allComplete
+        ? 'Nice work. Your study progress is saved in the flashcard, dosage, and anatomy tools.'
+        : sessionStarted
+            ? 'Open each activity, then return here to see your progress. Each activity updates the same saved study tools you already use.'
+            : 'This queue includes up to ten due or unfinished activities, balanced across flashcards, dosage arithmetic, and anatomy review.';
+    const emptyState = !queue.length
+        ? '<div class="mt-5 rounded-xl border border-dashed border-zinc-300 p-6 text-center dark:border-brand-600"><p class="font-bold text-zinc-900 dark:text-white">You are caught up</p><p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">There are no due flashcards, unfinished dosage problems, or unreviewed anatomy topics right now.</p></div>'
+        : '';
+    return '<section class="mx-auto max-w-5xl"><div class="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-900/60 dark:bg-indigo-950/30 sm:p-7"><div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Nursing Hub</p><h2 class="mt-1 text-2xl font-black text-zinc-900 dark:text-white">' + headingText + '</h2><p class="mt-2 max-w-2xl text-sm leading-6 text-zinc-700 dark:text-zinc-200">' + introText + '</p>' + progressText + '</div><div class="flex flex-wrap gap-2">' + startButton + resetButton + '</div></div></div>' +
+        emptyState + (queue.length ? '<ol class="mt-4 space-y-3">' + rows + '</ol>' : '') +
+        '<p class="mt-5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Practice prompts are for coursework review only. Follow your instructor and program guidance in clinical settings; never add real patient information to the Hub.</p></section>';
+}
+
 const TAB_DEFINITIONS = [
     { id: 'overview', label: 'Overview', icon: '🏠' },
+    { id: 'review', label: 'Quick review', icon: '⏱️' },
     { id: 'clinical', label: 'Clinicals', icon: '🩺' },
     { id: 'careplans', label: 'Care plans', icon: '🗂️' },
     { id: 'dosage', label: 'Dosage practice', icon: '🧮' },
@@ -595,15 +704,19 @@ function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
     const container = document.getElementById('nursingHub');
     if (!container) return;
     const previousScrollTop = container.scrollTop;
-    const body = activeTab === 'clinical' ? renderClinicalTab()
+    const body = activeTab === 'review' ? renderReviewTab()
+        : activeTab === 'clinical' ? renderClinicalTab()
         : activeTab === 'careplans' ? renderCarePlanTab()
             : activeTab === 'dosage' ? renderDosageTab()
                 : activeTab === 'flashcards' ? renderFlashcardsTab()
                     : activeTab === 'anatomy' ? renderAnatomyTab()
                         : renderOverview();
+    const reviewReturn = Array.isArray(activeReviewQueue) && activeTab !== 'review'
+        ? '<div class="mb-4"><button type="button" data-nursing-tab="review" class="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-brand-800 dark:text-indigo-200 dark:hover:bg-brand-700">← Return to review session</button></div>'
+        : '';
     container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-brand-700 dark:bg-brand-900/90">' +
         TAB_DEFINITIONS.map((tab) => '<button type="button" ' + (activeTab === tab.id ? 'aria-current="page" ' : '') + 'data-nursing-tab="' + tab.id + '" class="shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 ' + (activeTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + tab.icon + ' <span class="ml-1">' + tab.label + '</span></button>').join('') +
-        '</nav>' + body + '</div>';
+        '</nav>' + reviewReturn + body + '</div>';
     container.scrollTop = resetScroll ? 0 : previousScrollTop;
     const restored = findRestoredFocusTarget(container, focusTarget);
     if (focusTarget) {
@@ -740,7 +853,45 @@ function handleHubClick(event) {
     }
     const action = button.dataset.action;
     const id = button.dataset.id;
-    if (action === 'delete-rotation') {
+    if (action === 'start-review') {
+        activeReviewDate = getLocalDateKey();
+        const queue = buildNursingReviewQueue({
+            cards: getAllCards(),
+            cardMastery: workspace.cardMastery,
+            dosageProgress: workspace.dosageProgress,
+            completedSystems: workspace.completedSystems,
+            today: activeReviewDate,
+            limit: 10
+        });
+        activeReviewQueue = queue.length ? queue : null;
+        if (!activeReviewQueue) activeReviewDate = '';
+        activeTab = 'review';
+        renderActiveTab({ focusTarget: button, resetScroll: true });
+    } else if (action === 'reset-review') {
+        activeReviewQueue = null;
+        activeReviewDate = '';
+        activeTab = 'review';
+        renderActiveTab({ focusTarget: button, resetScroll: true });
+    } else if (action === 'open-review-item') {
+        const item = activeReviewQueue?.find((entry) => entry.type === button.dataset.reviewType && entry.id === button.dataset.reviewId);
+        if (!item) return;
+        showCardAnswer = false;
+        showAnatomyAnswer = false;
+        dosageFeedback = null;
+        if (item.type === 'flashcard') {
+            activeFlashcardId = item.id;
+            activeTab = 'flashcards';
+        } else if (item.type === 'dosage') {
+            const problemIndex = DOSAGE_PROBLEMS.findIndex((problem) => problem.id === item.id);
+            if (problemIndex < 0) return;
+            workspace.dosageIndex = problemIndex;
+            activeTab = 'dosage';
+        } else if (item.type === 'anatomy') {
+            activeSystemId = item.id;
+            activeTab = 'anatomy';
+        } else return;
+        renderActiveTab({ focusTarget: button, resetScroll: true });
+    } else if (action === 'delete-rotation') {
         if (!window.confirm('Remove this rotation and its tracked skills?')) return;
         workspace.rotations = workspace.rotations.filter((item) => item.id !== id);
         removeSyncConflictsForRecord('rotations', id);
@@ -771,6 +922,7 @@ function handleHubClick(event) {
         workspace.cardMastery[card.id] = calculateSM2Repetition(workspace.cardMastery[card.id] || {}, quality);
         showCardAnswer = false;
         const nextCard = getAllCards().find((item) => item.id !== card.id && isCardDue(item));
+        activeFlashcardId = nextCard ? nextCard.id : '';
         if (!nextCard) {
             activeTab = 'flashcards';
         }
@@ -923,6 +1075,9 @@ export async function loadNursingPage() {
         container.dataset.nursingBound = 'true';
     }
     activeTab = 'overview';
+    activeFlashcardId = '';
+    activeReviewQueue = null;
+    activeReviewDate = '';
     container.removeAttribute('aria-busy');
     renderActiveTab();
 }
