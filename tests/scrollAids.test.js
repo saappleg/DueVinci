@@ -25,4 +25,16 @@ describe('modal scroll aids', () => {
         expect(findModalScrollRoot(shell)).toBe(supportPane);
         expect(findModalScrollRoot(null)).toBe(null);
     });
+
+    it('finds the scroll pane inside a dialog root', () => {
+        const planPane = { clientHeight: 300 };
+        const shell = {
+            matches: (selector) => selector === '[role="dialog"]',
+            querySelector(selector) {
+                return selector === '.overflow-y-auto' ? planPane : null;
+            }
+        };
+
+        expect(findModalScrollRoot(shell)).toBe(planPane);
+    });
 });
