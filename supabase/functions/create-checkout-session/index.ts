@@ -86,10 +86,11 @@ serve(async (req) => {
 
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_plan, trial_end')
+      .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_plan, trial_end, account_deletion_pending')
       .eq('user_id', user.id)
       .maybeSingle()
     if (profileErr) throw profileErr
+    if (profile?.account_deletion_pending) throw new Error('This account is being deleted and cannot start a checkout.')
     if (profile?.stripe_subscription_id) {
       try {
         const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
