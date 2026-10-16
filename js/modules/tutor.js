@@ -43,17 +43,30 @@ function addMessage(role, text) {
 export async function loadTutorPage() {
     const locked = document.getElementById('tutorPaywall');
     const workspace = document.getElementById('tutorWorkspace');
+    const loadError = document.getElementById('tutorLoadError');
     const courseSelect = document.getElementById('tutorCourse');
+    loadError?.classList.add('hidden');
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return;
     const [{ data: snapshot, error: subscriptionError }, { data: courses, error: courseError }] = await Promise.all([
         getSubscriptionSnapshot({ forceRefresh: true }).then((data) => ({ data, error: null })).catch((error) => ({ data: null, error })),
         supabaseClient.from('courses').select('id, name, code').order('name'),
     ]);
-    if (courseError) return;
-    if (subscriptionError || !isTutorAccessActive(snapshot)) {
+    if (subscriptionError) {
+        locked?.classList.add('hidden');
+        workspace?.classList.add('hidden');
+        loadError?.classList.remove('hidden');
+        return;
+    }
+    if (!isTutorAccessActive(snapshot)) {
         locked?.classList.remove('hidden');
         workspace?.classList.add('hidden');
+        return;
+    }
+    if (courseError) {
+        locked?.classList.add('hidden');
+        workspace?.classList.add('hidden');
+        loadError?.classList.remove('hidden');
         return;
     }
     locked?.classList.add('hidden');
