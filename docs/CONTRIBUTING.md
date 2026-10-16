@@ -39,11 +39,12 @@ Please be respectful, constructive, and considerate when interacting with other 
    - Follow the existing dark-mode design aesthetics and Tailwind styling patterns.
    - Ensure no credentials, secrets, or API keys are committed.
 5. **Verify your changes locally**:
-   - Check JavaScript syntax:
+   - Run the repository checks:
      ```bash
-     node --check app.js academics.js timers.js sw.js
+     npm run check:syntax
+     npm test
      ```
-   - Open and test across pages (`index.html`, `courses.html`, `grades.html`, `calendar.html`).
+   - Open and test the dashboard and nested routes (`index.html`, `courses/index.html`, `grades/index.html`, `calendar/index.html`, `nursing/index.html`, and `tutor/index.html`). Verify keyboard navigation, narrow screens, and light/dark themes for any UI changes.
 6. **Commit & Push**:
    ```bash
    git commit -m "feat: add your descriptive message"

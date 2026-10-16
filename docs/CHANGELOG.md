@@ -1,5 +1,7 @@
 # Changelog
 
+> The canonical release history is maintained in the root [CHANGELOG.md](../CHANGELOG.md). This file is retained for historical releases; add new release notes to the root changelog to keep the project history in one place.
+
 All notable changes to the **DueVinci** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

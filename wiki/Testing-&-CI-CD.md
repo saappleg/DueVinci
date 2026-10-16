@@ -35,6 +35,11 @@ All test files reside in the `tests/` directory:
 | `tests/timers.test.js` | Pomodoro interval transitions, duration formatting, state machines |
 | `tests/quiz_backup.test.js` | JSON export schema validation, import parsing, migration scripts |
 | `tests/markdown.test.js` | HTML sanitization, markdown syntax parsing, math formatting, and safe external URLs |
+| `tests/nursing.test.js` | Nursing workspace validation, dosage calculations and units, and balanced quick-review queues |
+| `tests/degreeThemes.test.js` | Degree theme definitions and palette/contrast invariants |
+| `tests/scrollAids.test.js` | Nested Settings and Support modal scroll-pane detection |
+| `tests/preferenceMerge.test.js` | Account preference merge and validated Nursing workspace sync |
+| `tests/offlineDb.test.js` | Offline queue persistence, replay, and account isolation |
 
 ---
 

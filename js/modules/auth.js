@@ -1,7 +1,7 @@
 // --- AUTHENTICATION & USER SESSION MODULE ---
 import { supabaseClient } from './config.js';
 import { getCurrentPageName, getBasePath } from './utils.js';
-import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
+import { initializePreferenceSync, stopPreferenceSync, syncPreferencesNow } from './preferences.js';
 import { refreshProfileAvatar } from './profileAvatar.js';
 import { startReminderService, stopReminderService } from './reminders.js';
 import { clearSubscriptionSnapshot } from './subscription.js';
@@ -85,6 +85,9 @@ export async function handleAuth(session) {
         if ((page === 'tutor' || page === 'tutor.html') && document.getElementById('tutorWorkspace')) {
             if (typeof window.loadTutorPage === 'function') window.loadTutorPage();
         }
+        if ((page === 'nursing' || page === 'nursing.html') && document.getElementById('nursingHub')) {
+            if (typeof window.loadNursingPage === 'function') window.loadNursingPage();
+        }
     } else {
         currentUser = null;
         if (typeof window !== 'undefined') window.currentUser = null;
@@ -141,6 +144,10 @@ export async function signInWithGoogle() {
 
 export async function logout() {
     try {
+        // Flush recent preferences before the local session disappears. If
+        // offline or the request fails, syncPreferencesNow preserves a local
+        // per-user pending snapshot for the next sign-in.
+        await syncPreferencesNow();
         clearSubscriptionSnapshot();
         if (typeof localStorage !== 'undefined') localStorage.removeItem('duevinci_offline_user');
         // A local sign-out works even when offline; the default global scope

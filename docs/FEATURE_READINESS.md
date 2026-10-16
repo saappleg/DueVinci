@@ -13,6 +13,7 @@ offline.
 | Dashboard, grades, calendar, and study plan | Reads the course and assignment data above | No separate copy of academic data. |
 | Export/import backup | Supabase academic data plus device preferences and flashcard mastery | Plain JSON recovery/transfer tool, not encrypted and not a replacement for RLS-protected sync. |
 | Flashcard mastery | `flashcard_mastery` plus account-scoped localStorage | RLS-protected cloud row; authenticated writes atomically merge per-card review timestamps. Offline edits remain local and sync on reconnect or next authenticated launch. Backups include only the current account's local mastery and cloud rows. Unscoped progress from older app versions is not automatically attributed to an account. |
+| Nursing Hub workspace | Account-scoped `duevinci_workspace_nursing_hub_<user-id>` localStorage plus the signed-in user's `user_preferences` row | Opt-in and local-first. Validated workspace data syncs while online; disabling the Hub hides it and keeps drafts. Quick-review session state is temporary and derives its queue from saved flashcard, dosage, and anatomy progress. Keep real patient information out of all Nursing fields. |
 | Tutor usage ledger | `tutor_usage_monthly` | Users can read their own aggregate counts; only service-role functions can reserve or release requests. Daily cleanup removes rows within 12 months of last activity. |
 | Support form and inbox | `support_tickets` | Submitted with the signed-in user ID; resolved/closed tickets are automatically deleted 90 days after resolution. |
 | Browser diagnostics | `app_error_events` | Captures client error reports server-side; events are automatically deleted after 90 days. |
@@ -71,6 +72,12 @@ while online.
    90-day retention window; check the Supabase Cron job for scheduled cleanup.
 8. Change a preference on one signed-in device and confirm it appears on a
    second device.
+9. Enable the Nursing Hub on a test account, review the due/unfinished queue,
+   complete one item from each available tool, and confirm the existing progress
+   records save locally and sync to the same account.
+10. Open Settings from the dashboard and Nursing page, switch sections, close
+    with Escape, and scroll the modal in both light and dark degree themes.
+    Check narrow screens for readable text and controls.
 
 For subscription/Canvas promotion checks, use
 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) and `npm run verify:production-release`.

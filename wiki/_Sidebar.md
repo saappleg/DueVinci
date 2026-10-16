@@ -13,7 +13,8 @@
 * **[📂 Course & Term Management](Course-&-Term-Management)**
 * **[📊 Grade Tracker & GPA](Grade-Tracker-&-GPA-Calculator)**
 * **[⏱️ Pomodoro Timer & Focus](Pomodoro-Timer-&-Focus-Modes)**
-* **[📅 Calendar & Schedule Sync](Calendar-&-Schedule-Sync)**
+* **[📅 Calendar & Schedule Sync](Calendar-&-Schedule-Sync)
+* **[🩺 Nursing Hub](Nursing-Hub)**
 
 ---
 

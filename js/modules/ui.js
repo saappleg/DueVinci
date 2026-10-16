@@ -1,12 +1,15 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { fireConfetti, getBasePath } from './utils.js';
+import { DEGREE_THEMES, getDegreeTheme } from './degreeThemes.js';
 import { uploadProfileAvatar, removeProfileAvatar, getProfileDisplayName, saveProfileDisplayName, getProfileEasterEgg, setProfileEasterEgg } from './profileAvatar.js';
 import { refreshReminderSettings } from './reminders.js';
 import { applySubscriptionCatalog, clearSubscriptionSnapshot } from './subscription.js';
 import { clearOfflineUserData } from './offlineDb.js';
+import { getWeekStartDay, getWeekStartDayIndex, setWeekStartDay } from './weekPreferences.js';
+import { initializePreferenceSync, stopPreferenceSync } from './preferences.js';
 
-const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'academics', 'today_focus', 'daily_brief', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
+const WORKSPACE_FEATURES = new Set(['timer', 'grades', 'calendar', 'tutor', 'nursing_hub', 'academics', 'today_focus', 'daily_brief', 'up_next', 'goals', 'study_plan', 'reminders', 'weekly_review']);
 const DASHBOARD_WIDGET_ORDER_KEY = 'duevinci_dashboard_widget_order';
 const DASHBOARD_WIDGETS = [
     ['today_focus', 'Today’s focus'],
@@ -48,10 +51,10 @@ function showAccessibleModal(modal, closeModal) {
         });
         modal.dataset.a11yBound = 'true';
     }
-    const closeButton = modal.querySelector('[data-modal-close]');
-    if (closeButton) {
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => closeButton.focus());
-        else closeButton.focus();
+    const initialFocus = modal.querySelector('[aria-current="page"]') || modal.querySelector('[data-modal-close]');
+    if (initialFocus) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => initialFocus.focus());
+        else initialFocus.focus();
     }
 }
 
@@ -60,12 +63,20 @@ function hideAccessibleModal(modal) {
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     const trigger = modalReturnFocus.get(modal);
-    if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    if (trigger?.isConnected && typeof trigger.focus === 'function') trigger.focus();
+    else {
+        const fallback = modal.id === 'settingsModal'
+            ? document.querySelector('duevinci-sidebar button[aria-label="Open profile settings"]')
+            : document.querySelector('button[onclick*="openSupportModal"]');
+        fallback?.focus();
+    }
     modalReturnFocus.delete(modal);
 }
 
 export function isWorkspaceFeatureVisible(feature) {
-    if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return true;
+    if (!WORKSPACE_FEATURES.has(feature)) return true;
+    if (feature === 'nursing_hub') return typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_workspace_nursing_hub') === 'visible';
+    if (typeof localStorage === 'undefined') return true;
     if (feature === 'academics') return localStorage.getItem('duevinci_hide_academics') !== 'true';
     return localStorage.getItem(`duevinci_workspace_${feature}`) !== 'hidden';
 }
@@ -74,8 +85,12 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     if (!WORKSPACE_FEATURES.has(feature) || typeof localStorage === 'undefined') return;
     if (feature === 'academics') {
         window.toggleAcademicsVisibility?.(visible);
+        window.syncPreferencesNow?.();
         return;
     }
+    const nursingHubActionButton = feature === 'nursing_hub' && visible
+        ? document.activeElement?.closest('#nursingHub button[onclick*="nursing_hub"]')
+        : null;
     localStorage.setItem(`duevinci_workspace_${feature}`, visible ? 'visible' : 'hidden');
     if (typeof document !== 'undefined') document.querySelectorAll('duevinci-sidebar').forEach((sidebar) => sidebar.refresh?.());
     if (feature === 'today_focus') window.renderTodayWorkspace?.();
@@ -85,6 +100,19 @@ export function setWorkspaceFeatureVisibility(feature, visible) {
     if (feature === 'reminders') window.renderReminderDashboard?.();
     if (feature === 'weekly_review') window.renderWeeklyReview?.();
     applyDashboardWidgetLayout();
+    if (feature === 'nursing_hub') {
+        const pageLoad = window.loadNursingPage?.();
+        if (nursingHubActionButton) {
+            Promise.resolve(pageLoad).catch(() => {}).finally(() => window.requestAnimationFrame?.(() => {
+                    const heading = document.querySelector('#nursingHub h2');
+                    if (!heading) return;
+                    heading.tabIndex = -1;
+                    heading.focus({ preventScroll: true });
+                    heading.scrollIntoView({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                }));
+        }
+    }
+    window.syncPreferencesNow?.();
 }
 
 function getDashboardWidgetOrder() {
@@ -105,6 +133,7 @@ export function moveDashboardWidget(feature, direction) {
     if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return;
     [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
     localStorage.setItem(DASHBOARD_WIDGET_ORDER_KEY, JSON.stringify(order));
+    window.syncPreferencesNow?.();
     applyDashboardWidgetLayout();
     refreshDashboardLayoutControls();
 }
@@ -142,6 +171,7 @@ export function applyDashboardWidgetLayout() {
 
 export function changeTheme(themeValue) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('theme', themeValue);
+    window.syncPreferencesNow?.();
     if (typeof document === 'undefined') return;
     if (themeValue === 'dark' || (themeValue === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
@@ -154,20 +184,24 @@ export function toggleGreekTheme() {
     if (typeof document === 'undefined') return;
     const enabled = document.documentElement.classList.toggle('greek-theme');
     if (typeof localStorage !== 'undefined') localStorage.setItem('greekTheme', enabled ? 'on' : 'off');
+    window.syncPreferencesNow?.();
 }
 
 export function updateDateFormat(format) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_date_format', format);
+    window.syncPreferencesNow?.();
     if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
     if (typeof window.loadCoursesPage === 'function') window.loadCoursesPage();
 }
 
 export function toggleMuteAlarm(muted) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_mute_alarm', muted);
+    window.syncPreferencesNow?.();
 }
 
 export function updateAlarmSound(sound) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_alarm_sound', sound);
+    window.syncPreferencesNow?.();
 }
 
 export function updateAmbientNoise(type) {
@@ -178,6 +212,7 @@ export function updateAmbientNoise(type) {
 
 export function updateGpaScale(scale) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('duevinci_gpa_scale', scale);
+    window.syncPreferencesNow?.();
     if (typeof window.loadDashboardStats === 'function') window.loadDashboardStats();
 }
 
@@ -204,31 +239,46 @@ export function injectAppearanceSettingsExtras() {
     if (!appearanceTab || document.getElementById('appearanceExtrasContainer')) return;
 
     const currentFormat = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+    const currentWeekStartDay = getWeekStartDay();
+    const currentDegreeTheme = getDegreeTheme();
+    const degreeThemeOptions = DEGREE_THEMES.map((theme) => `<option value="${theme.id}" ${theme.id === currentDegreeTheme ? 'selected' : ''}>${theme.label}</option>`).join('');
     const currentGpaScale = localStorage.getItem('duevinci_gpa_scale') || '4.0';
     const isAcademicsHidden = localStorage.getItem('duevinci_hide_academics') === 'true';
     const hideCompletedCourses = localStorage.getItem('duevinci_hide_completed_courses') === 'true';
 
     const workspaceFeatures = [
-        ['timer', 'Focus timer', 'Hide the timer panel in the sidebar.'],
-        ['grades', 'Grades', 'Hide Grades from sidebar navigation.'],
-        ['calendar', 'Calendar', 'Hide Calendar from sidebar navigation.'],
-        ['tutor', 'Study Companion', 'Hide the optional AI Tutor from sidebar navigation.'],
-        ['academics', 'Academics widget', 'Hide dashboard analytics and progress summaries.'],
-        ['today_focus', 'Today’s focus', 'Hide the dashboard focus recommendation.'],
-        ['daily_brief', 'Pro Daily Brief', 'Hide your paid daily workload and focus summary.'],
-        ['up_next', 'Up Next', 'Hide the upcoming coursework card.'],
-        ['goals', 'Goals & completion', 'Hide course progress summaries.'],
-        ['study_plan', 'Study plan', 'Hide the dashboard study-plan workspace.'],
-        ['reminders', 'Upcoming reminders', 'Hide the dashboard reminder card.'],
-        ['weekly_review', 'Weekly review', 'Hide the weekly planning prompt.'],
+        ['timer', 'Focus timer', 'Show or hide the timer panel in your sidebar.'],
+        ['grades', 'Grades', 'Show or hide Grades in sidebar navigation.'],
+        ['calendar', 'Calendar', 'Show or hide Calendar in sidebar navigation.'],
+        ['tutor', 'Study Companion', 'Show or hide the optional AI Tutor in sidebar navigation.'],
+        ['academics', 'Academics widget', 'Show or hide dashboard analytics and progress summaries.'],
+        ['today_focus', 'Today’s focus', 'Show or hide the dashboard focus recommendation.'],
+        ['daily_brief', 'Pro Daily Brief', 'Show or hide your paid daily workload and focus summary.'],
+        ['up_next', 'Up Next', 'Show or hide the upcoming coursework card.'],
+        ['goals', 'Goals & completion', 'Show or hide course progress summaries.'],
+        ['study_plan', 'Study plan', 'Show or hide the dashboard study-plan workspace.'],
+        ['reminders', 'Upcoming reminders', 'Show or hide the dashboard reminder card.'],
+        ['weekly_review', 'Weekly review', 'Show or hide the weekly planning prompt.'],
     ];
 
     const container = document.createElement('div');
     container.id = 'appearanceExtrasContainer';
     container.className = 'max-w-sm space-y-4 pt-4 border-t border-zinc-200 dark:border-brand-700';
     container.innerHTML = `
+        <section class="space-y-2">
+            <div><label for="degreeThemeSelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Degree theme</label><p class="text-[11px] text-zinc-500 dark:text-zinc-400">Choose accent colors for your field of study. This preference syncs with your account.</p></div>
+            <select id="degreeThemeSelect" onchange="setDegreeTheme(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 cursor-pointer">${degreeThemeOptions}</select>
+        </section>
+        <section>
+            <label for="weekStartDaySelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Week starts on</label>
+            <p class="mb-2 text-[11px] text-zinc-500 dark:text-zinc-400">Choose Sunday or Monday for the calendar, study plan, and weekly workload summaries. Monday is selected by default. This preference syncs with your account.</p>
+            <select id="weekStartDaySelect" onchange="updateWeekStartDay(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 cursor-pointer">
+                <option value="sunday" ${currentWeekStartDay === 'sunday' ? 'selected' : ''}>Sunday</option>
+                <option value="monday" ${currentWeekStartDay === 'monday' ? 'selected' : ''}>Monday</option>
+            </select>
+        </section>
         <div>
-            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format Display</label>
+            <label for="dateFormatSelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Date Format Display</label>
             <select id="dateFormatSelect" onchange="updateDateFormat(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
                 <option value="YYYY-MM-DD" ${currentFormat === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
                 <option value="MM-DD-YYYY" ${currentFormat === 'MM-DD-YYYY' ? 'selected' : ''}>MM-DD-YYYY</option>
@@ -236,7 +286,7 @@ export function injectAppearanceSettingsExtras() {
             </select>
         </div>
         <div>
-            <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">GPA Scale Target</label>
+            <label for="gpaScaleSelect" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">GPA Scale Target</label>
             <select id="gpaScaleSelect" onchange="updateGpaScale(this.value)" class="w-full text-xs px-2.5 py-2 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
                 <option value="4.0" ${currentGpaScale === '4.0' ? 'selected' : ''}>4.0 Scale</option>
                 <option value="5.0" ${currentGpaScale === '5.0' ? 'selected' : ''}>5.0 Scale</option>
@@ -244,8 +294,13 @@ export function injectAppearanceSettingsExtras() {
         </div>
         <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Hide completed classes</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">Keep finished courses out of the Classes lists. Turn this off to show them again.</span></span><input type="checkbox" ${hideCompletedCourses ? 'checked' : ''} onchange="setHideCompletedCourses(this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
-            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Hide optional areas to declutter your workspace. Nothing is deleted.</p></div>
-            ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>`).join('')}
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Nursing Hub</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Optional nursing study tools. Turn it on to add rotations, fictional care-plan practice, dosage drills, flashcards, and anatomy review. Turning it off hides the Hub and keeps your drafts.</p></div>
+            <p id="nursingHubToggleHelp" class="text-[11px] text-zinc-500 dark:text-zinc-400">Use fictional study cases only; never save real patient information here.</p>
+            <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Enable Nursing Hub</span><span id="nursingHubToggleDetails" class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">Off by default. Your saved study drafts are kept if you switch it off.</span></span><input id="nursingHubEnabled" type="checkbox" aria-label="Enable Nursing Hub" aria-describedby="nursingHubToggleDetails nursingHubToggleHelp" data-feature-toggle="nursing_hub" ${isWorkspaceFeatureVisible('nursing_hub') ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('nursing_hub', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500"></label>
+        </section>
+        <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
+            <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Workspace visibility</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Choose which areas appear. Turning a section off only hides it; it does not delete saved work.</p></div>
+            ${workspaceFeatures.map(([feature, label, description]) => `<label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">${label}</span><span id="${feature}VisibilityHelp" class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">${description}</span></span><input type="checkbox" data-feature-toggle="${feature}" aria-label="Show ${label}" aria-describedby="${feature}VisibilityHelp" ${isWorkspaceFeatureVisible(feature) ? 'checked' : ''} onchange="setWorkspaceFeatureVisibility('${feature}', this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500"></label>`).join('')}
         </section>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
             <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Dashboard layout</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Use the arrows to arrange dashboard cards. Your order is saved on this device.</p></div>
@@ -258,7 +313,19 @@ export function injectAppearanceSettingsExtras() {
 export function setHideCompletedCourses(hidden) {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem('duevinci_hide_completed_courses', String(Boolean(hidden)));
+    window.syncPreferencesNow?.();
     window.loadCoursesPage?.();
+}
+
+export function updateWeekStartDay(value) {
+    const weekStartDay = setWeekStartDay(value);
+    const select = document.getElementById('weekStartDaySelect');
+    if (select) select.value = weekStartDay;
+    window.setCalendarWeekStart?.(getWeekStartDayIndex(weekStartDay));
+    window.renderTodayWorkspace?.();
+    window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
+    window.syncPreferencesNow?.();
+    return weekStartDay;
 }
 
 function injectReminderSettings() {
@@ -311,12 +378,12 @@ export function ensureSettingsModalExists() {
         div.id = 'settingsModal';
         div.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden';
         div.innerHTML = `
-            <div role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-[460px] max-h-[92vh] sm:max-h-[90vh]">
+            <div role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-0 max-h-[90vh]">
                 <div class="w-full sm:w-48 bg-zinc-50 dark:bg-brand-900 border-b sm:border-b-0 sm:border-r border-zinc-200 dark:border-brand-700 p-3 sm:p-4 shrink-0 flex flex-col justify-between">
                     <div>
                         <h3 class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 px-2">Settings</h3>
-                        <nav class="flex gap-1 overflow-x-auto sm:block sm:space-y-1">
-                            <button type="button" onclick="switchSettingsTab('profile')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
+                        <nav class="flex gap-1 overflow-x-auto sm:block sm:space-y-1" aria-label="Settings sections">
+                            <button type="button" onclick="switchSettingsTab('profile')" aria-current="page" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="tab-profile">Profile</button>
                             <button type="button" onclick="switchSettingsTab('appearance')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-appearance">Appearance</button>
                             <button type="button" onclick="switchSettingsTab('study')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-study">Study & Reminders</button>
                             <button type="button" onclick="switchSettingsTab('backup')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="tab-backup">Cloud & Backup</button>
@@ -331,11 +398,11 @@ export function ensureSettingsModalExists() {
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
-                <div class="flex-1 p-4 sm:p-6 relative overflow-y-auto max-h-[72vh] sm:max-h-[90vh]">
-                    <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                    
+                <div class="relative min-h-0 flex-1">
+                    <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
+                    <div class="settings-scroll-pane h-full min-h-0 overflow-y-auto p-4 pt-14 sm:p-6 sm:pt-16">
                     <!-- Tab: Profile -->
-                    <div id="content-profile" class="block space-y-6">
+                        <div id="content-profile" aria-hidden="false" class="block space-y-6">
                         <div>
                             <h2 id="settingsModalTitle" class="text-xl font-bold dark:text-white mb-1">Profile & Security</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Update your email, password, and manage your account.</p>
@@ -414,14 +481,14 @@ export function ensureSettingsModalExists() {
                     </div>
 
                     <!-- Tab: Appearance -->
-                    <div id="content-appearance" class="hidden space-y-6">
+                        <div id="content-appearance" aria-hidden="true" class="hidden space-y-6">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Appearance & Preferences</h2>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Customize how DueVinci looks and operates on this device.</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Themes and week-start preferences sync with your account. Dashboard card order stays on this device.</p>
                         </div>
                         <div class="max-w-sm">
                             <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Theme Preference</label>
-                            <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
+                            <select id="themeSelect" onchange="changeTheme(this.value)" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 cursor-pointer shadow-sm">
                                 <option value="system">💻 Follow System</option>
                                 <option value="light">☀️ Light Mode</option>
                                 <option value="dark">🌙 Dark Mode</option>
@@ -429,10 +496,10 @@ export function ensureSettingsModalExists() {
                         </div>
                     </div>
 
-                    <div id="content-study" class="hidden space-y-6"><div><h2 class="text-xl font-bold dark:text-white mb-1">Study & Reminders</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Control study-time reminders and browser alerts.</p></div></div>
+                        <div id="content-study" aria-hidden="true" class="hidden space-y-6"><div><h2 class="text-xl font-bold dark:text-white mb-1">Study & Reminders</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Control study-time reminders and browser alerts.</p></div></div>
 
                     <!-- Tab: Backup & Cloud Sync -->
-                    <div id="content-backup" class="hidden space-y-6">
+                    <div id="content-backup" aria-hidden="true" class="hidden space-y-6">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Supabase Cloud Sync & Data Backup</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Export local snapshots, restore course history, and sync with Supabase PostgreSQL.</p>
@@ -479,7 +546,7 @@ export function ensureSettingsModalExists() {
                     </div>
 
                     <!-- Tab: Privacy & AI -->
-                    <div id="content-privacy" class="hidden space-y-6">
+                    <div id="content-privacy" aria-hidden="true" class="hidden space-y-6">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Privacy & AI Data Transparency</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">How your student information and AI requests are protected.</p>
@@ -519,7 +586,7 @@ export function ensureSettingsModalExists() {
                     </div>
 
                     <!-- Tab: Subscription -->
-                    <div id="content-canvas" class="hidden space-y-5">
+                    <div id="content-canvas" aria-hidden="true" class="hidden space-y-5">
                         <div>
                         <h2 class="text-xl font-bold dark:text-white mb-1">DueVinci Pro</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Your existing DueVinci planning tools remain free forever. A subscription adds connected learning and guided study support.</p>
@@ -650,8 +717,8 @@ export function ensureSettingsModalExists() {
                         </div>
                     </div>
                     </div>
+                    </div>
                 </div>
-            </div>
         `;
         document.body.appendChild(div);
         div.addEventListener('click', (event) => {
@@ -708,62 +775,77 @@ export function ensureSettingsModalExists() {
 }
 
 export function openSettingsModal() {
+    if (typeof document === 'undefined') return;
     ensureSettingsModalExists();
-    applySubscriptionCatalog(document);
-    if (currentUser) {
-        const emailInput = document.getElementById('profileEmail');
-        if (emailInput) emailInput.value = currentUser.email;
-        const displayNameInput = document.getElementById('profileDisplayName');
-        if (displayNameInput) {
-            getProfileDisplayName(currentUser).then((displayName) => {
-                displayNameInput.value = displayName || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
-            });
-        }
-        const avatarInput = document.getElementById('profileAvatarInput');
-        if (avatarInput && !avatarInput.dataset.bound) {
-            avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
-            avatarInput.dataset.bound = 'true';
-        }
-        const badgeSelect = document.getElementById('profileAvatarBadgeSelect');
-        if (badgeSelect) {
-            badgeSelect.value = getProfileEasterEgg(currentUser) || '';
-            if (!badgeSelect.dataset.bound) {
-                badgeSelect.addEventListener('change', () => {
-                    const saved = setProfileEasterEgg(badgeSelect.value, currentUser);
-                    const message = document.getElementById('profileBadgeMsg');
-                    if (message) {
-                        message.textContent = saved
-                            ? (badgeSelect.value ? 'Profile badge updated.' : 'Profile badge removed.')
-                            : 'Could not update the profile badge.';
-                        message.classList.remove('hidden');
-                    }
-                });
-                badgeSelect.dataset.bound = 'true';
+    const modal = document.getElementById('settingsModal');
+    if (!modal) return;
+    // Reveal the dialog before loading optional subscription/profile/preferences data. A
+    // slow or unavailable enhancement should never make the Settings panel appear broken.
+    showAccessibleModal(modal, closeSettingsModal);
+    try {
+        applySubscriptionCatalog(document);
+        if (currentUser) {
+            const emailInput = document.getElementById('profileEmail');
+            if (emailInput) emailInput.value = currentUser.email;
+            const displayNameInput = document.getElementById('profileDisplayName');
+            if (displayNameInput) {
+                getProfileDisplayName(currentUser).then((displayName) => {
+                    displayNameInput.value = displayName || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
+                }).catch((error) => console.warn('Settings profile name could not be loaded:', error));
+            }
+            const avatarInput = document.getElementById('profileAvatarInput');
+            if (avatarInput && !avatarInput.dataset.bound) {
+                avatarInput.addEventListener('change', (event) => uploadProfileAvatar(event.target.files?.[0], currentUser));
+                avatarInput.dataset.bound = 'true';
+            }
+            const badgeSelect = document.getElementById('profileAvatarBadgeSelect');
+            if (badgeSelect) {
+                badgeSelect.value = getProfileEasterEgg(currentUser) || '';
+                if (!badgeSelect.dataset.bound) {
+                    badgeSelect.addEventListener('change', () => {
+                        const saved = setProfileEasterEgg(badgeSelect.value, currentUser);
+                        const message = document.getElementById('profileBadgeMsg');
+                        if (message) {
+                            message.textContent = saved
+                                ? (badgeSelect.value ? 'Profile badge updated.' : 'Profile badge removed.')
+                                : 'Could not update the profile badge.';
+                            message.classList.remove('hidden');
+                        }
+                    });
+                    badgeSelect.dataset.bound = 'true';
+                }
             }
         }
+        const themeSelect = document.getElementById('themeSelect');
+        if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
+
+        injectAppearanceSettingsExtras();
+        const degreeThemeSelect = document.getElementById('degreeThemeSelect');
+        if (degreeThemeSelect) degreeThemeSelect.value = getDegreeTheme();
+        document.querySelectorAll('[data-feature-toggle]').forEach((input) => {
+            input.checked = isWorkspaceFeatureVisible(input.dataset.featureToggle);
+        });
+        injectReminderSettings();
+        refreshReminderSettings();
+
+        const dfSelect = document.getElementById('dateFormatSelect');
+        if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
+        const weekStartDaySelect = document.getElementById('weekStartDaySelect');
+        if (weekStartDaySelect) weekStartDaySelect.value = getWeekStartDay();
+
+        const muteSwitch = document.getElementById('muteAlarmSwitch');
+        if (muteSwitch) muteSwitch.checked = localStorage.getItem('duevinci_mute_alarm') === 'true';
+
+        const gpaSelect = document.getElementById('gpaScaleSelect');
+        if (gpaSelect) gpaSelect.value = localStorage.getItem('duevinci_gpa_scale') || '4.0';
+
+        const acadSwitch = document.getElementById('academicsSwitch');
+        if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
+
+        applyDashboardWidgetLayout();
+    } catch (error) {
+        console.error('Settings opened, but some preferences could not be loaded:', error);
     }
-    const themeSelect = document.getElementById('themeSelect');
-    if (themeSelect) themeSelect.value = localStorage.getItem('theme') || 'system';
-
-    injectAppearanceSettingsExtras();
-    injectReminderSettings();
-    refreshReminderSettings();
-
-    const dfSelect = document.getElementById('dateFormatSelect');
-    if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
-
-    const muteSwitch = document.getElementById('muteAlarmSwitch');
-    if (muteSwitch) muteSwitch.checked = localStorage.getItem('duevinci_mute_alarm') === 'true';
-
-    const gpaSelect = document.getElementById('gpaScaleSelect');
-    if (gpaSelect) gpaSelect.value = localStorage.getItem('duevinci_gpa_scale') || '4.0';
-
-    const acadSwitch = document.getElementById('academicsSwitch');
-    if (acadSwitch) acadSwitch.checked = localStorage.getItem('duevinci_hide_academics') !== 'true';
-
-    const modal = document.getElementById('settingsModal');
-    showAccessibleModal(modal, closeSettingsModal);
-    applyDashboardWidgetLayout();
 }
 
 export function closeSettingsModal() {
@@ -803,21 +885,30 @@ export function showSettingsMovedNotice() {
 
 export function switchSettingsTab(tabName, options = {}) {
     const tabs = ['profile', 'appearance', 'study', 'backup', 'privacy', 'canvas'];
+    if (!tabs.includes(tabName)) return;
     tabs.forEach(t => {
         const content = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);
         if (content) {
             if (t === tabName) content.classList.remove('hidden');
             else content.classList.add('hidden');
+            content.setAttribute('aria-hidden', t === tabName ? 'false' : 'true');
         }
         if (tabBtn) {
+            if (t === tabName) tabBtn.setAttribute('aria-current', 'page');
+            else tabBtn.removeAttribute('aria-current');
             if (t === tabName) {
-                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+                tabBtn.classList.add('font-bold', 'bg-zinc-200', 'dark:bg-brand-700', 'text-indigo-600', 'dark:text-indigo-400');
+                tabBtn.classList.remove('font-medium', 'text-zinc-600', 'dark:text-zinc-400');
             } else {
-                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+                tabBtn.classList.remove('font-bold', 'bg-zinc-200', 'dark:bg-brand-700', 'text-indigo-600', 'dark:text-indigo-400');
+                tabBtn.classList.add('font-medium', 'text-zinc-600', 'dark:text-zinc-400');
             }
         }
     });
+    const scrollPane = document.querySelector('#settingsModal .settings-scroll-pane');
+    if (scrollPane) scrollPane.scrollTop = 0;
+    document.getElementById(`tab-${tabName}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     // When switching to Canvas tab, refresh its state
     if (tabName === 'canvas' && options.refresh !== false) {
         if (typeof window.initCanvasSettingsTab === 'function') window.initCanvasSettingsTab();
@@ -833,17 +924,17 @@ export function ensureSupportModalExists() {
         div.className = 'fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm hidden p-4';
         div.setAttribute('aria-hidden', 'true');
         div.innerHTML = `
-            <div role="dialog" aria-modal="true" aria-labelledby="supportModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex overflow-hidden min-h-[480px] max-h-[90vh]">
-                <div class="w-48 bg-zinc-50 dark:bg-brand-900 border-r border-zinc-200 dark:border-brand-700 p-4 shrink-0 flex flex-col justify-between">
+            <div role="dialog" aria-modal="true" aria-labelledby="supportModalTitle" class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col sm:flex-row overflow-hidden min-h-0 max-h-[90vh]">
+                <div class="w-full sm:w-48 bg-zinc-50 dark:bg-brand-900 border-b sm:border-b-0 sm:border-r border-zinc-200 dark:border-brand-700 p-3 sm:p-4 shrink-0 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center gap-2 mb-4 px-2">
                             <span class="text-indigo-600 dark:text-indigo-400 font-bold text-sm">💬 Help & Support</span>
                         </div>
-                        <nav class="space-y-1">
-                            <button type="button" onclick="switchSupportTab('contact')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="support-tab-contact">Contact Steven</button>
-                            <button type="button" onclick="switchSupportTab('faq')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-faq">Quick FAQ</button>
-                            <button type="button" onclick="switchSupportTab('github')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-github">GitHub & Bugs</button>
-                            <button type="button" onclick="switchSupportTab('inbox'); loadSupportInbox()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-inbox">Support Inbox</button>
+                        <nav class="flex gap-1 overflow-x-auto sm:block sm:space-y-1" aria-label="Support sections">
+                            <button type="button" onclick="switchSupportTab('contact')" aria-current="page" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition" id="support-tab-contact">Contact Steven</button>
+                            <button type="button" onclick="switchSupportTab('faq')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-faq">Quick FAQ</button>
+                            <button type="button" onclick="switchSupportTab('github')" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-github">GitHub & Bugs</button>
+                            <button type="button" onclick="switchSupportTab('inbox'); loadSupportInbox()" class="shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition" id="support-tab-inbox">Support Inbox</button>
                         </nav>
                     </div>
                     <div class="pt-4 border-t border-zinc-200/60 dark:border-brand-700/60 text-[11px] space-y-1 px-1">
@@ -851,10 +942,10 @@ export function ensureSupportModalExists() {
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                     </div>
                 </div>
-                <div class="flex-1 p-6 relative overflow-y-auto max-h-[90vh]">
-                    <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-xl">✕</button>
-                    
-                    <div id="support-content-contact" class="block space-y-4">
+                <div class="relative min-h-0 flex-1">
+                    <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
+                    <div class="support-scroll-pane h-full min-h-0 overflow-y-auto p-6 pt-16">
+                    <div id="support-content-contact" aria-hidden="false" class="block space-y-4">
                         <div>
                             <h2 id="supportModalTitle" class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Have a question or need assistance? Send a message directly to Steven.</p>
@@ -892,7 +983,7 @@ export function ensureSupportModalExists() {
                         </form>
                     </div>
 
-                    <div id="support-content-faq" class="hidden space-y-4">
+                    <div id="support-content-faq" aria-hidden="true" class="hidden space-y-4">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">Frequently Asked Questions</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Quick answers to common questions about DueVinci.</p>
@@ -925,7 +1016,7 @@ export function ensureSupportModalExists() {
                         </div>
                     </div>
 
-                    <div id="support-content-github" class="hidden space-y-4">
+                    <div id="support-content-github" aria-hidden="true" class="hidden space-y-4">
                         <div>
                             <h2 class="text-xl font-bold dark:text-white mb-1">GitHub & Issue Tracker</h2>
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Track bugs, request features, and contribute to DueVinci.</p>
@@ -955,10 +1046,11 @@ export function ensureSupportModalExists() {
                         </div>
                     </div>
 
-                    <div id="support-content-inbox" class="hidden space-y-3">
+                    <div id="support-content-inbox" aria-hidden="true" class="hidden space-y-3">
                         <div><h2 class="text-xl font-bold dark:text-white mb-1">Support Inbox</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Review and resolve incoming support tickets.</p></div>
                         <p id="supportInboxFeedback" class="text-xs text-red-500"></p>
-                        <div id="supportInboxList" class="space-y-3 max-h-[50vh] overflow-y-auto"></div>
+                        <div id="supportInboxList" class="space-y-3"></div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -989,21 +1081,30 @@ export function closeSupportModal() {
 
 export function switchSupportTab(tabName) {
     const tabs = ['contact', 'faq', 'github', 'inbox'];
+    if (!tabs.includes(tabName)) return;
     tabs.forEach(t => {
         const content = document.getElementById(`support-content-${t}`);
         const tabBtn = document.getElementById(`support-tab-${t}`);
         if (content) {
             if (t === tabName) content.classList.remove('hidden');
             else content.classList.add('hidden');
+            content.setAttribute('aria-hidden', t === tabName ? 'false' : 'true');
         }
         if (tabBtn) {
+            if (t === tabName) tabBtn.setAttribute('aria-current', 'page');
+            else tabBtn.removeAttribute('aria-current');
             if (t === tabName) {
-                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-zinc-200 dark:bg-brand-700 text-indigo-600 dark:text-indigo-400 transition";
+                tabBtn.classList.add('font-bold', 'bg-zinc-200', 'dark:bg-brand-700', 'text-indigo-600', 'dark:text-indigo-400');
+                tabBtn.classList.remove('font-medium', 'text-zinc-600', 'dark:text-zinc-400');
             } else {
-                tabBtn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 transition";
+                tabBtn.classList.remove('font-bold', 'bg-zinc-200', 'dark:bg-brand-700', 'text-indigo-600', 'dark:text-indigo-400');
+                tabBtn.classList.add('font-medium', 'text-zinc-600', 'dark:text-zinc-400');
             }
         }
     });
+    const scrollPane = document.querySelector('#supportModal .support-scroll-pane');
+    if (scrollPane) scrollPane.scrollTop = 0;
+    document.getElementById(`support-tab-${tabName}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function escapeSupportHtml(value) {
@@ -1119,12 +1220,17 @@ export async function confirmAccountDeletion() {
         return;
     }
 
+    let preferenceSyncStopped = false;
+    let accountDeletionSucceeded = false;
     try {
         const deletingUserId = currentUser?.id || null;
         if (currentUser && currentUser.id) {
+            stopPreferenceSync();
+            preferenceSyncStopped = true;
             const { data: deleteAccountData, error: deleteAccountError } = await supabaseClient.functions.invoke('delete-account');
             if (deleteAccountError) throw deleteAccountError;
             if (!deleteAccountData?.success) throw new Error(deleteAccountData?.error || 'Unable to delete account.');
+            accountDeletionSucceeded = true;
 
             const cacheCleared = await clearOfflineUserData(deletingUserId);
             clearSubscriptionSnapshot();
@@ -1149,6 +1255,9 @@ export async function confirmAccountDeletion() {
         alert("Your account and all associated data have been permanently deleted.");
         if (typeof window !== 'undefined') window.location.href = 'index.html';
     } catch (err) {
+        if (preferenceSyncStopped && !accountDeletionSucceeded && currentUser?.id) {
+            initializePreferenceSync(currentUser).catch((syncError) => console.warn('Preference sync could not resume after deletion failed:', syncError.message || syncError));
+        }
         console.error("Account deletion error:", err);
         let detail = err?.message || 'Please try again.';
         try {
@@ -1169,6 +1278,7 @@ if (typeof window !== 'undefined') {
     window.changeTheme = changeTheme;
     window.toggleGreekTheme = toggleGreekTheme;
     window.updateDateFormat = updateDateFormat;
+    window.updateWeekStartDay = updateWeekStartDay;
     window.toggleMuteAlarm = toggleMuteAlarm;
     window.updateAlarmSound = updateAlarmSound;
     window.updateAmbientNoise = updateAmbientNoise;

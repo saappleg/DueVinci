@@ -39,10 +39,12 @@ class DueVinciSidebar extends BaseElement {
         const isGrades = currentPage === 'grades' || currentPage === 'grades.html';
         const isCalendar = currentPage === 'calendar' || currentPage === 'calendar.html';
         const isTutor = currentPage === 'tutor' || currentPage === 'tutor.html';
+        const isNursing = currentPage === 'nursing' || currentPage === 'nursing.html';
         const showTimer = isWorkspaceFeatureVisible('timer');
         const showGrades = isWorkspaceFeatureVisible('grades');
         const showCalendar = isWorkspaceFeatureVisible('calendar');
         const showTutor = isWorkspaceFeatureVisible('tutor');
+        const showNursing = isWorkspaceFeatureVisible('nursing_hub');
 
         const navActiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
         const navInactiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
@@ -106,6 +108,9 @@ class DueVinciSidebar extends BaseElement {
                     </a>
                     <a href="${basePath}tutor/index.html" class="${isTutor ? navActiveStyle : navInactiveStyle}${showTutor ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-1.2-.24-2.34-.68-3.38"/><path d="M8.5 10.5a3.5 3.5 0 1 1 5.5 2.87c-.96.69-1.5 1.21-1.5 2.63"/><path d="M12 18.5h.01"/></svg> Study Companion
+                    </a>
+                    <a href="${basePath}nursing/index.html" class="${isNursing ? navActiveStyle : navInactiveStyle}${showNursing ? '' : ' hidden'}">
+                        <span aria-hidden="true">🩺</span> Nursing Hub
                     </a>
                 </nav>
             </div>

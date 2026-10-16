@@ -108,7 +108,7 @@ export function getBasePath() {
     // /DueVinci-dev/). Only actual application subpages need to climb out of
     // their directory; treating every single directory as a page made assets
     // such as profile Easter-egg badges resolve one level too high.
-    return /\/(?:courses|grades|calendar|legal|tutor)(?:\/|$)/.test(path) ? '../' : './';
+    return /\/(?:courses|grades|calendar|legal|tutor|nursing)(?:\/|$)/.test(path) ? '../' : './';
 }
 
 export function getCurrentPageName() {
@@ -116,10 +116,20 @@ export function getCurrentPageName() {
     const path = window.location.pathname || '';
     const segments = path.split("/").filter(Boolean);
     if (segments.length === 0) return 'index';
-    const last = segments[segments.length - 1].replace('.html', '');
-    if (last === 'index' && segments.length > 1) {
-        return segments[segments.length - 2];
+
+    const last = segments[segments.length - 1].replace(/\.html$/, '');
+    const appRoutes = new Set(['courses', 'grades', 'calendar', 'tutor', 'nursing']);
+
+    // A project hosted under a prefix (such as /DueVinci/) still has the
+    // dashboard at its root. Only known app routes should be treated as pages.
+    if (last === 'index') {
+        const parent = segments[segments.length - 2];
+        return appRoutes.has(parent) ? parent : 'index';
     }
+    if (appRoutes.has(last)) return last;
+
+    // Directory roots that are not app routes are the dashboard root.
+    if (path.endsWith('/') || (segments.length === 1 && !last.includes('.'))) return 'index';
     return last;
 }
 
