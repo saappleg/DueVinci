@@ -4,6 +4,7 @@ let initialized = false;
 export function findModalScrollRoot(shell) {
     if (!shell || typeof shell.querySelector !== 'function') return null;
     return shell.querySelector('.settings-scroll-pane')
+        || (shell.matches?.('[role="dialog"]') ? shell.querySelector('.overflow-y-auto') : null)
         || shell.querySelector('[role="dialog"] .overflow-y-auto');
 }
 
@@ -46,7 +47,8 @@ export function initScrollAids() {
 
     let animationFrame = 0;
     const getModalScrollRoot = () => {
-        const shells = [...document.querySelectorAll('#settingsModal, #supportModal')].filter((shell) => !shell.classList.contains('hidden'));
+        const shells = [...document.querySelectorAll('#settingsModal, #supportModal, [role="dialog"]')]
+            .filter((shell) => !shell.closest('.hidden'));
         for (const shell of shells) {
             const root = findModalScrollRoot(shell);
             if (root && root.clientHeight > 0) return root;
@@ -105,7 +107,7 @@ export function initScrollAids() {
         const contentObserver = new MutationObserver(scheduleUpdate);
         contentObserver.observe(scrollRoot, { childList: true, subtree: true });
         const discoverIndependentScrollAreas = () => {
-            document.querySelectorAll('#settingsModal, #supportModal').forEach((shell) => {
+            document.querySelectorAll('#settingsModal, #supportModal, [role="dialog"]').forEach((shell) => {
                 if (!observedModalShells.has(shell)) {
                     observedModalShells.add(shell);
                     const shellObserver = new MutationObserver(scheduleUpdate);
