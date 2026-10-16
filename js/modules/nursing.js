@@ -682,6 +682,11 @@ const TAB_DEFINITIONS = [
     { id: 'anatomy', label: 'Anatomy', icon: '🫀' }
 ];
 
+export function renderNursingTabButton(tab, activeTab) {
+    const isActive = activeTab === tab.id;
+    return '<button type="button" ' + (isActive ? 'aria-current="page" ' : '') + 'data-nursing-tab="' + escapeHtml(tab.id) + '" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 ' + (isActive ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + escapeHtml(tab.icon) + ' <span class="ml-1">' + escapeHtml(tab.label) + '</span></button>';
+}
+
 function findRestoredFocusTarget(container, source) {
     if (!source || !container) return null;
     if (source.matches?.('form[data-nursing-form]')) {
@@ -715,7 +720,7 @@ function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
         ? '<div class="mb-4"><button type="button" data-nursing-tab="review" class="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-brand-800 dark:text-indigo-200 dark:hover:bg-brand-700">← Return to review session</button></div>'
         : '';
     container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-brand-700 dark:bg-brand-900/90">' +
-        TAB_DEFINITIONS.map((tab) => '<button type="button" ' + (activeTab === tab.id ? 'aria-current="page" ' : '') + 'data-nursing-tab="' + tab.id + '" class="shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900 ' + (activeTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'border border-zinc-200 bg-white text-zinc-600 hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800 dark:text-zinc-300') + '">' + tab.icon + ' <span class="ml-1">' + tab.label + '</span></button>').join('') +
+        TAB_DEFINITIONS.map((tab) => renderNursingTabButton(tab, activeTab)).join('') +
         '</nav>' + reviewReturn + body + '</div>';
     container.scrollTop = resetScroll ? 0 : previousScrollTop;
     const restored = findRestoredFocusTarget(container, focusTarget);

@@ -4,12 +4,39 @@ describe('Timer Utilities', () => {
     let createTimerState;
     let stepTimerState;
     let formatTimerTime;
+    let renderTimersManager;
+    let toggleCustomTimersSection;
+    let customTimersExpanded;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/timers.js');
         createTimerState = mod.createTimerState || globalThis.createTimerState;
         stepTimerState = mod.stepTimerState || globalThis.stepTimerState;
         formatTimerTime = mod.formatTimerTime || globalThis.formatTimerTime;
+        renderTimersManager = mod.renderTimersManager;
+        toggleCustomTimersSection = mod.toggleCustomTimersSection;
+        customTimersExpanded = () => mod.customTimersExpanded;
+    });
+
+    it('renders a keyboard-operable Custom Timers disclosure and named 44px actions', () => {
+        const container = { innerHTML: '' };
+        renderTimersManager(container);
+
+        expect(container.innerHTML).toContain('id="customTimersToggle"');
+        expect(container.innerHTML).toContain(`aria-expanded="${customTimersExpanded()}"`);
+        expect(container.innerHTML).toContain('aria-controls="customTimersPanel"');
+        expect(container.innerHTML).toContain('id="customTimersPanel"');
+        expect(container.innerHTML).toMatch(/aria-label="(?:Start|Pause) .*? timer" aria-pressed="(?:true|false)"/);
+        expect(container.innerHTML).toMatch(/aria-label="Reset .*? timer"/);
+        expect(container.innerHTML).toMatch(/aria-label="Delete .*? timer"/);
+        expect(container.innerHTML.match(/h-11 w-11/g)?.length).toBeGreaterThanOrEqual(3);
+
+        const wasExpanded = customTimersExpanded();
+        toggleCustomTimersSection();
+        renderTimersManager(container);
+        expect(container.innerHTML).toContain(`aria-expanded="${!wasExpanded}"`);
+        expect(container.innerHTML).toContain(`id="customTimersPanel" class="${wasExpanded ? 'hidden' : 'block'} space-y-2"`);
+        toggleCustomTimersSection();
     });
 
     describe('createTimerState', () => {

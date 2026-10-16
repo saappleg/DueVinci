@@ -22,6 +22,76 @@ const DASHBOARD_WIDGETS = [
 ];
 
 const modalReturnFocus = new WeakMap();
+const sidebarReturnFocus = new WeakMap();
+const sidebarFocusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+function getVisibleSidebarFocusables(sidebar) {
+    if (!sidebar || typeof sidebar.querySelectorAll !== 'function') return [];
+    return [...sidebar.querySelectorAll(sidebarFocusableSelector)].filter((element) => (
+        !element.disabled
+        && element.getAttribute?.('aria-hidden') !== 'true'
+        && !element.closest?.('.hidden')
+        && element.offsetParent !== null
+    ));
+}
+
+export function focusFirstSidebarElement(sidebar) {
+    if (!sidebar) return null;
+    const first = getVisibleSidebarFocusables(sidebar)[0];
+    if (first) {
+        first.focus();
+        return first;
+    }
+    sidebar.tabIndex = -1;
+    sidebar.focus?.();
+    return sidebar;
+}
+
+export function trapSidebarTabKey(sidebar, event, activeElement = typeof document !== 'undefined' ? document.activeElement : null) {
+    if (!sidebar || event?.key !== 'Tab') return false;
+    const focusable = getVisibleSidebarFocusables(sidebar);
+    if (!focusable.length) {
+        event.preventDefault();
+        sidebar.focus?.();
+        return true;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const activeOutsideSidebar = !sidebar.contains(activeElement);
+    if (event.shiftKey && (activeElement === first || activeOutsideSidebar)) {
+        event.preventDefault();
+        last.focus();
+        return true;
+    }
+    if (!event.shiftKey && (activeElement === last || activeOutsideSidebar)) {
+        event.preventDefault();
+        first.focus();
+        return true;
+    }
+    return false;
+}
+
+function bindSidebarKeyboard(sidebar) {
+    if (sidebar.dataset.sidebarKeyboardBound === 'true') return;
+    sidebar.addEventListener('keydown', (event) => {
+        const isMobileOpen = typeof window !== 'undefined'
+            && window.matchMedia('(max-width: 1023px)').matches
+            && !sidebar.classList.contains('-translate-x-full')
+            && !sidebar.inert;
+        const visibleDialogOutsideSidebar = [...document.querySelectorAll('#settingsModal, #supportModal, #canvasSyncModal, [role="dialog"]')]
+            .some((dialog) => !dialog.closest('.hidden')
+                && dialog.getAttribute('aria-hidden') !== 'true'
+                && !sidebar.contains(dialog));
+        if (!isMobileOpen || visibleDialogOutsideSidebar) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            toggleSidebar(false);
+            return;
+        }
+        trapSidebarTabKey(sidebar, event);
+    });
+    sidebar.dataset.sidebarKeyboardBound = 'true';
+}
 
 function showAccessibleModal(modal, closeModal) {
     if (!modal) return;
@@ -222,9 +292,25 @@ export function toggleSidebar(forceOpen = null) {
     if (aside) {
         const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
         if (isMobile) {
-            const shouldOpen = forceOpen === null ? aside.classList.contains('-translate-x-full') : Boolean(forceOpen);
+            const isOpen = !aside.classList.contains('-translate-x-full');
+            const shouldOpen = forceOpen === null ? !isOpen : Boolean(forceOpen);
+            const trigger = document.activeElement;
+            if (shouldOpen && !isOpen) sidebarReturnFocus.set(aside, trigger);
             aside.classList.toggle('-translate-x-full', !shouldOpen);
+            aside.inert = !shouldOpen;
+            aside.setAttribute('aria-hidden', String(!shouldOpen));
             document.getElementById('sidebarBackdrop')?.classList.toggle('hidden', !shouldOpen);
+            if (shouldOpen && !isOpen) {
+                trigger?.setAttribute?.('aria-expanded', 'true');
+                trigger?.setAttribute?.('aria-controls', 'appSidebar');
+                bindSidebarKeyboard(aside);
+                focusFirstSidebarElement(aside);
+            } else if (!shouldOpen && isOpen) {
+                const returnFocus = sidebarReturnFocus.get(aside);
+                returnFocus?.setAttribute?.('aria-expanded', 'false');
+                sidebarReturnFocus.delete(aside);
+                if (returnFocus?.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
+            }
         } else {
             if (forceOpen === null) aside.classList.toggle('hidden');
             else aside.classList.toggle('hidden', !forceOpen);
@@ -410,9 +496,9 @@ export function ensureSettingsModalExists() {
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
-                <div class="relative min-h-0 flex-1">
+                <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    <div class="settings-scroll-pane h-full min-h-0 overflow-y-auto p-4 pt-14 sm:p-6 sm:pt-16">
+                    <div class="settings-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-14 sm:p-6 sm:pt-16">
                     <!-- Tab: Profile -->
                         <div id="content-profile" aria-hidden="false" class="block space-y-6">
                         <div>
@@ -421,7 +507,7 @@ export function ensureSettingsModalExists() {
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Display Name</label>
+                                <label for="profileDisplayName" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Display Name</label>
                                 <input type="text" id="profileDisplayName" maxlength="80" autocomplete="name" placeholder="How DueVinci should address you" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                                 <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Shown in your profile menu. Your email remains private.</p>
                             </div>
@@ -446,11 +532,11 @@ export function ensureSettingsModalExists() {
                                 <p id="profileBadgeMsg" class="hidden mt-1 text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                                <label for="profileEmail" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
                                 <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+                                <label for="profilePassword" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
                                 <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition shadow-sm">Save Profile Changes</button>
@@ -639,11 +725,11 @@ export function ensureSettingsModalExists() {
                             <div class="font-bold text-sm text-zinc-900 dark:text-white">🔗 Connect Your Canvas Instance</div>
                             <div id="canvasConnectorMsg" class="hidden text-xs rounded-lg px-3 py-2 border"></div>
                             <div>
-                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Canvas Instance URL</label>
+                                <label for="canvasDomainInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Canvas Instance URL</label>
                                 <input type="text" id="canvasDomainInput" placeholder="https://canvas.myschool.edu" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
+                                <label for="canvasTokenInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
                                 <input type="password" id="canvasTokenInput" placeholder="Canvas → Account → Settings → + New Access Token" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
                                 <p class="text-[11px] text-zinc-400 mt-1.5">Canvas: Account → Settings → Approved Integrations → + New Access Token.</p>
                             </div>
@@ -956,9 +1042,9 @@ export function ensureSupportModalExists() {
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                     </div>
                 </div>
-                <div class="relative min-h-0 flex-1">
+                <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    <div class="support-scroll-pane h-full min-h-0 overflow-y-auto p-6 pt-16">
+                    <div class="support-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-16">
                     <div id="support-content-contact" aria-hidden="false" class="block space-y-4">
                         <div>
                             <h2 id="supportModalTitle" class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>

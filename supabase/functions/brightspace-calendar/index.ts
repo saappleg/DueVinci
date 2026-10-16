@@ -1,11 +1,9 @@
-import { adminClient, corsHeaders, authenticatedUser, hasFeature, isSubscriptionActive, json, requireFeature } from '../_shared/canvas.ts'
+import { corsHeaders, authenticatedUser, hasFeature, isSubscriptionActive, json, requireFeature } from '../_shared/canvas.ts'
 import { decryptConnectionSecret, encryptConnectionSecret } from '../_shared/canvas_crypto.ts'
 import { parseBrightspaceCalendar } from '../_shared/brightspace_ical.ts'
+import { BRIGHTSPACE_MAX_EVENTS, saveBrightspaceCalendarEvents } from '../_shared/brightspace_calendar_sync.ts'
 
-const PROVIDER = 'brightspace'
 const MAX_FEED_BYTES = 3 * 1024 * 1024
-const MAX_EVENTS = 5000
-type AdminClient = ReturnType<typeof adminClient>
 const brightspaceCorsHeaders = { ...corsHeaders, 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 
 function normalizeFeedUrl(value: unknown) {
@@ -65,40 +63,6 @@ async function fetchCalendarFeed(url: string) {
   return new TextDecoder().decode(bytes)
 }
 
-async function saveCalendarEvents(admin: AdminClient, userId: string, calendarText: string) {
-  const events = parseBrightspaceCalendar(calendarText, MAX_EVENTS)
-  const syncedAt = new Date().toISOString()
-  if (events.length) {
-    const rows = events.map((event) => ({
-      user_id: userId,
-      title: event.title,
-      event_date: event.event_date,
-      color: '#0f766e',
-      source_provider: PROVIDER,
-      source_event_id: event.source_event_id,
-      source_last_seen_at: syncedAt,
-      is_active: true,
-    }))
-    for (let offset = 0; offset < rows.length; offset += 500) {
-      const { error } = await admin.from('custom_events').upsert(rows.slice(offset, offset + 500), {
-        onConflict: 'user_id,source_provider,source_event_id',
-      })
-      if (error) throw new Error('SNHU events could not be saved. Try syncing again.')
-    }
-    const { error: staleError } = await admin.from('custom_events')
-      .update({ is_active: false })
-      .eq('user_id', userId)
-      .eq('source_provider', PROVIDER)
-      .lt('source_last_seen_at', syncedAt)
-    if (staleError) throw new Error('SNHU events synced, but older feed entries could not be refreshed.')
-  }
-  const { error: connectionError } = await admin.from('brightspace_connections')
-    .update({ last_synced_at: syncedAt, last_sync_count: events.length, updated_at: syncedAt })
-    .eq('user_id', userId)
-  if (connectionError) throw new Error('SNHU events synced, but sync status could not be updated.')
-  return { count: events.length, syncedAt }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: brightspaceCorsHeaders })
   if (req.method !== 'POST') return json({ error: 'Use POST for Brightspace calendar actions.' }, 405)
@@ -127,7 +91,7 @@ Deno.serve(async (req) => {
     if (action === 'connect') {
       const feedUrl = normalizeFeedUrl(body?.feedUrl)
       const calendarText = await fetchCalendarFeed(feedUrl)
-      parseBrightspaceCalendar(calendarText, MAX_EVENTS)
+      parseBrightspaceCalendar(calendarText, BRIGHTSPACE_MAX_EVENTS)
       const now = new Date().toISOString()
       const { error } = await admin.from('brightspace_connections').upsert({
         user_id: user.id,
@@ -135,7 +99,7 @@ Deno.serve(async (req) => {
         updated_at: now,
       }, { onConflict: 'user_id' })
       if (error) throw error
-      const sync = await saveCalendarEvents(admin, user.id, calendarText)
+      const sync = await saveBrightspaceCalendarEvents(admin, user.id, calendarText)
       return json({ success: true, connected: true, lastSyncedAt: sync.syncedAt, lastSyncCount: sync.count })
     }
 
@@ -146,7 +110,7 @@ Deno.serve(async (req) => {
       if (!connection?.feed_url_encrypted) throw new Error('Connect your SNHU Brightspace calendar first.')
       const feedUrl = await decryptConnectionSecret(connection.feed_url_encrypted)
       const calendarText = await fetchCalendarFeed(feedUrl)
-      const sync = await saveCalendarEvents(admin, user.id, calendarText)
+      const sync = await saveBrightspaceCalendarEvents(admin, user.id, calendarText)
       return json({ success: true, connected: true, lastSyncedAt: sync.syncedAt, lastSyncCount: sync.count })
     }
 

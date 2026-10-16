@@ -37,6 +37,48 @@ export function shouldShowScrollProgress({ hasModal = false, modalRoot = null, a
         && scrollHeight - clientHeight > 1;
 }
 
+export function findScrollAidLeft(areaBounds, viewportWidth, buttonWidth, gap = 8, defaultRight = 16) {
+    if (!areaBounds || !Number.isFinite(viewportWidth) || buttonWidth <= 0) return null;
+    const minLeft = areaBounds.left + gap;
+    const maxLeft = areaBounds.right - gap - buttonWidth;
+    if (minLeft > maxLeft) return null;
+    return Math.max(minLeft, Math.min(viewportWidth - buttonWidth - defaultRight, maxLeft));
+}
+
+export function createScrollAidCandidateBounds(buttonBounds, left) {
+    const width = buttonBounds?.width;
+    const height = buttonBounds?.height;
+    if (!Number.isFinite(left) || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    return { left, right: left + width, width, height };
+}
+
+export function findScrollAidBottomOffset({ buttonBounds, controlBounds = [], viewportHeight, areaBounds, defaultOffset = 16, gap = 8 } = {}) {
+    if (!buttonBounds || !Array.isArray(controlBounds) || !Number.isFinite(viewportHeight)) return null;
+    const width = buttonBounds.width ?? buttonBounds.right - buttonBounds.left;
+    const height = buttonBounds.height ?? buttonBounds.bottom - buttonBounds.top;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    const areaTop = Math.max(0, areaBounds?.top ?? 0) + gap;
+    const areaBottom = Math.min(viewportHeight, areaBounds?.bottom ?? viewportHeight) - gap;
+    const minOffset = viewportHeight - areaBottom;
+    const maxOffset = viewportHeight - areaTop - height;
+    if (minOffset > maxOffset) return null;
+    let offset = Math.max(minOffset, Math.min(defaultOffset, maxOffset));
+    for (let attempt = 0; attempt <= controlBounds.length; attempt += 1) {
+        const top = viewportHeight - offset - height;
+        const bottom = top + height;
+        const overlapping = controlBounds.filter((control) => (
+            control && control.width !== 0 && control.height !== 0
+            && control.right > buttonBounds.left && control.left < buttonBounds.right
+            && control.bottom > top && control.top < bottom
+        ));
+        if (!overlapping.length) return offset;
+        const nextOffset = Math.max(offset, ...overlapping.map((control) => viewportHeight - control.top + gap));
+        if (nextOffset > maxOffset || nextOffset <= offset) return null;
+        offset = nextOffset;
+    }
+    return null;
+}
+
 function reducedMotionRequested() {
     return typeof window !== 'undefined'
         && typeof window.matchMedia === 'function'
@@ -75,13 +117,16 @@ export function initScrollAids() {
     document.body.append(backToTop);
 
     let animationFrame = 0;
+    const defaultBackToTopBottom = backToTop.style.bottom;
     const update = () => {
         const modalShells = [...document.querySelectorAll('#settingsModal, #supportModal, #canvasSyncModal, [role="dialog"]')];
         const modalShell = findForegroundModalShell(modalShells);
         const modalRootCandidate = findModalScrollRoot(modalShell);
         const modalRoot = modalRootCandidate?.clientHeight > 0 ? modalRootCandidate : null;
         activeScrollRoot = modalRoot || modalShell || scrollRoot;
-        const activeDialog = modalRoot?.closest('[role="dialog"]') || modalShell?.closest('[role="dialog"]') || (modalShell?.matches?.('[role="dialog"]') ? modalShell : null);
+        const activeDialog = modalRoot?.closest('[role="dialog"]')
+            || modalShell?.closest('[role="dialog"]')
+            || (modalShell?.matches?.('[role="dialog"]') ? modalShell : null);
         const backToTopParent = activeDialog || document.body;
         if (backToTop.parentElement !== backToTopParent) backToTopParent.append(backToTop);
         const maxScroll = Math.max(0, activeScrollRoot.scrollHeight - activeScrollRoot.clientHeight);
@@ -95,6 +140,42 @@ export function initScrollAids() {
         const percent = canScroll ? Math.min(1, Math.max(0, activeScrollRoot.scrollTop / maxScroll)) : 0;
         progress.hidden = !canScroll;
         fill.style.transform = 'scaleX(' + percent + ')';
+        let backToTopPositionSafe = true;
+        backToTop.style.bottom = defaultBackToTopBottom;
+        backToTop.style.left = '';
+        backToTop.style.right = '';
+        if (canScroll) {
+            backToTop.hidden = false;
+            const buttonBounds = backToTop.getBoundingClientRect();
+            const collisionScope = modalShell || app;
+            const areaBounds = activeScrollRoot.getBoundingClientRect();
+            const controlBounds = [...collisionScope.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')]
+                .filter((element) => element !== backToTop
+                    && !element.closest('.hidden')
+                    && !element.closest('[aria-hidden="true"]')
+                    && element.getClientRects().length > 0
+                    && getComputedStyle(element).visibility !== 'hidden')
+                .map((element) => element.getBoundingClientRect());
+            const preferredLeft = findScrollAidLeft(areaBounds, window.innerWidth, buttonBounds.width);
+            if (preferredLeft === null) {
+                backToTopPositionSafe = false;
+            } else {
+                const candidateBounds = createScrollAidCandidateBounds(buttonBounds, preferredLeft);
+                const adjustedBottom = candidateBounds && findScrollAidBottomOffset({
+                    buttonBounds: candidateBounds,
+                    controlBounds,
+                    viewportHeight: window.innerHeight,
+                    areaBounds,
+                    defaultOffset: Number.parseFloat(getComputedStyle(backToTop).bottom) || 16,
+                });
+                if (adjustedBottom === null) backToTopPositionSafe = false;
+                else {
+                    backToTop.style.left = Math.round(preferredLeft) + 'px';
+                    backToTop.style.right = 'auto';
+                    backToTop.style.bottom = Math.round(adjustedBottom) + 'px';
+                }
+            }
+        }
         if (modalRoot) {
             const bounds = modalRoot.getBoundingClientRect();
             progress.style.top = Math.round(bounds.top) + 'px';
@@ -108,7 +189,8 @@ export function initScrollAids() {
             progress.style.left = leftOffset + 'px';
             progress.style.width = Math.max(0, window.innerWidth - leftOffset) + 'px';
         }
-        backToTop.hidden = !canScroll || (activeScrollRoot.scrollTop < 240 && document.activeElement !== backToTop);
+        backToTop.hidden = !canScroll || !backToTopPositionSafe
+            || (activeScrollRoot.scrollTop < 240 && document.activeElement !== backToTop);
     };
     const scheduleUpdate = () => {
         if (animationFrame) return;
