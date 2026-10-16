@@ -130,16 +130,22 @@ function showAccessibleModal(modal, closeModal) {
 
 function hideAccessibleModal(modal) {
     if (!modal) return;
+    const trigger = modalReturnFocus.get(modal);
+    const fallback = modal.id === 'settingsModal'
+        ? document.querySelector('duevinci-sidebar button[aria-label="Open profile settings"]')
+        : document.querySelector('button[onclick*="openSupportModal"]');
+    const focusIsInsideModal = () => Boolean(modal.contains?.(document.activeElement));
+    const focusOutsideModal = (target) => {
+        if (!target?.isConnected || typeof target.focus !== 'function' || modal.contains?.(target)) return false;
+        target.focus();
+        return !focusIsInsideModal();
+    };
+
+    if (!focusOutsideModal(trigger)) focusOutsideModal(fallback);
+    if (focusIsInsideModal()) document.activeElement?.blur?.();
+
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
-    const trigger = modalReturnFocus.get(modal);
-    if (trigger?.isConnected && typeof trigger.focus === 'function') trigger.focus();
-    else {
-        const fallback = modal.id === 'settingsModal'
-            ? document.querySelector('duevinci-sidebar button[aria-label="Open profile settings"]')
-            : document.querySelector('button[onclick*="openSupportModal"]');
-        fallback?.focus();
-    }
     modalReturnFocus.delete(modal);
 }
 

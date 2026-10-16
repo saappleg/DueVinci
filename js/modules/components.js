@@ -67,8 +67,8 @@ class DueVinciSidebar extends BaseElement {
         const showTutor = isWorkspaceFeatureVisible('tutor');
         const showNursing = isWorkspaceFeatureVisible('nursing_hub');
 
-        const navActiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
-        const navInactiveStyle = "flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
+        const navActiveStyle = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
+        const navInactiveStyle = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
 
         this.innerHTML = `
         <div id="sidebarBackdrop" onclick="toggleSidebar(false)" class="hidden fixed inset-0 z-30 bg-zinc-900/50 backdrop-blur-[1px] lg:hidden"></div>
@@ -77,10 +77,10 @@ class DueVinciSidebar extends BaseElement {
                 <div class="px-6 pt-6 pb-2 flex justify-between items-center text-zinc-500 dark:text-zinc-400">
                     <span class="text-xs font-bold uppercase tracking-wider">Timer</span>
                     <div class="flex gap-2">
-                        <button type="button" onclick="toggleTimerSettings()" title="Custom Timer Settings" class="hover:text-zinc-800 dark:hover:text-white transition">
+                        <button type="button" onclick="toggleTimerSettings()" title="Custom Timer Settings" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition">
                             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                         </button>
-                        <button type="button" onclick="toggleTimerCollapse()" title="Collapse Timer" class="hover:text-zinc-800 dark:hover:text-white transition" id="timerCollapseIcon">
+                        <button type="button" onclick="toggleTimerCollapse()" title="Collapse Timer" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition" id="timerCollapseIcon">
                             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
                         </button>
                     </div>
@@ -88,10 +88,10 @@ class DueVinciSidebar extends BaseElement {
 
                 <div id="timerSettingsForm" class="hidden px-6 pb-4 text-sm text-zinc-600 dark:text-zinc-400 space-y-2">
                     <div class="flex justify-between items-center gap-2">
-                        <label class="flex-1 text-xs font-medium">Focus (min): <input type="number" id="focusMinInput" class="w-14 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600 text-xs text-center" value="25"></label>
-                        <label class="flex-1 text-xs font-medium">Break (min): <input type="number" id="breakMinInput" class="w-14 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600 text-xs text-center" value="5"></label>
+                        <label class="flex-1 text-xs font-medium">Focus (min): <input type="number" id="focusMinInput" class="min-h-[44px] w-14 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600 text-xs text-center" value="25"></label>
+                        <label class="flex-1 text-xs font-medium">Break (min): <input type="number" id="breakMinInput" class="min-h-[44px] w-14 border rounded p-1 ml-1 dark:bg-brand-900 dark:border-brand-600 text-xs text-center" value="5"></label>
                     </div>
-                    <button type="button" onclick="saveTimerSettings()" class="w-full bg-indigo-600 text-white font-bold py-1.5 rounded hover:bg-indigo-700 transition text-xs shadow-sm">Save Time</button>
+                    <button type="button" onclick="saveTimerSettings()" class="min-h-[44px] min-w-[44px] w-full bg-indigo-600 text-white font-bold py-1.5 rounded hover:bg-indigo-700 transition text-xs shadow-sm">Save Time</button>
                 </div>
 
                 <div id="timerContent" class="px-6 pb-5 flex flex-col items-center transition-all overflow-hidden">
@@ -104,9 +104,9 @@ class DueVinciSidebar extends BaseElement {
                     </div>
 
                     <div class="flex items-center gap-3 mb-2 text-zinc-500 dark:text-zinc-400">
-                        <button type="button" onclick="resetTimer()" title="Reset Timer" class="hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
-                        <button type="button" onclick="toggleTimer()" id="timerPlayBtn" class="bg-white dark:bg-zinc-100 text-zinc-900 p-2.5 rounded-lg shadow-sm hover:scale-105 transition"><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-                        <button type="button" onclick="skipTimer()" title="Skip Mode" class="hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 4v16M9 4l10 8-10 8V4z"/></svg></button>
+                        <button type="button" onclick="resetTimer()" title="Reset Timer" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+                        <button type="button" onclick="toggleTimer()" id="timerPlayBtn" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-white dark:bg-zinc-100 text-zinc-900 p-2.5 rounded-lg shadow-sm hover:scale-105 transition"><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                        <button type="button" onclick="skipTimer()" title="Skip Mode" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 4v16M9 4l10 8-10 8V4z"/></svg></button>
                     </div>
 
                     <div id="timersManagerContainer" class="w-full mt-2 pt-2 border-t border-zinc-200 dark:border-brand-700"></div>
@@ -149,7 +149,7 @@ class DueVinciSidebar extends BaseElement {
                     </span>
                     <svg class="h-4 w-4 shrink-0 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
-                <button type="button" onclick="openSupportModal()" class="flex items-center gap-3 w-full text-left px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm font-medium transition">
+                <button type="button" onclick="openSupportModal()" class="flex min-h-[44px] min-w-[44px] items-center gap-3 w-full text-left px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm font-medium transition">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support & Help
                 </button>
             </div>
