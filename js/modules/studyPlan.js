@@ -1052,9 +1052,9 @@ export async function openStudyPlanDayModal(dateStr) {
     if (!day) return;
 
     // Intensity calculation
-    let intensityLabel = 'Rest & Light Review';
+    let intensityLabel = day.isProtectedDate ? 'Protected No-Study Date' : (day.isRestDay ? 'Rest & Recovery Day' : 'Open Study Day');
     let intensityBg = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
-    let intensityIcon = '🌴';
+    let intensityIcon = day.isProtectedDate ? '🛡️' : (day.isRestDay ? '🌴' : '📚');
 
     if (day.totalMinutes > 90) {
         intensityLabel = 'Heavy Study Load';
@@ -1173,7 +1173,7 @@ export async function openStudyPlanDayModal(dateStr) {
     modal.innerHTML = `
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200 text-zinc-800 dark:text-zinc-200">
             <!-- Modal Header -->
-            <div class="p-6 pb-4 border-b border-zinc-200 dark:border-brand-700 bg-zinc-50/80 dark:bg-brand-900 flex items-start justify-between gap-4">
+            <div class="shrink-0 p-6 pb-4 border-b border-zinc-200 dark:border-brand-700 bg-zinc-50/80 dark:bg-brand-900 flex items-start justify-between gap-4">
                 <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-xl">🗓️</span>
@@ -1197,7 +1197,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Rest Day Toggle Bar -->
-            <div class="px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
+            <div class="shrink-0 px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
                 <span class="text-zinc-600 dark:text-zinc-400 font-medium">
                     ${day.isProtectedDate ? '🛡️ This is a <strong>protected no-study date</strong>; the planner will not assign coursework here.' : (day.isRestDay ? '🌴 This day is marked as a <strong>Rest Day</strong> (no study blocks assigned).' : '📚 This day is an active <strong>Study Day</strong>.')}
                 </span>
@@ -1207,7 +1207,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Summary Stats Bar -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-zinc-100/60 dark:bg-brand-900 border-b border-zinc-200 dark:border-brand-700 text-xs">
+            <div class="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-zinc-100/60 dark:bg-brand-900 border-b border-zinc-200 dark:border-brand-700 text-xs">
                 <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
                     <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Planned Time</div>
                     <div class="text-base font-black text-indigo-600 dark:text-indigo-400 mt-0.5">${day.totalMinutes} mins</div>
@@ -1227,7 +1227,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Modal Body (Scrollable Task List) -->
-            <div class="p-6 space-y-4 overflow-y-auto max-h-[55vh] bg-white dark:bg-brand-800">
+            <div class="min-h-0 flex-1 p-6 space-y-4 overflow-y-auto bg-white dark:bg-brand-800">
                 <div class="flex justify-between items-center pb-1">
                     <h4 class="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">All Scheduled Blocks (${day.allBlocks.length})</h4>
                     <span class="text-[11px] text-zinc-400 font-medium">Sequential Unit & Lesson Order</span>
@@ -1246,7 +1246,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Modal Footer -->
-            <div class="p-4 px-6 bg-zinc-50 dark:bg-brand-900 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between gap-3">
+            <div class="shrink-0 p-4 px-6 bg-zinc-50 dark:bg-brand-900 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between gap-3">
                 <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Click any timer to jump straight into deep work.</span>
                 <button type="button" onclick="closeStudyPlanDayModal()" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-brand-700 dark:hover:bg-brand-600 text-white font-bold rounded-xl text-xs transition shadow-sm">
                     Close Plan
