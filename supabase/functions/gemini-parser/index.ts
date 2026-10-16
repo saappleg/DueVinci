@@ -1,4 +1,9 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+import { authenticatedUser } from '../_shared/canvas.ts'
+
+const MAX_REQUEST_BYTES = 12 * 1024 * 1024
+const MAX_SYLLABUS_CHARACTERS = 100_000
+const MAX_IMAGE_BASE64_LENGTH = 11_200_000
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,6 +64,16 @@ async function generateContent(apiKey: string, bodyPayload: object) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
+  const contentLength = Number(req.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return json({ error: 'The uploaded file is too large. Please use a smaller syllabus or image.' }, 413)
+  }
+
+  try {
+    await authenticatedUser(req)
+  } catch {
+    return json({ error: 'Sign in before using Syllabus AI.' }, 401)
+  }
 
   try {
     const { type, text, imageBase64, mimeType } = await req.json()
@@ -68,10 +83,20 @@ Deno.serve(async (req) => {
     const currentYear = new Date().getFullYear()
     let bodyPayload: object
     if (type === 'syllabus') {
+      if (typeof text !== 'string' || text.length === 0 || text.length > MAX_SYLLABUS_CHARACTERS) {
+        return json({ error: 'Syllabus text must be non-empty and no longer than 100,000 characters.' }, 413)
+      }
       bodyPayload = { contents: [{ parts: [{ text: `You are a syllabus parser. The current year is ${currentYear}. Read this syllabus and return ONLY a valid JSON object. Do not include markdown formatting or backticks. The JSON must have: 'description' (string, max 250 chars), 'objectives' (string, max 250 chars), and 'units' (array of objects with 'num' (integer), 'title', 'dateStr' (string, extract the exact date text if present), and a 'lessons' array of strings). Syllabus text: ${text}` }] }] }
     } else if (type === 'syllabus_metadata') {
+      if (typeof text !== 'string' || text.length === 0 || text.length > MAX_SYLLABUS_CHARACTERS) {
+        return json({ error: 'Syllabus text must be non-empty and no longer than 100,000 characters.' }, 413)
+      }
       bodyPayload = { contents: [{ parts: [{ text: `You are a syllabus analyzer. Read this syllabus and return ONLY a valid JSON object. Do not include markdown formatting or backticks. The JSON must have ONLY: 'description' (string, max 250 chars) and 'objectives' (string, max 250 chars). Do not include units or lessons. Syllabus text: ${text}` }] }] }
     } else if (type === 'screenshot') {
+      if (typeof imageBase64 !== 'string' || imageBase64.length === 0 || imageBase64.length > MAX_IMAGE_BASE64_LENGTH
+        || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
+        return json({ error: 'Use a JPEG, PNG, or WebP image under 8 MB.' }, 413)
+      }
       bodyPayload = { contents: [{ parts: [
         { text: `You are a course lesson parser. The current year is ${currentYear}. Read this screenshot. Return ONLY a valid JSON object (no markdown, no backticks). It must contain a 'units' array. Each unit should be an object with: 'num' (integer), 'title' (string), 'dateStr' (string, the START date for this unit — if a date range is shown like "Aug 26 – Sep 2" extract only the first date "Aug 26"), 'endDateStr' (string or null, the END date if a date range is shown — e.g. "Sep 2" — otherwise null), and 'lessons' (array of strings). If a single date is shown, set endDateStr to null.` },
         { inlineData: { mimeType, data: imageBase64 } },
