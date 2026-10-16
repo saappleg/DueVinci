@@ -1,79 +1,52 @@
 # Testing & CI/CD 🧪
 
-DueVinci maintains a robust automated testing and continuous integration suite to ensure stability across releases.
+DueVinci uses Vitest for source and behavior regressions, syntax checks for the modules listed in `package.json`, and GitHub Actions for release validation.
 
----
-
-## 🔬 Test Suite (Vitest)
-
-DueVinci uses [Vitest](https://vitest.dev/) for high-speed ESM-native unit testing.
-
-### Running Tests Locally
+## Local commands
 
 ```bash
-# Run all unit tests once
 npm test
-
-# Run tests in interactive watch mode (ideal during development)
 npm run test:watch
-
-# Generate code coverage reports
-npm run test:coverage
-```
-
----
-
-## 📂 Test Coverage Structure
-
-All test files reside in the `tests/` directory:
-
-| Test File | Target Modules / Features Covered |
-| :--- | :--- |
-| `tests/academic.test.js` | Study streaks, due-date calculations, GPA conversion, and workload-radar classification |
-| `tests/sm2_spaced_repetition.test.js` | SuperMemo-2 ease factor updates, interval progression, floor clamping |
-| `tests/study_plan.test.js` | Lesson sequencing, deadline-first allocation, rest-day behavior, and study blocks |
-| `tests/timers.test.js` | Pomodoro interval transitions, duration formatting, state machines |
-| `tests/quiz_backup.test.js` | JSON export schema validation, import parsing, migration scripts |
-| `tests/markdown.test.js` | HTML sanitization, markdown syntax parsing, math formatting, and safe external URLs |
-| `tests/nursing.test.js` | Nursing workspace validation, dosage calculations and units, and balanced quick-review queues |
-| `tests/degreeThemes.test.js` | Degree theme definitions and palette/contrast invariants |
-| `tests/scrollAids.test.js` | Nested Settings and Support modal scroll-pane detection |
-| `tests/preferenceMerge.test.js` | Account preference merge and validated Nursing workspace sync |
-| `tests/offlineDb.test.js` | Offline queue persistence, replay, and account isolation |
-
----
-
-## 🔍 Syntax & Static Checks
-
-To prevent runtime errors in ES6 native modules, the project provides a syntax validation script:
-
-```bash
 npm run check:syntax
 ```
-This runs `node --check` against all JavaScript modules in `js/` and `js/modules/` to verify AST correctness.
 
----
+`npm run test:coverage` is defined for environments with the required coverage tooling; it was not part of the October 16 release evidence. Syntax checking is not type checking or a browser execution test.
 
-## 🚀 GitHub Actions CI Pipeline
+## Coverage areas
 
-The project includes an automated workflow in `.github/workflows/ci.yml` that triggers on every pull request and push to `main` or `dev`:
+| Tests | Contract covered |
+| --- | --- |
+| `academic`, `study_plan`, `today`, `weekly_review` | Dates, workload, sequencing, planning boundaries and summaries |
+| `courses`, `calendar`, `calendar_conversion`, `term_rollover` | Course behavior, date/file handling, conversion and rollover idempotency |
+| `grades`, `timers`, `tutor` | Grade controls, timer states, Tutor loading/reply/error boundaries |
+| `sm2_spaced_repetition`, `quiz_backup`, `backup_export` | Review math, portable payloads and export failure handling |
+| `nursing`, `degreeThemes`, `preferenceMerge` | Fictional study workspace, theme invariants and validated preferences |
+| `settings_accessibility`, `navigationTargets`, `sidebarFocus`, `modalFocus` | Labels, source sizing contracts and focus behavior |
+| `scrollAids`, `pwa`, `service_worker`, `offlineDb` | Nested panes, visibility/collisions, local worker exclusion, cache and offline queue contracts |
+| `brightspace_calendar_sync`, `canvas_assignment_changes`, `study_calibration` | Feed retirement/error safeguards, assignment change detection and bounded personalization |
 
-```mermaid
-flowchart LR
-    Push[Push / Pull Request] --> Checkout[Checkout Repo]
-    Checkout --> SetupNode[Setup Node.js 24]
-    SetupNode --> Install[npm ci]
-    Install --> Syntax[npm run check:syntax]
-    Syntax --> Test[npm test]
-    Test --> Status{CI Result}
-    Status -->|Pass| Ready[PR Mergeable ✅]
-    Status -->|Fail| Block[Blocked ❌]
-```
+These are `tests/*.test.js` files. Source class assertions do not calculate CSS geometry, and DOM stubs do not replace an accessibility-tree or real keyboard check.
 
-The GitHub Pages deployment workflow repeats `npm run check:syntax` and `npm test` before publishing, so a deployment cannot skip the release checks. After deployment it runs `scripts/release-smoke.mjs`, which verifies the published pages, service worker, manifest, and local PWA assets.
+## CI and deployment
 
-When the repository Actions secrets `DUEVINCI_SMOKE_EMAIL` and
-`DUEVINCI_SMOKE_PASSWORD` are configured for a dedicated test account, the same
-smoke test also verifies Supabase password sign-in, a temporary planner write
-(which it deletes), and the support Edge Function. Never use a personal account
-or place its password in source code.
+[CI](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/ci.yml) runs on pull requests and pushes to `main`/`dev`, using Node 24, syntax checks, Vitest, and asset checks. The [Pages workflow](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/deploy.yml) repeats syntax/tests before publishing.
+
+After deployment, `scripts/release-smoke.mjs` checks public pages, the service worker, manifest, and local assets. With dedicated `DUEVINCI_SMOKE_EMAIL`/`DUEVINCI_SMOKE_PASSWORD` secrets, it also signs in and performs a temporary planner write followed by a cleanup step. Pages and the production monitor currently set `DUEVINCI_SMOKE_SKIP_SUPPORT=true`; support submission is intentionally skipped. Do not use personal credentials or describe a logged cleanup attempt as an independent database deletion check.
+
+## October 16, 2026 release evidence
+
+Application release [c9abb3900f4762cd5109c8064afbf2029d133066](https://github.com/saappleg/DueVinci/commit/c9abb3900f4762cd5109c8064afbf2029d133066), application line 2.8 / shell `duevinci-v8.42`:
+
+- **231 tests in 33 files** passed, plus `npm run check:syntax` and `git diff --check`.
+- [Main CI](https://github.com/saappleg/DueVinci/actions/runs/38886005100), [Pages and production smoke](https://github.com/saappleg/DueVinci/actions/runs/38886005054), and [built-in Pages](https://github.com/saappleg/DueVinci/actions/runs/38886005150) passed.
+- Signed-in Chrome's full six-section Settings light/dark matrix passed on v8.40. Scrolling reached lower controls; Nursing header artwork and one fictional General Tutor reply were checked.
+- v8.41 focused checks verified 393×852 mobile navigation/timer bounds, drawer Tab/Escape/focus return, Grades header width, and Dashboard/Nursing Settings plus Support close focus.
+- v8.42 confirmed the main timer's **Start or pause timer** accessible name and 44×44 target. The timer was not started for that check.
+
+The browser was restored to desktop Nursing Overview with Follow System selected. These observations are dated release evidence, not a claim that every mode was rerun on every follow-up.
+
+## Remaining verification boundaries
+
+Purchases, real LMS synchronization, account deletion/credential changes, cross-device workflows, and complete accessibility compliance were not established by that audit. Deno was unavailable locally; backend deployment acceptance and status-only UI checks do not replace Deno type checking or a real provider sync. Nursing checks must always use fictional study content and no patient information.
+
+Follow the [release checklist](https://github.com/saappleg/DueVinci/blob/main/docs/RELEASE_CHECKLIST.md) for additional environment-specific checks.

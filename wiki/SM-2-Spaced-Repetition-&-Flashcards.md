@@ -1,54 +1,40 @@
 # SM-2 Spaced Repetition & Flashcards 🃏
 
-DueVinci incorporates a native, client-side implementation of the renowned **SuperMemo-2 (SM-2)** spaced repetition algorithm (`js/modules/flashcards.js`) to optimize long-term concept retention for exams and quizzes.
+`js/modules/flashcards.js` builds course study material from the student's notes, calculates SM-2 review intervals, and saves account-scoped mastery. Current generation extracts note concepts locally; it does not call Gemini to generate these decks.
 
----
+## SM-2 calculation
 
-## 🧮 The SM-2 Algorithm Explained
+The pure calculation accepts recall quality from 0 to 5. The UI presents four responses: **Again** (1), **Hard** (3), **Good** (4), and **Easy** (5).
 
-The SM-2 algorithm calculates the ideal interval before reviewing a card again based on the user's recall quality rating (from `0` to `5`).
-
-### 1. Recall Quality Ratings ($q$)
-- **5 (Perfect Recall)**: Instant, confident response.
-- **4 (Good Recall)**: Correct response with brief hesitation.
-- **3 (Passable Recall)**: Correct response with noticeable effort.
-- **2 (Incorrect / High Effort)**: Incorrect response, but remembered upon seeing answer.
-- **1 (Incorrect / Familiar)**: Incorrect response, answer felt familiar.
-- **0 (Complete Blackout)**: No memory of the concept.
-
-### 2. Ease Factor Formula
-The Ease Factor ($EF$) starts at `2.5` and adapts after each review session:
+The ease factor starts at 2.5 and is updated as:
 
 $$EF' = EF + (0.1 - (5 - q) \times (0.08 + (5 - q) \times 0.02))$$
 
-> [!NOTE]
-> The Ease Factor ($EF$) has a strict minimum floor of `1.30` to prevent cards from getting permanently stuck in review loops.
-
-### 3. Interval Calculation ($I$)
-- If $q < 3$ (Failed recall): $n = 0, \quad I = 1\text{ day}$
-- If $q \ge 3$ (Successful recall):
-  - For $n = 1$: $I_1 = 1\text{ day}$
-  - For $n = 2$: $I_2 = 6\text{ days}$
-  - For $n > 2$: $I_n = I_{n-1} \times EF$
+Its minimum is 1.3. Failed recall (`q < 3`) resets repetitions and schedules one day. Successful recall schedules one day for the first repetition, six days for the second, and then a rounded previous interval multiplied by the updated ease factor. The resulting date and review state are saved per card.
 
 ```mermaid
 stateDiagram-v2
     [*] --> NewCard
-    NewCard --> InReview: First Practice
-    InReview --> ReviewPassed: Score >= 3
-    InReview --> ReviewFailed: Score < 3
-    ReviewFailed --> InReview: Interval = 1 Day (Reset Repetitions)
-    ReviewPassed --> Graduated: Interval *= Ease Factor
-    Graduated --> InReview: Due Date Arrived
+    NewCard --> InReview: Review
+    InReview --> ReviewFailed: Quality below 3
+    InReview --> ReviewPassed: Quality 3 or above
+    ReviewFailed --> InReview: Reset repetitions, one day
+    ReviewPassed --> InReview: Next interval
 ```
 
----
+## Using course study tools
 
-## ✨ Features
+1. Open a class's Scratchpad or Study & Quiz section and supply your own study notes.
+2. Generate the spaced deck/practice quiz using the existing controls.
+3. Flip cards with **Flip Card**, use Previous/Next, and select a recall response.
+4. Use the optional read-aloud control or export the current deck as CSV for compatible tools.
 
-- 🗂️ **Deck & Tag Management**: Group flashcards by Course, Term, Topic, or Exam.
-- ⚡ **Active Recall Quiz Mode**: Fullscreen flip-card interface with keyboard shortcuts:
-  - `Space` / `Enter`: Flip card.
-  - `1`, `2`, `3`, `4`, `5`: Rate recall quality.
-- 🤖 **AI Card Generator**: Generate flashcard decks automatically from syllabus outlines, lecture notes, or markdown files using Google Gemini.
-- 📈 **Retention Analytics**: Visual charts showing cards due today, learning cards, and graduated cards.
+The current UI does not implement a separate deck/tag manager, global number-key recall shortcuts, retention charts, or Anki `.apkg` import/export. Native buttons remain keyboard-activatable; this is different from global hotkey support.
+
+## Saving and portability
+
+Mastery is scoped to the signed-in account and course. Local review changes are retained for later cloud merge; per-card timestamps resolve review-state updates. Backups include the current account's available local/cloud mastery. Older unscoped progress is not automatically assigned to whichever account signs in next.
+
+See [Data Backup & Cloud Sync](Data-Backup-&-Cloud-Sync) and [Offline Support & PWA](Offline-Support-&-PWA). Cross-device behavior needs verification with actual accounts; static algorithm tests do not prove a complete synchronization session.
+
+Nursing Hub has its own documented workspace/review tools. All nursing study content must be fictional and contain no real patient information.

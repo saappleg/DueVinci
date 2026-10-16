@@ -18,11 +18,19 @@ The dashboard now shows the importer preference poll at the top of the main page
 
 ## Database rollout
 
-Apply these migrations to the target Supabase environment before enabling the hosted beta:
+Review and approve the listed migrations for the intended Supabase environment
+before enabling the hosted beta. Link that project, inspect the dry run, then
+apply the approved pending migrations:
 
 ```sh
-supabase db push --project-ref <target-project-ref>
+supabase link --project-ref <target-project-ref>
+supabase db push --dry-run
+supabase db push
 ```
+
+Replace the project reference with the intended environment; keep Dev and
+Production links separate. The [Supabase CLI reference](https://supabase.com/docs/reference/cli/introduction)
+documents `--project-ref` on `link`, not `db push`.
 
 The weekly course migration adds course window metadata. The importer poll migrations are write-only for `anon` and `authenticated`: visitors may submit a multi-select vote from the website, but the Data API does not expose individual responses for reading.
 

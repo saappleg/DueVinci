@@ -1,124 +1,71 @@
 # Architecture & Tech Stack 🏛️
 
-DueVinci is built with a **modular, zero-build, local-first architecture** designed for high performance, rapid prototyping, and privacy.
+DueVinci is a static multi-page application using native JavaScript ES modules, locally served vendor assets, Supabase services, and a per-user offline planner cache. The application does not need a production bundler to run.
 
----
-
-## 🏗️ Architecture Diagram
+## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Client Browser
-        subgraph UI Layer
-            HTML[HTML5 Semantic Pages]
-            TW[Locally hosted Tailwind CSS]
-            Icons[Heroicons & SVG Icons]
-            FC[FullCalendar UI]
-        end
-
-        subgraph Engine Layer [ES6 Feature Engines in /js/modules/]
-            Academics[academics.js - Academic dashboard and workload radar]
-            StudyPlan[studyPlan.js - Workload & Scheduling]
-            Flashcards[flashcards.js - SM-2 Spaced Repetition]
-            Grades[grades.js - GPA & What-If Engine]
-            Timers[timers.js - Pomodoro & Audio Synth]
-            Calendar[calendar.js - ICS & Event Engine]
-            Markdown[markdown.js - Markdown & Math Renderer]
-            Tour[tour.js - Onboarding Engine]
-        end
-
-        subgraph Core Layer
-            App[app.js - App Orchestrator]
-            UI[ui.js - Modals, Toasts & Themes]
-            Config[config.js - Constants & Keys]
-            Auth[auth.js - Supabase & Guest Auth]
-            Backup[backup.js - JSON Export/Import]
-            OfflineDB[offlineDb.js - local persistence helper]
-            PWA[pwa.js / sw.js - Service Worker Cache]
-        end
-    end
-
-    subgraph Backend & Services
-        Supabase[(Supabase PostgreSQL + Auth)]
-        EdgeFn[Supabase Edge Function: gemini-parser]
-        Gemini[Google Gemini 1.5 Pro/Flash AI]
-    end
-
-    HTML --> App
-    App --> Engine Layer
-    Engine Layer --> OfflineDB
-    Engine Layer <--> Supabase
-    Engine Layer --> EdgeFn
-    EdgeFn --> Gemini
+    Pages[Dashboard, Classes, Grades, Calendar, Nursing, Tutor]
+    Modules[Feature modules and shared UI]
+    LocalDB[(Per-user cache and mutation queue)]
+    Preferences[(Local preferences and account sync)]
+    SW[Production service worker]
+    Assets[(Versioned static assets)]
+    Supabase[(Supabase Auth, RLS data and storage)]
+    Edge[Authenticated Edge Functions]
+    Providers[Gemini, Canvas, Brightspace, Stripe and Web Push]
+    Pages --> Modules
+    Pages --> SW
+    SW --> Assets
+    Modules <--> LocalDB
+    Modules <--> Preferences
+    LocalDB --> Supabase
+    Preferences <--> Supabase
+    Modules --> Supabase
+    Modules --> Edge
+    Edge --> Providers
 ```
 
----
+## Frontend
 
-## 🛠️ Technology Stack Breakdown
+- HTML and vanilla ES modules; `js/app.js` coordinates initialization and bindings.
+- Tailwind and browser vendor libraries are served locally and included in the production cache where configured.
+- FullCalendar renders the current Month/Week calendar UI.
+- PDF.js extracts PDF text; configurable Gemini models process optional syllabus requests server-side.
+- Inline SVGs and existing theme CSS preserve the site's visual identity. Degree themes provide accent colors and background artwork.
+- Web Audio synthesizes timer alarms and ambient white/brown noise.
 
-### Frontend
-- **Language**: Native Modern JavaScript (ES6+ Modules, zero-bundler dependency).
-- **Styling**: Locally hosted Tailwind CSS and vendor assets, pre-cached for PWA availability, with custom dark-mode color palettes.
-- **Icons**: Inline SVG / Heroicons for lightweight, crisp vector rendering.
-- **Interactive Calendar**: [FullCalendar](https://fullcalendar.io/) (v6) for month, week, day, and list schedule visualization.
-- **Document Rendering**: [PDF.js](https://mozilla.github.io/pdf.js/) for client-side text extraction from uploaded PDF documents.
-- **Spaced Repetition Engine**: Native implementation of the SuperMemo-2 (SM-2) memory decay curve algorithm.
-- **Sound Synthesis**: Native Web Audio API for synthetic chimes and alerts without requiring external `.mp3` dependencies.
+## Main modules
 
-### Persistence & Cloud Sync
-- **Offline planner cache**: IndexedDB keeps a per-user cache and queued free-planner mutations for replay after reconnecting.
-- **Browser preferences**: Non-sensitive UI preferences are cached locally and synchronize through the RLS-protected `user_preferences` table for signed-in users.
-- **Cloud Backend**: [Supabase](https://supabase.com) (PostgreSQL and Auth) stores authenticated coursework and calendar data. Row Level Security policies scope data to `auth.uid() = user_id`.
-- **Edge Computing**: Supabase Edge Functions (Deno runtime) for proxying AI requests securely without exposing developer API keys in frontend client bundles.
-- **AI Processing**: Google Gemini API (`gemini-1.5-flash` / `gemini-1.5-pro`) for multimodal syllabus analysis.
+| Module | Responsibility |
+| --- | --- |
+| `academics.js`, `studyPlan.js`, `courseDates.js` | Academic summaries, workload, sequence/deadline planning and date windows |
+| `courses.js`, `termRollover.js` | Class/term UI, syllabus import, old-term-preserving class-shell copies |
+| `calendar.js` | Calendar UI, date-based `.ics` handling and event-to-assignment conversion |
+| `grades.js` | Percentage averages, linear GPA scaling and temporary What-If values |
+| `flashcards.js` | Note-derived study content, SM-2 calculations and account-scoped mastery |
+| `timers.js`, `studyCalibration.js` | Countdown timers and opt-in Pro duration estimates from completed linked work |
+| `nursing.js`, `degreeThemes.js` | Optional fictional Nursing workspace and field themes |
+| `tutor.js`, `subscription.js`, `canvas.js`, `brightspace.js`, `lmsAlerts.js` | Pro UI, entitlement snapshots, provider actions and opt-in alerts |
+| `ui.js`, `components.js`, `scrollAids.js` | Shared sidebar, Settings/Support, focus, themes and nested-pane aids |
+| `auth.js`, `preferences.js`, `offlineDb.js`, `backup.js`, `pwa.js` | Authentication, account preferences, local queue, portability and worker lifecycle |
 
----
+The repository also contains `supabase/functions/`, `supabase/migrations/`, `tests/`, `docs/`, and the wiki source. See [Developer Guide](Developer-Guide-&-Contributing) for contribution checks.
 
-## 📂 Directory Structure
+## Persistence boundaries
 
-```text
-DueVinci/
-├── index.html                   # Dashboard (Up Next, Daily Goals & Overview)
-├── courses/
-│   └── index.html               # Course Hub, Syllabus AI, Flashcards & Modules
-├── grades/
-│   └── index.html               # Grade Tracker & Interactive GPA Simulator
-├── calendar/
-│   └── index.html               # FullCalendar view, Agenda & .ics Sync
-├── legal/
-│   ├── terms.html               # Terms of Service
-│   └── privacy.html             # Privacy Policy & Data Retention Policy
-├── js/
-│   ├── app.js                   # Root initialization and module coordinator
-│   └── modules/                 # Modular feature controllers
-│       ├── academics.js         # Dashboard analytics and workload radar
-│       ├── auth.js              # Supabase authentication & guest state
-│       ├── backup.js            # JSON import/export & version migrations
-│       ├── calendar.js          # Calendar events & ICS generation
-│       ├── components.js        # Reusable UI component templates
-│       ├── config.js            # Configuration & environment constants
-│       ├── courses.js           # Course view controller & syllabus ingestion
-│       ├── easterEggs.js        # Interactive rewards & themes
-│       ├── flashcards.js        # SM-2 engine & active recall quizzes
-│       ├── grades.js            # Weighted GPA & What-If simulator
-│       ├── markdown.js          # Sanitized markdown and math renderer
-│       ├── offlineDb.js         # Local persistence helper
-│       ├── pwa.js               # PWA install prompt & offline indicators
-│       ├── studyPlan.js         # Dynamic study scheduler
-│       ├── timers.js            # Pomodoro timer, stopwatch & audio
-│       ├── tour.js              # Onboarding step-by-step tour
-│       ├── ui.js                # Theme switching, toasts & modal manager
-│       └── utils.js             # Date helpers, formatters, and validators
-├── assets/                      # Stylesheets, icons, sound assets
-├── docs/                        # Project documentation & guidelines
-├── tests/                       # Automated Vitest test suite
-└── wiki/                        # GitHub Wiki documentation files
-```
+- Supabase Auth identifies accounts; owner-scoped RLS protects academic data. There is no general anonymous guest planner sign-in flow.
+- IndexedDB/localStorage cache supported free-planner data and queue writes by account. The worker caches static assets, not authenticated API responses.
+- Non-sensitive preferences, the optional Nursing workspace, and study settings/history can synchronize through validated account preferences.
+- Flashcard mastery has account-scoped local storage and cloud merge. Timers and some UI state remain local; this is not universal realtime state sync.
+- Tutor conversation history is current-page memory; the backend stores usage aggregates separately. A selected course adds bounded account-owned course/notes/assignment context to its request.
+- Local previews on loopback hosts skip/remove only DueVinci's worker. Hosted production retains installation/offline support.
 
----
+## Backend and providers
 
-## 🔒 Security & Privacy Model
+Authenticated Edge Functions handle syllabus/Tutor requests, Canvas/Brightspace connections, billing, support and push-related operations. Privileged keys and encrypted provider connection secrets remain server-side. Model availability, credentials, entitlements, and deployment state affect provider features independently of static page availability.
 
-1. **Client-Side Secrets Protection**: API keys for AI models and privileged services are never stored in client code; requests route through authenticated Supabase Edge Functions.
-2. **Account Data Isolation**: Authenticated course, assignment, and event records are isolated by Supabase Row Level Security policies.
-3. **Content Security & Sanitization**: Markdown and user input are strictly sanitized before insertion into the DOM to prevent XSS (Cross-Site Scripting).
+Canvas imports courses/dated assignments; optional change alerts follow sync. Brightspace is SNHU calendar-only import with user/provider-scoped stale-entry handling. Stripe provides subscription checkout/portal/webhook operations. Direct Google/Microsoft calendar account OAuth remains planned.
+
+See the [readiness map](https://github.com/saappleg/DueVinci/blob/main/docs/FEATURE_READINESS.md), [operations guide](https://github.com/saappleg/DueVinci/blob/main/docs/OPERATIONS.md), and [Privacy Policy](https://duevinci.tech/legal/privacy.html). Nursing practice is fictional only; never store patient information.

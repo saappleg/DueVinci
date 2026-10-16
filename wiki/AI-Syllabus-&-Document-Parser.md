@@ -1,81 +1,48 @@
 # AI Syllabus & Document Parser 🧠
 
-The **AI Syllabus & Document Parser** enables students to upload raw course syllabi (PDFs, screenshots, or pasted text) and automatically populate their DueVinci dashboard with structured course details, grading rubrics, weekly breakdown schedules, and assignments.
+Optional syllabus parsing sends extracted PDF text or a supported lesson screenshot through the authenticated `gemini-parser` Edge Function. Provider keys stay server-side; model selection is configurable with fallbacks. Manually created classes and coursework remain usable without AI.
 
----
+## PDF workflow
 
-## ⚡ How It Works
+1. Open a class's **Overview & Syllabus** section.
+2. Select a PDF; PDF.js extracts its text in the browser.
+3. Choose the metadata-only checkbox if you do not want units/lessons added.
+4. Run the scan and review the native confirmation summarizing description and objectives, plus proposed units when importing units.
+5. Continue to save, or cancel. Review saved dates and coursework afterward.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Browser as Client Browser (PDF.js / Image reader)
-    participant EdgeFn as Supabase Edge Function
-    participant Gemini as Google Gemini 1.5 API
-    participant Store as Local / Cloud Database
-
-    User->>Browser: Uploads Syllabus (PDF / PNG / JPG / Text)
-    alt PDF Document
-        Browser->>Browser: PDF.js extracts text layers
-    else Image / Screenshot
-        Browser->>Browser: Encodes to Base64 image payload
-    end
-    Browser->>EdgeFn: POST /functions/v1/gemini-parser
-    EdgeFn->>Gemini: Prompt + Document Text / Image
-    Gemini-->>EdgeFn: Structured JSON (Courses, Grading Weights, Due Dates)
-    EdgeFn-->>Browser: JSON Response
-    Browser->>User: Displays Preview & Approval Modal
-    User->>Browser: Confirms / Edits Extracted Items
-    Browser->>Store: Saves Course, Categories & Assignments
-```
-
----
-
-## 📄 Extraction Schema
-
-The Gemini model parses documents and enforces structured JSON responses matching this specification:
+The metadata-only response contains `description` and `objectives`. A full syllabus response can also contain `units`:
 
 ```json
 {
-  "courseName": "Introduction to Computer Science",
-  "courseCode": "CS 101",
-  "instructor": "Dr. Alan Turing",
-  "term": "Fall 2026",
-  "gradingScale": {
-    "scaleType": "standard_4_0",
-    "categories": [
-      { "name": "Homework Assignments", "weight": 30 },
-      { "name": "Midterm Examination", "weight": 30 },
-      { "name": "Final Project", "weight": 40 }
-    ]
-  },
-  "schedule": [
+  "description": "Fictional introductory course",
+  "objectives": "Explain the course concepts",
+  "units": [
     {
-      "weekNumber": 1,
-      "topic": "Algorithms & Complexity Basics",
-      "reading": "Chapters 1 - 2",
-      "deliverables": [
-        {
-          "title": "Problem Set 1",
-          "dueDate": "2026-09-15T23:59:00",
-          "category": "Homework Assignments",
-          "maxPoints": 100
-        }
-      ]
+      "num": 1,
+      "title": "Foundations",
+      "dateStr": "October 20, 2026",
+      "lessons": ["Key terms", "Practice review"]
     }
   ]
 }
 ```
 
----
+This is the requested extraction shape, not a guarantee that a model always returns valid or complete data. It is not a schema for professors, credit hours, grading rubrics, or weighted categories.
 
-## 🎯 Features
+## Lesson screenshots
 
-- **Multi-Format Support**:
-  - Direct PDF ingestion using `pdf.js` client-side parsing.
-  - Image and screenshot uploads (JPG, PNG, WebP) processed multimodally.
-  - Plain text and syllabus markdown paste.
-- **Interactive Review Modal**: Before importing anything into your workspace, DueVinci presents a diff-like preview where you can uncheck unwanted dates, edit names, or adjust weight percentages.
-- **Auto-Weight Normalization**: Automatically validates that grading weight categories total 100% or alerts the user if adjustments are needed.
-- **Duplicate Prevention**: Intelligently detects if assignments or courses with similar names already exist in the selected term.
+The screenshot control sends JPEG, PNG, or WebP data to the same function. The response requests units with `num`, `title`, `dateStr`, optional `endDateStr`, and lesson strings. The current screenshot workflow saves the parsed units/lessons directly after a successful response; it does **not** offer the PDF confirmation or an editable per-row preview. Use only material you are ready to import and review results afterward.
+
+The server limits request/text/image size and checks authentication. Scanned PDFs without a usable text layer and unusual layouts can produce incomplete results. The current class UI does not provide a generic pasted-text upload flow.
+
+## Dates, duplicates, and review limits
+
+Imports use the class/term date window, adjust imported dates to that window, and report adjustments. A unit range can spread lesson dates across its weekdays. Missing dates can receive fallback dates, so always compare results against the actual syllabus.
+
+The native PDF confirmation is a summary, not a diff editor with individual selection or grading-weight normalization. Do not assume repeated scans are deduplicated. Correct or remove unwanted results using the existing coursework controls.
+
+## Privacy and troubleshooting
+
+Only upload material you are authorized to process. Never include real patient information; nursing examples must be fictional. Provider processing follows the applicable service terms—do not assume inputs avoid all provider processing or training use based solely on this UI.
+
+For failed requests, check sign-in/connectivity and ask the operator to verify deployed function configuration. Do not put provider API keys in browser code, logs, or issues. See [FAQ & Troubleshooting](FAQ-&-Troubleshooting) and the [security policy](https://github.com/saappleg/DueVinci/blob/main/docs/SECURITY.md).
