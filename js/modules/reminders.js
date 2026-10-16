@@ -101,7 +101,8 @@ export async function subscribeToPushNotifications(user = window.currentUser) {
     if (!permission.granted) return permission;
     if (!user?.id || !navigator.serviceWorker || !window.PushManager) return { granted: false, message: 'Push notifications are not supported by this browser.' };
     const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+    const subscription = await registration.pushManager.getSubscription()
+        || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
     const json = subscription.toJSON();
     const { error } = await supabaseClient.from('push_subscriptions').upsert({
         user_id: user.id, endpoint: subscription.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth, updated_at: new Date().toISOString(),

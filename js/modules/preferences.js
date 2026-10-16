@@ -17,6 +17,7 @@ const SYNCED_PREFERENCE_KEYS = new Set([
     'duevinci_hide_academics', 'duevinci_hide_completed_courses', 'duevinci_show_archived_terms', 'duevinci_terms', 'duevinci_term_details',
     'duevinci_rest_days', 'duevinci_no_study_dates', 'duevinci_timers', 'duevinci_dashboard_widget_order', 'duevinci_activity_dates',
     'duevinci_assignment_priorities', 'duevinci_assignment_types', 'duevinci_reminders_enabled', 'duevinci_reminder_offsets',
+    'duevinci_lms_change_alerts_enabled', 'duevinci_study_calibration_enabled', 'duevinci_study_history',
     'duevinci_week_start_day',
 ]);
 const SYNCED_PREFERENCE_PREFIXES = ['duevinci_workspace_', 'resources_'];

@@ -16,7 +16,9 @@ export const SUBSCRIPTION_CATALOG = Object.freeze({
         'Canvas LMS connection and course syncing',
         'SNHU Brightspace calendar sync for course events and assignment due dates',
         'Assignment importing and due-date updates',
+        'Opt-in Canvas assignment change alerts after sync',
         'Socratic Study Companion with selected-course context and notes',
+        'Personalized study-plan estimates based on focus history',
         'Daily workload summary and next-focus suggestion',
         'Socratic Tutor: up to 30 prompts/day and 250/month (trial: 8/day and 40/month)'
     ]

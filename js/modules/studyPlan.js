@@ -5,6 +5,7 @@ import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
 import { getCourseDateBounds, isDateWithinCourseWindow, isWeeklyPacedCourse } from './courseDates.js';
 import { getWeekStartDayIndex } from './weekPreferences.js';
+import { getStudyCalibrationContext, getPersonalizedStudyEstimate, recordStudyPlanCompletionIfEntitled, removeStudyPlanCompletion } from './studyCalibration.js';
 
 function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
@@ -418,13 +419,15 @@ export function toggleRestDay(dayName) {
 
 const DEFAULT_DAILY_FOCUS_CAP = 120;
 
-function estimatedMinutes(task) {
+function estimatedMinutes(task, calibration = null) {
     const savedEstimate = Number(task.estimated_minutes);
-    if (Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480) return savedEstimate;
     let localType = '';
     try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[task.id] || ''; } catch { /* Use the synced assignment type below. */ }
     const type = localType || task.task_type || task.type || '';
-    return type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
+    const base = Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480
+        ? savedEstimate
+        : type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
+    return getPersonalizedStudyEstimate({ ...task, taskType: type }, base, calibration);
 }
 
 function taskMovePriority(task) {
@@ -437,9 +440,9 @@ function taskMovePriority(task) {
  * deadline or onto a rest day. Moving later is curriculum-safe: it cannot put
  * a later lesson before an earlier one already scheduled on the source day.
  */
-export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP, courses = []) {
+export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP, courses = [], calibration = null) {
     const coursesById = new Map(courses.map((course) => [course.id, course]));
-    const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task), 0);
+    const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task, calibration), 0);
     const canMoveToDay = (entry, sourceIndex, targetIndex) => {
         const target = days[targetIndex];
         if (!target || target.isRestDay || sourceIndex === targetIndex) return false;
@@ -471,7 +474,7 @@ export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOC
                 });
             let moved = false;
             for (const candidate of candidates) {
-                const duration = estimatedMinutes(candidate.entry.task);
+                const duration = estimatedMinutes(candidate.entry.task, calibration);
                 const targetIndex = days
                     .map((target, index) => ({ target, index }))
                     // Prefer the focus cap, but still reduce a sharp imbalance
@@ -618,9 +621,10 @@ export function getCurrentStudyWeekAssignments(courses = [], assignments = [], r
  * @param {Array|null} customRestDays Optional rest days override (e.g. ['Sun', 'Sat'])
  * @returns {Array} List of daily study plan objects
  */
-export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7, customRestDays = null) {
+export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7, customRestDays = null, options = {}) {
     if (!courses || !assignments || !Array.isArray(courses) || !Array.isArray(assignments)) return [];
 
+    const calibration = options?.calibration || null;
     const restDays = customRestDays !== null ? (Array.isArray(customRestDays) ? customRestDays : []) : getRestDays();
     const noStudyDates = new Set(getNoStudyDates());
 
@@ -705,7 +709,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
         const isExam = taskType === 'exam';
         const isReview = taskType === 'review';
-        const durationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task);
+        const baselineDurationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task);
+        const durationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task, calibration);
         const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
         let priority = localPrios[task.id] || task.priority || 'medium';
@@ -778,6 +783,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             priority,
             priorityBadgeText,
             durationMinutes: durationMin,
+            baselineDurationMinutes: baselineDurationMin,
             isExam,
             isReview,
             dueDate: task.due_date,
@@ -929,7 +935,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // A course-by-course allocation can otherwise stack every course's first
     // lesson on day zero. Rebalance only when there is later, non-rest time
     // before the item's own deadline.
-    rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses);
+    rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses, calibration);
     applyManualStudyMoves(days);
 
     // Build rich daily blocks from assigned tasks
@@ -1044,7 +1050,8 @@ export async function openStudyPlanDayModal(dateStr) {
         }
 
         if (courses.length > 0) {
-            const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7);
+            const calibration = await getStudyCalibrationContext();
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7, null, { calibration });
             day = plan.find(d => d.date === dateStr) || plan[0];
         }
     }
@@ -1149,7 +1156,7 @@ export async function openStudyPlanDayModal(dateStr) {
 
                 <!-- Interactive Actions -->
                 <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                    <button type="button" onclick="startStudyPlanTimer(${durationMinutes}, '${inlineArg(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
+                    <button type="button" onclick="startStudyPlanTimer(${durationMinutes}, '${inlineArg(block.title)}', '${inlineArg(block.taskId)}', '${inlineArg(block.courseId)}', '${inlineArg(block.taskType)}', ${Number(block.baselineDurationMinutes) || durationMinutes})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
                         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         Start ${durationMinutes}m Timer
                     </button>
@@ -1337,7 +1344,7 @@ export async function refreshStudyPlan() {
  * @param {number} durationMinutes Duration in minutes
  * @param {string} taskTitle Title of task being studied
  */
-export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
+export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '', taskId = null, courseId = null, taskType = '', baselineDurationMinutes = null) {
     if (typeof window !== 'undefined') {
         if (typeof window.setTimerDuration === 'function') {
             window.setTimerDuration(durationMinutes, true);
@@ -1349,6 +1356,7 @@ export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
             }
             if (typeof window.resetTimer === 'function') window.resetTimer();
         }
+        window.setStudyFocusContext?.({ taskId, courseId, taskType, estimatedMinutes: baselineDurationMinutes || durationMinutes });
         if (!window.timerRunning && typeof window.toggleTimer === 'function') {
             window.toggleTimer();
         }
@@ -1362,7 +1370,23 @@ export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
 export async function toggleStudyPlanAssignment(assignId, currentState, courseId, dateStr) {
     if (!supabaseClient) return;
     const newState = !currentState;
-    await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    if (error) {
+        console.error('Could not update study-plan coursework:', error);
+        return;
+    }
+    const block = cachedStudyPlan.flatMap((day) => day.allBlocks || []).find((entry) => String(entry.taskId) === String(assignId));
+    if (newState && block) {
+        recordStudyPlanCompletionIfEntitled({
+            taskId: assignId,
+            courseId: block.courseId,
+            taskType: block.taskType,
+            title: block.rawTitle || block.title,
+            estimatedMinutes: block.baselineDurationMinutes,
+        });
+    } else if (!newState) {
+        removeStudyPlanCompletion(assignId);
+    }
     if (newState) fireConfetti();
 
     // Refresh dashboard widget and re-open modal with refreshed data
@@ -1444,7 +1468,8 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         return [];
     }
 
-    const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5);
+    const calibration = await getStudyCalibrationContext();
+    const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5, null, { calibration });
 
     let daysHtml = '';
     plan.forEach(day => {
@@ -1523,6 +1548,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <div>
                         <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
                         <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Balanced study blocks lead up to deadlines. Weekly-paced classes show the week you are working through now.</p>
+                        ${calibration ? '<p class="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Pro estimates adjust using your completed focus sessions and study-plan tasks.</p>' : ''}
                     </div>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">

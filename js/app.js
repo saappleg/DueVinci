@@ -17,6 +17,8 @@ import { refreshProfileAvatar, uploadProfileAvatar, removeProfileAvatar, getProf
 import { buildBackupPayload, validateBackupPayload, exportUserDataJSON, importUserDataJSON, syncDataWithSupabase } from './modules/backup.js';
 import { startWalkthrough, updateTourButtonVisibility, replayTourFromSettings, showFirstRunOnboarding, openWhatsNewModal, closeWhatsNewModal, checkWhatsNewOnLaunch, checkImporterBetaOnLaunch, hydrateImporterPoll } from './modules/tour.js?v=2.7.0';
 import { getReminderPreferences, saveReminderPreferences, collectReminderItems, requestReminderPermission, renderReminderDashboard, checkDueReminders, startReminderService, stopReminderService, refreshReminderSettings } from './modules/reminders.js';
+import './modules/studyCalibration.js';
+import './modules/lmsAlerts.js';
 import { prioritizeTodayTasks, renderTodayWorkspace, renderAdaptiveDailyBrief, completeTodayTask, startTodayFocus } from './modules/today.js';
 import { applySubscriptionCatalog } from './modules/subscription.js';
 import './modules/brightspace.js';

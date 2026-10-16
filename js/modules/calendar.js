@@ -4,9 +4,14 @@ import { currentUser } from './auth.js';
 import { fireConfetti, getLocalDateKey, escapeHtml } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 import { getWeekStartDayIndex } from './weekPreferences.js';
+import { isDateWithinCourseWindow } from './courseDates.js';
+import { getStudyCalibrationContext, recordStudyPlanCompletionIfEntitled, removeStudyPlanCompletion } from './studyCalibration.js';
 
 export let calendarInstance = null;
 let lastEventModalTrigger = null;
+let lastCalendarActionTrigger = null;
+let activeCalendarEvent = null;
+let calendarActionCourses = [];
 
 async function getCalendarUser() {
     if (currentUser?.id) return currentUser;
@@ -312,6 +317,35 @@ export function buildCustomEventPayload({ userId, title, eventDate, color = '#8b
     return { user_id: userId, title: cleanTitle, event_date: cleanDate, color: color || '#8b5cf6' };
 }
 
+export function buildCalendarAssignmentPayload({ userId, courseId, title, dueDate, calendarEventId } = {}) {
+    const cleanTitle = String(title || '').trim();
+    const cleanDate = String(dueDate || '').slice(0, 10);
+    if (!userId) throw new Error('Please sign in before creating an assignment.');
+    if (!courseId) throw new Error('Choose a class for this assignment.');
+    if (!calendarEventId) throw new Error('This calendar event cannot be linked to coursework.');
+    if (!cleanTitle || cleanTitle.length > 200) throw new Error('The assignment title must be between 1 and 200 characters.');
+    if (!isValidISODate(cleanDate)) throw new Error('This event does not have a valid date.');
+    return {
+        user_id: userId,
+        course_id: courseId,
+        title: cleanTitle,
+        due_date: cleanDate,
+        task_type: 'assignment',
+        type: 'assignment',
+        priority: 'medium',
+        is_completed: false,
+        source_calendar_event_id: String(calendarEventId),
+    };
+}
+
+export function findMatchingCalendarAssignment(assignments = [], { courseId, title, dueDate } = {}) {
+    const normalizedTitle = String(title || '').trim().toLocaleLowerCase();
+    const dateKey = String(dueDate || '').slice(0, 10);
+    return assignments.find((assignment) => assignment.course_id === courseId
+        && String(assignment.title || '').trim().toLocaleLowerCase() === normalizedTitle
+        && String(assignment.due_date || '').slice(0, 10) === dateKey) || null;
+}
+
 export function buildCustomEventRows({ userId, title, startDate, endDate, color = '#8b5cf6' } = {}) {
     const firstDate = String(startDate || '').slice(0, 10);
     const lastDate = String(endDate || firstDate).slice(0, 10);
@@ -366,6 +400,164 @@ export function generateICSString(events = [], calendarName = "DueVinci Master S
     return ics;
 }
 
+function ensureCalendarEventActionsModal() {
+    if (typeof document === 'undefined') return null;
+    let modal = document.getElementById('calendarEventActionsModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'calendarEventActionsModal';
+    modal.className = 'hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-sm';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="calendarEventActionsTitle" class="w-full max-w-md space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-brand-600 dark:bg-brand-800">
+            <div class="flex items-start justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-brand-700">
+                <div class="min-w-0"><h2 id="calendarEventActionsTitle" class="truncate text-lg font-bold text-zinc-900 dark:text-white"></h2><p id="calendarEventActionsDate" class="mt-1 text-xs text-zinc-500 dark:text-zinc-400"></p></div>
+                <button type="button" id="calendarEventActionsClose" aria-label="Close calendar event" class="shrink-0 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-brand-700">✕</button>
+            </div>
+            <div class="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Create an assignment</h3>
+                <p class="text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">Choose a class. The calendar event stays on your calendar, and DueVinci checks for a matching assignment before creating one.</p>
+                <label for="calendarEventCourseSelect" class="block pt-1 text-xs font-semibold text-zinc-700 dark:text-zinc-200">Class</label>
+                <select id="calendarEventCourseSelect" class="w-full rounded-lg border border-zinc-300 bg-white p-2.5 text-sm dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option value="">Choose a class…</option></select>
+            </div>
+            <p id="calendarEventActionsStatus" role="status" aria-live="polite" class="min-h-5 text-xs text-zinc-500 dark:text-zinc-400"></p>
+            <div class="flex flex-wrap justify-between gap-2">
+                <button type="button" id="calendarEventDeleteButton" class="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30">Delete event</button>
+                <div class="flex gap-2"><button type="button" id="calendarEventActionsCancel" class="rounded-lg bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-brand-700 dark:text-zinc-100 dark:hover:bg-brand-600">Close</button><button type="button" id="calendarEventCreateAssignment" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Create assignment</button></div>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeCalendarEventActions();
+    });
+    modal.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeCalendarEventActions();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = [...modal.querySelectorAll('button, select')].filter((element) => !element.disabled && element.offsetParent !== null);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+    document.getElementById('calendarEventActionsClose')?.addEventListener('click', closeCalendarEventActions);
+    document.getElementById('calendarEventActionsCancel')?.addEventListener('click', closeCalendarEventActions);
+    document.getElementById('calendarEventCreateAssignment')?.addEventListener('click', createAssignmentFromCalendarEvent);
+    document.getElementById('calendarEventDeleteButton')?.addEventListener('click', async () => {
+        if (!activeCalendarEvent?.eventId) return;
+        if (!confirm(`Delete calendar event “${activeCalendarEvent.title}”?`)) return;
+        await deleteCustomEvent(activeCalendarEvent.eventId);
+        closeCalendarEventActions();
+    });
+    return modal;
+}
+
+export async function openCalendarEventActions(event, trigger = null) {
+    const modal = ensureCalendarEventActionsModal();
+    if (!modal || !event) return;
+    activeCalendarEvent = {
+        eventId: event.extendedProps?.eventId || event.id,
+        title: String(event.title || 'Calendar event'),
+        date: String(event.startStr || event.start?.toISOString?.() || '').slice(0, 10),
+    };
+    lastCalendarActionTrigger = trigger || document.activeElement;
+    document.getElementById('calendarEventActionsTitle').textContent = activeCalendarEvent.title;
+    document.getElementById('calendarEventActionsDate').textContent = activeCalendarEvent.date
+        ? new Date(`${activeCalendarEvent.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        : 'Date unavailable';
+    const select = document.getElementById('calendarEventCourseSelect');
+    const status = document.getElementById('calendarEventActionsStatus');
+    const createButton = document.getElementById('calendarEventCreateAssignment');
+    const deleteButton = document.getElementById('calendarEventDeleteButton');
+    if (select) select.innerHTML = '<option value="">Choose a class…</option>';
+    if (status) status.textContent = '';
+    if (createButton) createButton.disabled = true;
+    if (deleteButton) deleteButton.disabled = false;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    try {
+        const { data, error } = await supabaseClient.from('courses').select('id,code,emoji,color,start_date,end_date,term').order('code', { ascending: true });
+        if (error) throw error;
+        calendarActionCourses = data || [];
+        if (select) select.innerHTML = '<option value="">Choose a class…</option>' + calendarActionCourses.map((course) =>
+            `<option value="${escapeHtml(course.id)}">${escapeHtml(course.emoji || '📚')} ${escapeHtml(course.code || course.name || 'Untitled class')}</option>`
+        ).join('');
+        if (!calendarActionCourses.length && status) status.textContent = 'Add a class before creating an assignment.';
+        if (createButton) createButton.disabled = !calendarActionCourses.length;
+    } catch (error) {
+        calendarActionCourses = [];
+        if (status) status.textContent = error.message || 'Could not load your classes. Try again.';
+    }
+    if (select) select.focus();
+}
+
+export function closeCalendarEventActions() {
+    const modal = typeof document !== 'undefined' ? document.getElementById('calendarEventActionsModal') : null;
+    modal?.classList.add('hidden');
+    modal?.setAttribute('aria-hidden', 'true');
+    if (lastCalendarActionTrigger && typeof lastCalendarActionTrigger.focus === 'function') lastCalendarActionTrigger.focus();
+    lastCalendarActionTrigger = null;
+    activeCalendarEvent = null;
+}
+
+export async function createAssignmentFromCalendarEvent() {
+    if (!activeCalendarEvent || typeof document === 'undefined') return;
+    const select = document.getElementById('calendarEventCourseSelect');
+    const button = document.getElementById('calendarEventCreateAssignment');
+    const status = document.getElementById('calendarEventActionsStatus');
+    const courseId = select?.value || '';
+    const course = calendarActionCourses.find((item) => String(item.id) === String(courseId));
+    try {
+        const user = await getCalendarUser();
+        if (!user) throw new Error('Please sign in before creating an assignment.');
+        if (!course) throw new Error('Choose a class for this assignment.');
+        if (!isDateWithinCourseWindow(activeCalendarEvent.date, course)) throw new Error('Choose a class whose term dates include this calendar event.');
+        if (button) button.disabled = true;
+        if (status) status.textContent = 'Checking for duplicates…';
+        const { data: existing, error: lookupError } = await supabaseClient.from('assignments')
+            .select('id,course_id,title,due_date')
+            .eq('user_id', user.id)
+            .eq('course_id', course.id);
+        if (lookupError) throw lookupError;
+        const duplicate = findMatchingCalendarAssignment(existing || [], {
+            courseId: course.id,
+            title: activeCalendarEvent.title,
+            dueDate: activeCalendarEvent.date,
+            calendarEventId: activeCalendarEvent.eventId,
+        });
+        if (duplicate) throw new Error('A matching assignment already exists for this class and date. The calendar event is still here.');
+        const payload = buildCalendarAssignmentPayload({
+            userId: user.id,
+            courseId: course.id,
+            title: activeCalendarEvent.title,
+            dueDate: activeCalendarEvent.date,
+        });
+        if (status) status.textContent = 'Creating assignment…';
+        const { data: created, error } = await supabaseClient.from('assignments')
+            .upsert([payload], { onConflict: 'user_id,source_calendar_event_id', ignoreDuplicates: true })
+            .select('id');
+        if (error) throw error;
+        if (!created?.length) throw new Error('This calendar event already has an assignment. The event remains on your calendar.');
+        const title = activeCalendarEvent.title;
+        closeCalendarEventActions();
+        setImportStatus(`Created “${title}” as an assignment. The original calendar event remains.`, 'success');
+        await loadCalendarCourses();
+        if (typeof window !== 'undefined') window.loadCoursesPage?.();
+    } catch (error) {
+        if (status) status.textContent = error.message || 'Could not create this assignment.';
+        if (button) button.disabled = false;
+    }
+}
+
 export function initCalendar() {
     if (typeof document === 'undefined') return;
     if (calendarInstance) return;
@@ -381,11 +573,28 @@ export function initCalendar() {
         dayMaxEvents: true,
         eventClick: async function(info) {
             if (info.event.extendedProps.isCustom) {
-                if (confirm(`Delete custom event "${info.event.title}"?`)) deleteCustomEvent(info.event.extendedProps.eventId);
+                openCalendarEventActions(info.event, info.jsEvent?.target);
             } else if (info.event.extendedProps.isAssignment) {
                 const assignId = info.event.extendedProps.assignmentId;
                 const newState = !info.event.extendedProps.isCompleted;
-                await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+                const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+                if (error) {
+                    console.error('Could not update calendar coursework:', error);
+                    return;
+                }
+                if (newState) {
+                    let localType = '';
+                    try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[assignId] || ''; } catch { /* Use the synced assignment type below. */ }
+                    recordStudyPlanCompletionIfEntitled({
+                        taskId: assignId,
+                        courseId: info.event.extendedProps.courseId,
+                        taskType: localType || info.event.extendedProps.taskType || '',
+                        title: info.event.extendedProps.assignmentTitle || '',
+                        estimatedMinutes: info.event.extendedProps.estimatedMinutes,
+                    });
+                } else {
+                    removeStudyPlanCompletion(assignId);
+                }
                 if (newState) fireConfetti();
                 loadCalendarCourses();
             }
@@ -416,18 +625,22 @@ export async function loadCalendarCourses() {
             title: `${course.emoji || '📚'} ${prefix}${assign.title}`,
             start: assign.due_date,
             color: assign.is_completed ? '#9ca3af' : course.color,
-            extendedProps: { isAssignment: true, assignmentId: assign.id, isCompleted: assign.is_completed }
+            extendedProps: {
+                isAssignment: true, assignmentId: assign.id, isCompleted: assign.is_completed,
+                courseId: assign.course_id, assignmentTitle: assign.title, taskType: assign.task_type, estimatedMinutes: assign.estimated_minutes,
+            }
         });
     });
 
     if (customEvents) customEvents.filter(ev => ev.is_active !== false).forEach(ev => {
-        calendarEvents.push({ title: ev.title, start: ev.event_date, color: ev.color, extendedProps: { isCustom: true, eventId: ev.id } });
+        calendarEvents.push({ title: ev.title, start: ev.event_date, color: ev.color, extendedProps: { isCustom: true, eventId: ev.id, sourceProvider: ev.source_provider || null } });
     });
 
     // Planned focus blocks are separate from due dates: they show when the
     // student intends to work, without changing the assignment itself.
     if (courses && assignments) {
-        const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 21);
+        const calibration = await getStudyCalibrationContext();
+        const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 21, null, { calibration });
         let syncedMoves = [];
         if (currentUser?.id) {
             const { data } = await supabaseClient.from('study_plan_moves')
@@ -636,6 +849,9 @@ _scope.initCalendar = initCalendar;
 _scope.loadCalendarCourses = loadCalendarCourses;
 _scope.openEventModal = openEventModal;
 _scope.closeEventModal = closeEventModal;
+_scope.openCalendarEventActions = openCalendarEventActions;
+_scope.closeCalendarEventActions = closeCalendarEventActions;
+_scope.createAssignmentFromCalendarEvent = createAssignmentFromCalendarEvent;
 _scope.deleteCustomEvent = deleteCustomEvent;
 _scope.exportToICS = exportToICS;
 _scope.importICSFile = importICSFile;

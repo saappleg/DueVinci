@@ -6,6 +6,9 @@ import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escap
 import { getUnitNumber, getLessonNumber, getCurrentStudyWeekAssignments } from './studyPlan.js';
 import { deleteDeckMastery } from './flashcards.js';
 import { getArchivedTermNames, getCourseDateBounds, getTermDateRange, saveTermDateRange, isDateWithinCourseWindow, clampDateToCourseWindow } from './courseDates.js';
+import { buildTermRolloverCoursePayload, suggestNextTermName } from './termRollover.js';
+import { syncPreferencesNow } from './preferences.js';
+import { recordStudyPlanCompletionIfEntitled, removeStudyPlanCompletion } from './studyCalibration.js';
 
 export let localCourses = [];
 export let customTerms = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_terms'))) || ['Fall 2026', 'Spring 2027'];
@@ -914,6 +917,102 @@ export function createNewTermFolder() {
     renderAlphabeticals();
 }
 
+export function showTermRolloverForm() {
+    if (!activeTermModalName || activeTermModalName === 'Unassigned') return;
+    const panel = document.getElementById('termRolloverPanel');
+    const nameInput = document.getElementById('rolloverTermNameInput');
+    if (!panel || !nameInput) return;
+    nameInput.value = suggestNextTermName(activeTermModalName, customTerms);
+    panel.classList.remove('hidden');
+    document.getElementById('rolloverTermMessage')?.classList.add('hidden');
+    nameInput.focus();
+}
+
+export async function rolloverTermToNextTerm() {
+    const targetName = document.getElementById('rolloverTermNameInput')?.value.trim() || '';
+    const startDate = document.getElementById('rolloverTermStartDate')?.value || '';
+    const endDate = document.getElementById('rolloverTermEndDate')?.value || '';
+    const button = document.getElementById('rolloverTermSubmit');
+    const message = document.getElementById('rolloverTermMessage');
+    const showMessage = (text, tone = 'error') => {
+        if (!message) return;
+        message.textContent = text;
+        message.className = `mt-2 text-xs ${tone === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`;
+        message.classList.remove('hidden');
+    };
+    if (!activeTermModalName || activeTermModalName === 'Unassigned') {
+        showMessage('Open a named term before rolling it over.');
+        return;
+    }
+    if (!targetName || targetName.length > 80) {
+        showMessage('Enter a term name with 80 characters or fewer.');
+        return;
+    }
+    if (customTerms.some((term) => term.trim().toLocaleLowerCase() === targetName.toLocaleLowerCase())) {
+        showMessage('That term already exists. Choose a different name.');
+        return;
+    }
+    if (startDate && endDate && startDate > endDate) {
+        showMessage('The term end date must be on or after the start date.');
+        return;
+    }
+    const user = await getPlannerUser();
+    if (!user) {
+        showMessage('Please sign in before rolling over a term.');
+        return;
+    }
+    const sourceCourses = localCourses.filter((course) => String(course.term || '').trim() === activeTermModalName);
+    let payload;
+    try {
+        payload = buildTermRolloverCoursePayload(sourceCourses, user.id, targetName);
+    } catch (error) {
+        showMessage(error.message || 'Could not prepare this term rollover.');
+        return;
+    }
+    if (button) button.disabled = true;
+    showMessage(payload.length ? 'Copying classes…' : 'Creating the new term…', 'success');
+    let createdCourses = [];
+    try {
+        if (payload.length) {
+            const { data, error } = await supabaseClient.from('courses').upsert(payload, {
+                onConflict: 'user_id,term,rollover_source_course_id',
+                ignoreDuplicates: true,
+            }).select('*');
+            if (error) throw error;
+            createdCourses = data || [];
+        }
+    } catch (error) {
+        showMessage(error.message || 'Could not create the new term. The previous term remains unchanged.');
+        if (button) button.disabled = false;
+        return;
+    }
+
+    try {
+        customTerms.push(targetName);
+        localStorage.setItem('duevinci_terms', JSON.stringify(customTerms));
+        saveTermDateRange(targetName, startDate, endDate);
+        await syncPreferencesNow();
+    } catch (error) {
+        console.warn('The new term was created, but its preferences could not be saved:', error?.message || error);
+    }
+    try {
+        await loadCoursesPage();
+    } catch (error) {
+        localCourses = [...localCourses, ...createdCourses.filter((course) => !localCourses.some((item) => String(item.id) === String(course.id)))];
+        console.warn('The new term was created, but the classes list could not refresh:', error?.message || error);
+    }
+    if (button) button.disabled = false;
+    openTermModal(targetName);
+    const termMessage = document.getElementById('termDatesMessage');
+    if (termMessage) {
+        const alreadyCopied = Math.max(0, payload.length - createdCourses.length);
+        const existingCopyText = alreadyCopied ? `; ${alreadyCopied} existing ${alreadyCopied === 1 ? 'copy' : 'copies'} kept` : '';
+        termMessage.textContent = `New term ready. ${createdCourses.length} class${createdCourses.length === 1 ? '' : 'es'} copied${existingCopyText}.`;
+        termMessage.className = 'mt-2 text-[11px] text-emerald-600 dark:text-emerald-400';
+        termMessage.classList.remove('hidden');
+    }
+}
+
 export function ensureTermModalExists() {
     let modal = document.getElementById('termModal');
     if (!modal && typeof document !== 'undefined') {
@@ -939,9 +1038,21 @@ export function ensureTermModalExists() {
                     </div>
                     <p id="termDatesMessage" role="status" aria-live="polite" class="mt-2 hidden text-[11px]"></p>
                 </div>
+                <div id="termRolloverPanel" class="hidden mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                    <h4 class="text-xs font-bold text-zinc-900 dark:text-white">Start a new term from these classes</h4>
+                    <p class="mt-1 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">Copies class names, colors, and pacing settings into a new term. The old term, assignments, grades, and notes stay unchanged; new classes start with no coursework.</p>
+                    <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:items-end">
+                        <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 sm:col-span-1">New term<input id="rolloverTermNameInput" maxlength="80" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white"></label>
+                        <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Starts<input type="date" id="rolloverTermStartDate" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white"></label>
+                        <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Ends<input type="date" id="rolloverTermEndDate" class="mt-1 w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white"></label>
+                    </div>
+                    <p id="rolloverTermMessage" role="status" aria-live="polite" class="hidden mt-2 text-xs"></p>
+                    <div class="mt-3 flex justify-end gap-2"><button type="button" onclick="document.getElementById('termRolloverPanel').classList.add('hidden')" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-700 dark:bg-brand-700 dark:text-white">Cancel</button><button type="button" id="rolloverTermSubmit" onclick="rolloverTermToNextTerm()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Create new term</button></div>
+                </div>
                 <div id="termModalCourseList" class="py-4 space-y-3 overflow-y-auto flex-1"></div>
                 <div class="pt-4 border-t border-zinc-200 dark:border-brand-700 flex justify-between items-center">
                     <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" id="termRolloverButton" onclick="showTermRolloverForm()" class="hidden text-xs font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">Start a new term</button>
                         <button type="button" id="restoreTermButton" onclick="restoreCurrentTermFolder()" class="hidden text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-bold transition">Restore term</button>
                         <button type="button" onclick="deleteCurrentTermFolder()" class="text-xs text-red-500 hover:text-red-700 font-bold transition">Delete Term Folder</button>
                     </div>
@@ -984,6 +1095,12 @@ export function openTermModal(termName) {
     const range = getTermDateRange(termName);
     const dateEditor = document.getElementById('termDateEditor');
     if (dateEditor) dateEditor.classList.toggle('hidden', termName === 'Unassigned');
+    document.getElementById('termRolloverPanel')?.classList.add('hidden');
+    document.getElementById('termRolloverButton')?.classList.toggle('hidden', termName === 'Unassigned');
+    const rolloverStart = document.getElementById('rolloverTermStartDate');
+    const rolloverEnd = document.getElementById('rolloverTermEndDate');
+    if (rolloverStart) rolloverStart.value = '';
+    if (rolloverEnd) rolloverEnd.value = '';
     const restoreButton = document.getElementById('restoreTermButton');
     if (restoreButton) restoreButton.classList.toggle('hidden', !getArchivedTermNames(customTerms).has(termName));
     const termStartInput = document.getElementById('termStartDateInput');
@@ -1808,9 +1925,26 @@ export async function toggleCourseComplete(courseId, currentState) {
 
 export async function toggleAssignment(assignId, currentState, courseId) {
     const newState = !currentState;
-    await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    if (error) {
+        console.error('Could not update coursework completion:', error);
+        return;
+    }
     const cachedAssignment = courseProgressAssignments.find((assignment) => assignment.id === assignId);
     if (cachedAssignment) cachedAssignment.is_completed = newState;
+    if (newState) {
+        let localType = '';
+        try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[assignId] || ''; } catch { /* Use the synced assignment type below. */ }
+        recordStudyPlanCompletionIfEntitled({
+            taskId: assignId,
+            courseId: cachedAssignment?.course_id || courseId,
+            taskType: localType || cachedAssignment?.task_type || cachedAssignment?.type || '',
+            title: cachedAssignment?.title || '',
+            estimatedMinutes: cachedAssignment?.estimated_minutes,
+        });
+    } else {
+        removeStudyPlanCompletion(assignId);
+    }
     if (newState) fireConfetti();
     renderAlphabeticals();
     const page = getCurrentPageName();
@@ -2563,6 +2697,8 @@ if (typeof window !== 'undefined') {
     window.updateCourseTerm = updateCourseTerm;
     window.updateQuickAddDateBounds = updateQuickAddDateBounds;
     window.createNewTermFolder = createNewTermFolder;
+    window.showTermRolloverForm = showTermRolloverForm;
+    window.rolloverTermToNextTerm = rolloverTermToNextTerm;
     window.openTermModal = openTermModal;
     window.closeTermModal = closeTermModal;
     window.saveCurrentTermDateRange = saveCurrentTermDateRange;

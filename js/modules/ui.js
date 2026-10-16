@@ -366,7 +366,19 @@ function injectReminderSettings() {
         <label class="flex items-center justify-between gap-4 rounded-xl bg-zinc-50 dark:bg-brand-900 p-3 border border-zinc-200 dark:border-brand-700"><span class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Enable reminders</span><input id="remindersEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
         <div><label class="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Remind me</label><select id="reminderSchedule" class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option value="0">On the due date</option><option value="0,1">On the due date and 1 day before</option><option value="0,1,3">On the due date, 1 day, and 3 days before</option><option value="0,1,3,7">On the due date, 1 day, 3 days, and 1 week before</option></select></div>
         <div class="flex gap-2"><button type="button" onclick="saveReminderSettingsFromUI()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save reminders</button><button type="button" onclick="requestReminderPermission()" class="rounded-lg bg-zinc-200 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-300 dark:bg-brand-700 dark:text-white">Enable browser alerts</button></div>
-        <p id="reminderSettingsMsg" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>`;
+        <p id="reminderSettingsMsg" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        <div class="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+            <div><h3 class="text-sm font-bold text-zinc-900 dark:text-white">🧠 Personalized study plan · Pro</h3><p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">With your permission, completed focus sessions and finished study-plan tasks help estimate future study time. History stays in your DueVinci account and can be cleared here.</p></div>
+            <label class="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><span>Use my study history to adjust estimates</span><input id="studyCalibrationEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
+            <div class="flex flex-wrap gap-2"><button type="button" onclick="saveStudyCalibrationSettingsFromUI()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save setting</button><button type="button" onclick="clearStudyCalibrationHistory()" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:bg-brand-700 dark:text-white dark:hover:bg-brand-600">Clear history</button></div>
+            <p id="studyCalibrationSettingsMsg" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        </div>
+        <div class="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+            <div><h3 class="text-sm font-bold text-zinc-900 dark:text-white">📣 Canvas assignment change alerts · Pro</h3><p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">Get a browser push alert after Canvas sync adds a dated assignment or changes its due date. Your existing classes and assignments stay in the free plan.</p></div>
+            <label class="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><span>Alert me about Canvas assignment changes</span><input id="lmsChangeAlertsEnabled" type="checkbox" class="h-4 w-4 accent-emerald-600"></label>
+            <button type="button" onclick="saveLmsChangeAlertSettingsFromUI()" class="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500">Save alert setting</button>
+            <p id="lmsChangeAlertsMsg" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        </div>`;
     appearanceTab.appendChild(container);
 }
 
@@ -827,6 +839,8 @@ export function openSettingsModal() {
         });
         injectReminderSettings();
         refreshReminderSettings();
+        Promise.resolve(window.refreshStudyCalibrationSettings?.()).catch(() => {});
+        Promise.resolve(window.refreshLmsChangeAlertSettings?.()).catch(() => {});
 
         const dfSelect = document.getElementById('dateFormatSelect');
         if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';

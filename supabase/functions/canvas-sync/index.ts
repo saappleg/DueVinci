@@ -1,12 +1,14 @@
-import { corsHeaders, entitledConnection, json } from '../_shared/canvas.ts'
+import { corsHeaders, entitledConnection, hasFeature, json } from '../_shared/canvas.ts'
 import { DEV_MOCK_CANVAS_ASSIGNMENTS, DEV_MOCK_CANVAS_COURSES, isMockCanvasConnection } from '../_shared/mock_canvas.ts'
+import { detectCanvasAssignmentChanges, getCanvasCoursesEligibleForNewAlerts, type CanvasAssignmentSnapshot } from '../_shared/canvas_assignment_changes.ts'
+import { sendCanvasAssignmentChangeAlerts } from '../_shared/lms_change_alerts.ts'
 
 const colors = ['#4f46e5', '#0f766e', '#c2410c', '#be123c', '#7c3aed', '#0369a1']
 const colorFor = (id: unknown) => colors[String(id).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length]
 
 type CanvasCourse = { id: unknown, name?: unknown, course_code?: unknown }
 type CanvasAssignment = { id: unknown, name?: unknown, due_at?: unknown, submission_types?: unknown }
-type SavedCourse = { id: string, lms_source_id: string, term: string | null, start_date: string | null, end_date: string | null }
+type SavedCourse = { id: string, lms_source_id: string, term: string | null, start_date: string | null, end_date: string | null, created_at?: string }
 
 function dateKey(value: unknown): string {
   const key = String(value || '').slice(0, 10)
@@ -54,7 +56,7 @@ Deno.serve(async (req) => {
     const { selectedIds } = await req.json()
     if (!Array.isArray(selectedIds) || selectedIds.length === 0) throw new Error('Choose at least one course.')
     const requested = new Set(selectedIds.map(String))
-    const { admin, user, connection } = await entitledConnection(req)
+    const { admin, user, profile, connection } = await entitledConnection(req)
     const mockConnection = isMockCanvasConnection(connection.canvas_domain)
     const sourceCourses: CanvasCourse[] = mockConnection
       ? DEV_MOCK_CANVAS_COURSES
@@ -75,7 +77,7 @@ Deno.serve(async (req) => {
     }))
     const { data: savedCourses, error: courseError } = await admin.from('courses')
       .upsert(coursePayload, { onConflict: 'user_id,lms_source_id' })
-      .select('id,lms_source_id,term,start_date,end_date')
+      .select('id,lms_source_id,term,start_date,end_date,created_at')
     if (courseError) throw courseError
     const savedCourseBySourceId = new Map((savedCourses || []).map((course: SavedCourse) => [String(course.lms_source_id), course]))
     const { data: preferenceRow, error: preferenceError } = await admin.from('user_preferences')
@@ -122,15 +124,50 @@ Deno.serve(async (req) => {
     })
     const adjustedAssignments = importedAssignments.filter((assignment) => assignment._date_adjusted).length
     const assignmentPayload = importedAssignments.map(({ _date_adjusted, ...assignment }) => assignment)
+    let changeAlerts: ReturnType<typeof detectCanvasAssignmentChanges> = []
+    let alertsEnabled = false
+    if (preferenceRow?.preferences?.duevinci_lms_change_alerts_enabled === 'true') {
+      try {
+        alertsEnabled = await hasFeature(admin, profile || {}, 'lms_change_alerts')
+        if (alertsEnabled && assignmentPayload.length) {
+          const courseIds = [...new Set(assignmentPayload.map((assignment) => assignment.course_id))]
+          const { data: existing, error: existingError } = await admin.from('assignments')
+            .select('lms_source_id, title, due_date, course_id').eq('user_id', user.id).eq('lms_provider', 'canvas').in('course_id', courseIds)
+          if (existingError) throw existingError
+          const existingRows = (existing || []) as CanvasAssignmentSnapshot[]
+          const eligibleNewCourseIds = getCanvasCoursesEligibleForNewAlerts(savedCourses || [], connection.last_synced_at)
+          const courseCodeById = new Map<string, string>()
+          for (const course of (savedCourses || []) as SavedCourse[]) {
+            courseCodeById.set(course.id, String(selectedCourses.find((item) => String(item.id) === String(course.lms_source_id))?.course_code || course.lms_source_id))
+          }
+          const incoming = assignmentPayload.map((assignment) => ({
+            ...assignment, course_code: courseCodeById.get(String(assignment.course_id)) || '',
+          })) as CanvasAssignmentSnapshot[]
+          changeAlerts = detectCanvasAssignmentChanges(existingRows, incoming).filter((change) =>
+            change.kind !== 'new_assignment' || eligibleNewCourseIds.has(change.courseId))
+        }
+      } catch (alertSetupError) {
+        console.warn('Canvas change alerts were skipped during sync:', alertSetupError instanceof Error ? alertSetupError.message : alertSetupError)
+        changeAlerts = []
+      }
+    }
     if (assignmentPayload.length) {
       const { error: assignmentError } = await admin.from('assignments').upsert(assignmentPayload, { onConflict: 'user_id,lms_source_id' })
       if (assignmentError) throw assignmentError
+    }
+    let sentChangeAlerts = 0
+    if (alertsEnabled && changeAlerts.length) {
+      try {
+        sentChangeAlerts = await sendCanvasAssignmentChangeAlerts(admin, user.id, changeAlerts)
+      } catch (alertError) {
+        console.warn('Canvas assignment changes synced, but push alerts could not be sent:', alertError instanceof Error ? alertError.message : alertError)
+      }
     }
     await Promise.all([
       admin.from('profiles').update({ canvas_last_synced_at: now, updated_at: now }).eq('user_id', user.id),
       admin.from('canvas_connections').update({ last_synced_at: now, updated_at: now }).eq('user_id', user.id),
     ])
-    return json({ success: true, synced: selectedCourses.length, syncedCourses: selectedCourses.length, syncedAssignments: assignmentPayload.length, adjustedAssignments, conflictingWindowAssignments, invalidCanvasDateAssignments, syncedAt: now })
+    return json({ success: true, synced: selectedCourses.length, syncedCourses: selectedCourses.length, syncedAssignments: assignmentPayload.length, adjustedAssignments, conflictingWindowAssignments, invalidCanvasDateAssignments, sentChangeAlerts, syncedAt: now })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown Canvas sync error.'
     console.error('canvas-sync error:', message)
