@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.39';
+const CACHE_NAME = 'duevinci-v8.40';
 // Version runtime assets with the shell so query-versioned modules from a
 // previous release cannot survive activation and override the current code.
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;

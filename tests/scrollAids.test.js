@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScrollAidCandidateBounds, findForegroundModalScrollRoot, findForegroundModalShell, findModalScrollRoot, findScrollAidBottomOffset, findScrollAidLeft, shouldShowScrollProgress } from '../js/modules/scrollAids.js';
+import { createScrollAidCandidateBounds, findForegroundModalScrollRoot, findForegroundModalShell, findModalScrollRoot, findScrollAidBottomOffset, findScrollAidLeft, setScrollAidVisibility, shouldShowScrollProgress } from '../js/modules/scrollAids.js';
 
 describe('modal scroll aids', () => {
     it('finds the nested Settings scroll pane', () => {
@@ -103,6 +103,34 @@ describe('modal scroll aids', () => {
             scrollHeight: 900,
             clientHeight: 600
         })).toBe(true);
+    });
+
+    it('sets an explicit display override when initially hidden', () => {
+        const button = { hidden: false, style: { display: '' } };
+
+        setScrollAidVisibility(button, false);
+
+        expect(button.hidden).toBe(true);
+        expect(button.style.display).toBe('none');
+    });
+
+    it('clears the inline display override before measuring a visible button', () => {
+        const button = { hidden: true, style: { display: 'none' } };
+
+        setScrollAidVisibility(button, true);
+
+        expect(button.hidden).toBe(false);
+        expect(button.style.display).toBe('');
+    });
+
+    it('restores explicit display none when hiding after a visible update', () => {
+        const button = { hidden: true, style: { display: 'none' } };
+        setScrollAidVisibility(button, true);
+
+        setScrollAidVisibility(button, false);
+
+        expect(button.hidden).toBe(true);
+        expect(button.style.display).toBe('none');
     });
 
     it('moves Back to top above a bottom control it would otherwise cover', () => {
