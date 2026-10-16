@@ -160,16 +160,22 @@ export function parseBrightspaceCalendar(text: string, maxEvents = 5000) {
   if (!normalizedText.includes('BEGIN:VCALENDAR') || !normalizedText.includes('END:VCALENDAR')) throw new Error('Brightspace did not return a valid calendar feed.')
   const events: BrightspaceEvent[] = []
   let event: IcsEvent | null = null
+  let eventType: 'VEVENT' | 'VTODO' | null = null
   for (const line of unfoldCalendar(text).split(/\n/)) {
     const normalized = line.trim()
-    if (['BEGIN:VEVENT', 'BEGIN:VTODO'].includes(normalized.toUpperCase())) {
+    const componentLine = normalized.toUpperCase()
+    if (['BEGIN:VEVENT', 'BEGIN:VTODO'].includes(componentLine)) {
+      if (event) throw new Error('Brightspace did not return a valid calendar feed.')
       event = {}
+      eventType = componentLine === 'BEGIN:VEVENT' ? 'VEVENT' : 'VTODO'
       continue
     }
-    if (['END:VEVENT', 'END:VTODO'].includes(normalized.toUpperCase())) {
-      if (event) events.push(...eventRows(event, maxEvents - events.length))
+    if (['END:VEVENT', 'END:VTODO'].includes(componentLine)) {
+      const closedEventType = componentLine.slice('END:'.length)
+      if (!event || eventType !== closedEventType) throw new Error('Brightspace did not return a valid calendar feed.')
+      if (events.length < maxEvents) events.push(...eventRows(event, maxEvents - events.length))
       event = null
-      if (events.length >= maxEvents) break
+      eventType = null
       continue
     }
     if (!event) continue
@@ -178,5 +184,6 @@ export function parseBrightspaceCalendar(text: string, maxEvents = 5000) {
     if (parsed.name === 'EXDATE') event.EXDATE = [...(event.EXDATE || []), parsed.property]
     else if (['UID', 'SUMMARY', 'DTSTART', 'DTEND', 'DUE', 'RRULE', 'STATUS'].includes(parsed.name)) event[parsed.name] = parsed.property
   }
+  if (event) throw new Error('Brightspace did not return a valid calendar feed.')
   return events.slice(0, maxEvents)
 }

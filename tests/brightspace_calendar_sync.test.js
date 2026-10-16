@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { saveBrightspaceCalendarEvents } from '../supabase/functions/_shared/brightspace_calendar_sync.ts';
+import { parseBrightspaceCalendar } from '../supabase/functions/_shared/brightspace_ical.ts';
 
 const USER_ID = 'user-1';
 const EMPTY_FEED = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n';
@@ -75,6 +76,48 @@ function fakeAdmin(initialEvents = [], { upsertError = null, staleError = null }
     };
 }
 
+describe('Brightspace iCalendar component structure', () => {
+    it('rejects nested event components', () => {
+        const feed = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:outer-event',
+            'BEGIN:VEVENT', 'UID:inner-event', 'END:VEVENT', 'END:VEVENT', 'END:VCALENDAR', '',
+        ].join('\r\n');
+
+        expect(() => parseBrightspaceCalendar(feed)).toThrow('valid calendar feed');
+    });
+
+    it('rejects malformed components after reaching the output cap', () => {
+        const start = new Date();
+        start.setUTCDate(start.getUTCDate() + 7);
+        const date = start.toISOString().slice(0, 10).replaceAll('-', '');
+        const feed = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0',
+            'BEGIN:VEVENT', 'UID:complete-event', 'SUMMARY:Complete event', `DTSTART;VALUE=DATE:${date}`, 'END:VEVENT',
+            'BEGIN:VEVENT', 'UID:truncated-event', 'SUMMARY:Truncated event', 'END:VCALENDAR', '',
+        ].join('\r\n');
+
+        expect(() => parseBrightspaceCalendar(feed, 1)).toThrow('valid calendar feed');
+    });
+
+    it('accepts VTODO and ignores unsupported components such as VALARM and VFREEBUSY', () => {
+        const start = new Date();
+        start.setUTCDate(start.getUTCDate() + 7);
+        const date = start.toISOString().slice(0, 10).replaceAll('-', '');
+        const feed = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0',
+            'BEGIN:VFREEBUSY', 'UID:unsupported-entry', 'END:VFREEBUSY',
+            'BEGIN:VEVENT', 'UID:event-with-alarm', 'SUMMARY:Event with alarm', `DTSTART;VALUE=DATE:${date}`,
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'END:VALARM', 'END:VEVENT',
+            'BEGIN:VTODO', 'UID:todo-entry', 'SUMMARY:Due item', `DUE;VALUE=DATE:${date}`, 'END:VTODO',
+            'END:VCALENDAR', '',
+        ].join('\r\n');
+
+        const events = parseBrightspaceCalendar(feed);
+
+        expect(events.map((event) => event.title)).toEqual(['Event with alarm', 'Due item']);
+    });
+});
+
 describe('Brightspace calendar sync persistence', () => {
     it('deactivates stale SNHU entries when a valid feed contains zero events', async () => {
         const admin = fakeAdmin([
@@ -117,6 +160,25 @@ describe('Brightspace calendar sync persistence', () => {
             .rejects.toThrow('valid calendar feed');
         expect(malformedAdmin.calls).toHaveLength(0);
         expect(malformedAdmin.events[0].is_active).toBe(true);
+
+        const malformedEventFeeds = [
+            [
+                'unclosed VEVENT',
+                'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:truncated\r\nSUMMARY:Truncated event\r\nEND:VCALENDAR\r\n',
+            ],
+            [
+                'mismatched component end',
+                'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:mismatched\r\nEND:VTODO\r\nEND:VCALENDAR\r\n',
+            ],
+        ];
+        for (const [description, malformedFeed] of malformedEventFeeds) {
+            const malformedEventAdmin = fakeAdmin([oldEntry]);
+            await expect(saveBrightspaceCalendarEvents(malformedEventAdmin, USER_ID, malformedFeed), description)
+                .rejects.toThrow('valid calendar feed');
+            expect(malformedEventAdmin.calls, description).toHaveLength(0);
+            expect(malformedEventAdmin.events[0].is_active, description).toBe(true);
+            expect(malformedEventAdmin.connectionUpdates, description).toHaveLength(0);
+        }
 
         const failedWriteAdmin = fakeAdmin([oldEntry], { upsertError: new Error('write failed') });
         await expect(saveBrightspaceCalendarEvents(failedWriteAdmin, USER_ID, feedWithEvent()))
