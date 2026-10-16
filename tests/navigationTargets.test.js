@@ -27,6 +27,11 @@ describe('navigation touch targets', () => {
 
     const sidebarSource = readSource('js/modules/components.js');
 
+    it('gives the main timer toggle a descriptive accessible name', () => {
+        const button = sidebarSource.match(/<button\b[^>]*id="timerPlayBtn"[^>]*>/)[0];
+        expect(button).toContain('aria-label="Start or pause timer"');
+    });
+
     it.each([
         'toggleTimerSettings()',
         'toggleTimerCollapse()',

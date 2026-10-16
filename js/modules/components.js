@@ -105,7 +105,7 @@ class DueVinciSidebar extends BaseElement {
 
                     <div class="flex items-center gap-3 mb-2 text-zinc-500 dark:text-zinc-400">
                         <button type="button" onclick="resetTimer()" title="Reset Timer" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
-                        <button type="button" onclick="toggleTimer()" id="timerPlayBtn" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-white dark:bg-zinc-100 text-zinc-900 p-2.5 rounded-lg shadow-sm hover:scale-105 transition"><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                        <button type="button" onclick="toggleTimer()" id="timerPlayBtn" aria-label="Start or pause timer" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-white dark:bg-zinc-100 text-zinc-900 p-2.5 rounded-lg shadow-sm hover:scale-105 transition"><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
                         <button type="button" onclick="skipTimer()" title="Skip Mode" class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-zinc-800 dark:hover:text-white transition p-1"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 4v16M9 4l10 8-10 8V4z"/></svg></button>
                     </div>
 
