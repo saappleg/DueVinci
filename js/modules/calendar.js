@@ -532,7 +532,6 @@ export async function createAssignmentFromCalendarEvent() {
             courseId: course.id,
             title: activeCalendarEvent.title,
             dueDate: activeCalendarEvent.date,
-            calendarEventId: activeCalendarEvent.eventId,
         });
         if (duplicate) throw new Error('A matching assignment already exists for this class and date. The calendar event is still here.');
         const payload = buildCalendarAssignmentPayload({
@@ -540,6 +539,7 @@ export async function createAssignmentFromCalendarEvent() {
             courseId: course.id,
             title: activeCalendarEvent.title,
             dueDate: activeCalendarEvent.date,
+            calendarEventId: activeCalendarEvent.eventId,
         });
         if (status) status.textContent = 'Creating assignment…';
         const { data: created, error } = await supabaseClient.from('assignments')

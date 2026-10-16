@@ -702,14 +702,14 @@ export function ensureSettingsModalExists() {
                         </div>
 
                         <!-- Canvas Sync Modal -->
-                        <div id="canvasSyncModal" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                            <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div id="canvasSyncModal" aria-hidden="true" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                            <div role="dialog" aria-modal="true" aria-labelledby="canvasSyncModalTitle" class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                                 <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                     <div>
-                                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
+                                        <h3 id="canvasSyncModalTitle" class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
                                         <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Import selected courses plus their dated assignments.</p>
                                     </div>
-                                    <button type="button" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
+                                    <button type="button" data-modal-close aria-label="Close Canvas sync" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
                                 </div>
                                 <div id="canvasSyncModalMsg" class="hidden mx-5 mt-4 p-3 rounded-xl text-xs border"></div>
                                 <div class="flex-1 overflow-y-auto p-5" id="canvasCourseList">

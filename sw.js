@@ -1,8 +1,10 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.36';
-const RUNTIME_CACHE = 'duevinci-runtime-v1';
+const CACHE_NAME = 'duevinci-v8.38';
+// Version runtime assets with the shell so query-versioned modules from a
+// previous release cannot survive activation and override the current code.
+const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -20,9 +22,16 @@ const ASSETS_TO_CACHE = [
   './assets/images/maestro-logo.svg',
   './assets/images/maestro-logo.png',
   './assets/images/wgu-owl.png',
+  './assets/icons/favicon.ico',
+  './assets/icons/icon-16x16.png',
+  './assets/icons/icon-32x32.png',
+  './assets/icons/icon-48x48.png',
+  './assets/icons/icon-72x72.png',
+  './assets/icons/icon-96x96.png',
+  './assets/icons/icon-144x144.png',
   './assets/icons/icon-192x192.png',
   './assets/icons/icon-512x512.png',
-  './assets/icons/favicon.ico',
+  './assets/icons/icon-512x512-maskable.png',
   './js/app.js',
   './js/modules/config.js',
   './js/modules/degreeThemes.js',
@@ -41,6 +50,9 @@ const ASSETS_TO_CACHE = [
   './js/modules/flashcards.js',
   './js/modules/markdown.js',
   './js/modules/studyPlan.js',
+  './js/modules/studyCalibration.js',
+  './js/modules/termRollover.js',
+  './js/modules/lmsAlerts.js',
   './js/modules/offlineDb.js',
   './js/modules/profileAvatar.js',
   './js/modules/components.js',
@@ -74,7 +86,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then(async (cache) => {
       // An optional asset failing to cache must not prevent the PWA shell from
       // installing. Cache as much of the shell as is available.
-      await Promise.allSettled(ASSETS_TO_CACHE.map((asset) => cache.add(asset)));
+      await Promise.allSettled(ASSETS_TO_CACHE.map((asset) => cache.add(new Request(asset, { cache: 'reload' }))));
     }).then(() => self.skipWaiting())
   );
 });
@@ -160,7 +172,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.open(CACHE_NAME).then((appCache) => appCache.match(request)).then(async (cached) => {
+    caches.open(CACHE_NAME).then((appCache) => appCache.match(request, { ignoreSearch: true })).then(async (cached) => {
       if (cached) return cached;
       const runtimeCached = await caches.open(RUNTIME_CACHE).then((cache) => cache.match(request));
       if (runtimeCached) return runtimeCached;

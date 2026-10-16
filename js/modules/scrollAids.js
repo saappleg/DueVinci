@@ -5,7 +5,36 @@ export function findModalScrollRoot(shell) {
     if (!shell || typeof shell.querySelector !== 'function') return null;
     return shell.querySelector('.settings-scroll-pane')
         || (shell.matches?.('[role="dialog"]') ? shell.querySelector('.overflow-y-auto') : null)
-        || shell.querySelector('[role="dialog"] .overflow-y-auto');
+        || shell.querySelector('[role="dialog"] .overflow-y-auto')
+        || (shell.matches?.('.overflow-y-auto') ? shell : null);
+}
+
+function isVisibleModalShell(shell) {
+    return Boolean(shell)
+        && !shell.closest?.('.hidden')
+        && shell.getAttribute?.('aria-hidden') !== 'true';
+}
+
+export function findForegroundModalShell(shells = []) {
+    // Nested and later-opened dialogs follow their parent shells in document order.
+    // Search from the end so a visible foreground dialog wins over its background shell.
+    for (let index = shells.length - 1; index >= 0; index -= 1) {
+        const shell = shells[index];
+        if (isVisibleModalShell(shell)) return shell;
+    }
+    return null;
+}
+
+export function findForegroundModalScrollRoot(shells = []) {
+    const shell = findForegroundModalShell(shells);
+    const root = findModalScrollRoot(shell);
+    return root && root.clientHeight > 0 ? root : null;
+}
+
+export function shouldShowScrollProgress({ hasModal = false, modalRoot = null, appVisible = false, scrollHeight = 0, clientHeight = 0 } = {}) {
+    return (hasModal ? Boolean(modalRoot) : appVisible)
+        && clientHeight > 0
+        && scrollHeight - clientHeight > 1;
 }
 
 function reducedMotionRequested() {
@@ -46,24 +75,23 @@ export function initScrollAids() {
     document.body.append(backToTop);
 
     let animationFrame = 0;
-    const getModalScrollRoot = () => {
-        const shells = [...document.querySelectorAll('#settingsModal, #supportModal, [role="dialog"]')]
-            .filter((shell) => !shell.closest('.hidden'));
-        for (const shell of shells) {
-            const root = findModalScrollRoot(shell);
-            if (root && root.clientHeight > 0) return root;
-        }
-        return null;
-    };
     const update = () => {
-        const modalRoot = getModalScrollRoot();
-        activeScrollRoot = modalRoot || scrollRoot;
-        const activeDialog = modalRoot?.closest('[role="dialog"]');
+        const modalShells = [...document.querySelectorAll('#settingsModal, #supportModal, #canvasSyncModal, [role="dialog"]')];
+        const modalShell = findForegroundModalShell(modalShells);
+        const modalRootCandidate = findModalScrollRoot(modalShell);
+        const modalRoot = modalRootCandidate?.clientHeight > 0 ? modalRootCandidate : null;
+        activeScrollRoot = modalRoot || modalShell || scrollRoot;
+        const activeDialog = modalRoot?.closest('[role="dialog"]') || modalShell?.closest('[role="dialog"]') || (modalShell?.matches?.('[role="dialog"]') ? modalShell : null);
         const backToTopParent = activeDialog || document.body;
         if (backToTop.parentElement !== backToTopParent) backToTopParent.append(backToTop);
         const maxScroll = Math.max(0, activeScrollRoot.scrollHeight - activeScrollRoot.clientHeight);
-        const rootVisible = modalRoot ? true : !app.classList.contains('hidden');
-        const canScroll = rootVisible && activeScrollRoot.clientHeight > 0 && maxScroll > 1;
+        const canScroll = shouldShowScrollProgress({
+            hasModal: Boolean(modalShell),
+            modalRoot,
+            appVisible: !app.classList.contains('hidden'),
+            scrollHeight: activeScrollRoot.scrollHeight,
+            clientHeight: activeScrollRoot.clientHeight,
+        });
         const percent = canScroll ? Math.min(1, Math.max(0, activeScrollRoot.scrollTop / maxScroll)) : 0;
         progress.hidden = !canScroll;
         fill.style.transform = 'scaleX(' + percent + ')';
@@ -72,7 +100,7 @@ export function initScrollAids() {
             progress.style.top = Math.round(bounds.top) + 'px';
             progress.style.left = Math.round(bounds.left) + 'px';
             progress.style.width = Math.round(bounds.width) + 'px';
-        } else {
+        } else if (!modalShell) {
             const headerBottom = app.querySelector('header')?.getBoundingClientRect().bottom || 0;
             const sidebarRight = app.querySelector('#appSidebar')?.getBoundingClientRect().right || 0;
             const leftOffset = Math.max(0, Math.min(window.innerWidth, sidebarRight));
@@ -107,11 +135,11 @@ export function initScrollAids() {
         const contentObserver = new MutationObserver(scheduleUpdate);
         contentObserver.observe(scrollRoot, { childList: true, subtree: true });
         const discoverIndependentScrollAreas = () => {
-            document.querySelectorAll('#settingsModal, #supportModal, [role="dialog"]').forEach((shell) => {
+            document.querySelectorAll('#settingsModal, #supportModal, #canvasSyncModal, [role="dialog"]').forEach((shell) => {
                 if (!observedModalShells.has(shell)) {
                     observedModalShells.add(shell);
                     const shellObserver = new MutationObserver(scheduleUpdate);
-                    shellObserver.observe(shell, { attributes: true, attributeFilter: ['class'] });
+                    shellObserver.observe(shell, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
                 }
                 const root = findModalScrollRoot(shell);
                 if (root && !observedScrollRoots.has(root)) {
