@@ -79,9 +79,18 @@ export async function loadGradesPage(isFastRecalc = false) {
         return;
     }
 
-    const { data: courses } = await supabaseClient.from('courses').select('*');
-    const { data: assignments } = await supabaseClient.from('assignments').select('*');
-    if (!courses || !assignments) return;
+    const { data: courses, error: coursesError } = await supabaseClient.from('courses').select('*');
+    const { data: assignments, error: assignmentsError } = await supabaseClient.from('assignments').select('*');
+    if (coursesError || assignmentsError || !Array.isArray(courses) || !Array.isArray(assignments)) {
+        container.innerHTML = `
+            <section class="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center dark:border-amber-900/70 dark:bg-amber-950/30" role="alert">
+                <h3 class="font-bold text-zinc-900 dark:text-white">Grades could not load</h3>
+                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">Check your connection and try again. Your saved grades have not been changed.</p>
+                <button type="button" onclick="loadGradesPage()" class="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white">Try again</button>
+            </section>
+        `;
+        return;
+    }
 
     container.innerHTML = '';
     let totalGradePoints = 0;

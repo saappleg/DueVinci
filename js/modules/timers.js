@@ -1,8 +1,15 @@
 // --- POMODORO TIMER, SIDEBAR CONTROLS & MULTI-TIMER STATE MACHINE MODULE ---
 import { playTimerAlarm, fireConfetti, recordStudyActivity, escapeHtml, escapeInlineJs } from './utils.js';
+import { recordCompletedFocusSessionIfEntitled } from './studyCalibration.js';
 
 function timerArg(value) {
     return escapeHtml(escapeInlineJs(value));
+}
+
+function startInterval(callback, delay) {
+    const interval = setInterval(callback, delay);
+    interval?.unref?.();
+    return interval;
 }
 
 // --- SIDEBAR POMODORO TIMER STATE ---
@@ -18,10 +25,49 @@ export let timerCollapsed = typeof localStorage !== 'undefined' ? (localStorage.
 export let customTimersExpanded = typeof localStorage !== 'undefined' ? (localStorage.getItem('customTimersExpanded') === 'true') : true;
 export let floatingTimerDismissed = false;
 
+const STUDY_FOCUS_CONTEXT_KEY = 'duevinci_active_study_context';
+
+function getStudyFocusContext() {
+    if (typeof localStorage === 'undefined') return null;
+    try { return JSON.parse(localStorage.getItem(STUDY_FOCUS_CONTEXT_KEY) || 'null'); } catch { return null; }
+}
+
+export function setStudyFocusContext(context = null) {
+    if (typeof localStorage === 'undefined') return;
+    if (!context?.taskId) {
+        localStorage.removeItem(STUDY_FOCUS_CONTEXT_KEY);
+        return;
+    }
+    localStorage.setItem(STUDY_FOCUS_CONTEXT_KEY, JSON.stringify({
+        taskId: String(context.taskId),
+        courseId: context.courseId == null ? null : String(context.courseId),
+        taskType: String(context.taskType || ''),
+    }));
+}
+
+function clearStudyFocusContext() {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(STUDY_FOCUS_CONTEXT_KEY);
+}
+
+function recordFinishedStudyFocusSession() {
+    const context = getStudyFocusContext();
+    const saved = context?.taskId
+        ? recordCompletedFocusSessionIfEntitled({ ...context, minutes: focusMinutes })
+        : Promise.resolve(false);
+    clearStudyFocusContext();
+    return saved;
+}
+
 // Sync active state from timestamp on script load
 if (timerRunning && timerEndTime > Date.now()) {
     timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
 } else {
+    if (timerRunning && timerEndTime > 0 && isWorking) {
+        recordFinishedStudyFocusSession();
+        isWorking = false;
+        timeLeft = breakMinutes * 60;
+        if (typeof localStorage !== 'undefined') localStorage.setItem('timerIsWorking', 'false');
+    }
     timerRunning = false;
     if (typeof localStorage !== 'undefined') localStorage.setItem('timerRunning', 'false');
 }
@@ -123,13 +169,13 @@ export function toggleTimer() {
         }
         if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
 
-        timerInterval = setInterval(() => {
+        timerInterval = startInterval(() => {
             if (timerEndTime > Date.now()) {
                 timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                 updateTimerDisplay();
             } else {
                 playTimerAlarm();
-                skipTimer();
+                skipTimer(true);
             }
         }, 1000);
         recordStudyActivity();
@@ -138,6 +184,7 @@ export function toggleTimer() {
 }
 
 export function resetTimer() {
+    clearStudyFocusContext();
     timerRunning = false;
     if (timerInterval) {
         clearInterval(timerInterval);
@@ -150,7 +197,11 @@ export function resetTimer() {
     updateTimerDisplay();
 }
 
-export function skipTimer() {
+export function skipTimer(completed = false) {
+    if (isWorking) {
+        if (completed) recordFinishedStudyFocusSession();
+        else clearStudyFocusContext();
+    }
     isWorking = !isWorking;
     if (typeof localStorage !== 'undefined') localStorage.setItem('timerIsWorking', isWorking);
     const labelEl = document.getElementById('timerLabel');
@@ -414,7 +465,7 @@ export function renderTimersManager(container) {
 
 // Global ticker running every second for active custom timers
 if (typeof setInterval !== 'undefined') {
-    setInterval(() => {
+    startInterval(() => {
         let updated = false;
         activeTimers = activeTimers.map(t => {
             if (t.running) {
@@ -461,6 +512,7 @@ _timerScope.toggleMultiTimerRun = toggleMultiTimerRun;
 _timerScope.initMultiTimersUI = initMultiTimersUI;
 _timerScope.renderTimersManager = renderTimersManager;
 _timerScope.setTimerDuration = setTimerDuration;
+_timerScope.setStudyFocusContext = setStudyFocusContext;
 
 // Auto-initialize timer collapse, display, and multi-timers on DOM ready
 if (typeof document !== 'undefined') {
@@ -472,13 +524,13 @@ if (typeof document !== 'undefined') {
         if (timerRunning && timeLeft > 0) {
             const btn = document.getElementById('timerPlayBtn');
             if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-            timerInterval = setInterval(() => {
+            timerInterval = startInterval(() => {
                 if (timerEndTime > Date.now()) {
                     timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                     updateTimerDisplay();
                 } else {
                     playTimerAlarm();
-                    skipTimer();
+                    skipTimer(true);
                 }
             }, 1000);
         }
