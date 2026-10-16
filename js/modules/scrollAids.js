@@ -79,6 +79,16 @@ export function findScrollAidBottomOffset({ buttonBounds, controlBounds = [], vi
     return null;
 }
 
+export function setScrollAidVisibility(element, visible) {
+    if (visible) {
+        element.hidden = false;
+        element.style.display = '';
+        return;
+    }
+    element.hidden = true;
+    element.style.display = 'none';
+}
+
 function reducedMotionRequested() {
     return typeof window !== 'undefined'
         && typeof window.matchMedia === 'function'
@@ -113,7 +123,7 @@ export function initScrollAids() {
     backToTop.setAttribute('aria-label', 'Back to top');
     backToTop.title = 'Back to top';
     backToTop.innerHTML = '<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 15 7-7 7 7\"/></svg>';
-    backToTop.hidden = true;
+    setScrollAidVisibility(backToTop, false);
     document.body.append(backToTop);
 
     let animationFrame = 0;
@@ -145,7 +155,7 @@ export function initScrollAids() {
         backToTop.style.left = '';
         backToTop.style.right = '';
         if (canScroll) {
-            backToTop.hidden = false;
+            setScrollAidVisibility(backToTop, true);
             const buttonBounds = backToTop.getBoundingClientRect();
             const collisionScope = modalShell || app;
             const areaBounds = activeScrollRoot.getBoundingClientRect();
@@ -189,8 +199,8 @@ export function initScrollAids() {
             progress.style.left = leftOffset + 'px';
             progress.style.width = Math.max(0, window.innerWidth - leftOffset) + 'px';
         }
-        backToTop.hidden = !canScroll || !backToTopPositionSafe
-            || (activeScrollRoot.scrollTop < 240 && document.activeElement !== backToTop);
+        setScrollAidVisibility(backToTop, canScroll && backToTopPositionSafe
+            && (activeScrollRoot.scrollTop >= 240 || document.activeElement === backToTop));
     };
     const scheduleUpdate = () => {
         if (animationFrame) return;
