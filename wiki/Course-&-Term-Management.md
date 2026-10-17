@@ -17,7 +17,7 @@ Named term and optional date window
 ## Find and organize classes
 
 - Give classes a code, icon, and color; use term folders or the alphabetical list.
-- Search classes/terms, select classes for a bulk term move, and choose whether completed classes are visible.
+- Search classes/terms, select classes for a bulk term move, and choose whether completed classes are visible. **Hide completed classes** also removes those courses from Grades, including its GPA summary and term insights.
 - Set class and term start/end dates. Planning and imports use their effective date window; terms can archive after their end date.
 - Show archived terms to find or restore older folders. Hiding or archiving a folder does not mean its coursework was deleted.
 - Choose manual or supported weekly pacing profiles. Weekly progress follows the current coursework week rather than assuming all overdue work belongs today.
@@ -30,7 +30,7 @@ Rollover copies class shells: name/code, icon/color, and pacing type. Old course
 
 ## Assignment management
 
-Coursework supports a title, unit, date, task type, priority, effort estimate, a 0–100% progress value, and completion. Marking an item complete sets progress to 100%; marking it incomplete resets progress to 0%. Partially completed work uses a proportional remaining-time estimate in the Smart Study Plan.
+Coursework supports a title, unit, date, task type, priority, effort estimate, a 0–100% progress value, completion, and an **Include in Grades** choice. New lessons, subtasks, and assignments start unchecked so a large course outline does not flood the Grades page. Select the items you want in the grade tracker; turning the choice off hides the grade row while preserving its saved grade and category. Items that already have a grade or category remain selected after the gradebook-selection migration. Marking an item complete sets progress to 100%; marking it incomplete resets progress to 0%. Partially completed work uses a proportional remaining-time estimate in the Smart Study Plan.
 
 Use **Add subtask** on a top-level coursework item to break it into separately scheduled work. Subtasks keep their own due date, completion, and progress, and appear directly after their parent when ordered. Deleting a parent keeps its subtasks as standalone coursework.
 
@@ -40,7 +40,7 @@ Choose **Every week** when adding coursework to create weekly instances through 
 
 Syllabus PDF and image imports open a review dialog for each extracted unit and lesson row. Edit titles and dates or clear a row's Include checkbox before importing. Canceling the review leaves course metadata and coursework unchanged; selected due dates continue to follow the class and term date bounds.
 
-Instructions, progress, and parent links are synced with assignment records, kept by the offline cache, and included in full data backups. Apply `supabase/migrations/20261017022939_coursework_workflow_fields.sql` before deploying the UI changes so the new assignment fields exist.
+Instructions, progress, parent links, and gradebook inclusion are synced with assignment records, kept by the offline cache, and included in full data backups. Apply `supabase/migrations/20261017022939_coursework_workflow_fields.sql` and `supabase/migrations/20261017064026_assignment_gradeability.sql` before deploying the matching UI so the saved assignment fields exist.
 
 Grades accepts percentage values and an Exclude choice. Course category weights and credit hours are configurable in the Grades page; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains how the estimates work and their limits. The saved settings require `supabase/migrations/20261017022938_weighted_gradebook_and_gpa.sql`.
 

@@ -130,13 +130,13 @@ export function startWalkthrough(manualStart = false) {
             { popover: { title: 'Class & Syllabus Center 📚', description: 'Here is where you set up your classes and automatically parse coursework.' } },
             { element: '#courseForm', popover: { title: '1. Add a Class', description: 'Pick an emoji, type your course code (e.g. CS101), select a color badge, and click Add.', side: "bottom" } },
             { element: '#termFoldersGrid', popover: { title: '2. Term Folders', description: 'Create folders for your semesters, set their date ranges, and choose a term from each class row to organize your courses.', side: "top" } },
-            { element: '#alphabeticalCourseList', popover: { title: '3. Syllabus & AI Scanner', description: 'Click any class card to open its modal. You can upload a PDF syllabus or a screenshot of lessons to let Gemini AI build your schedule automatically.', side: "top" } }
+            { element: '#alphabeticalCourseList', popover: { title: '3. Syllabus & AI Scanner', description: 'Click any class card to open its modal. You can upload a PDF syllabus or a screenshot of lessons to let Gemini AI build your schedule automatically. Choose which coursework appears in Grades with the Include in Grades checkbox.', side: "top" } }
         ];
     } else if (page === 'grades' || page === 'grades.html') {
         steps = [
             { popover: { title: 'Academic Performance 💯', description: 'Keep track of course averages and calculate your cumulative GPA in real-time.' } },
             { element: '#gpaBadgeContainer', popover: { title: '1. Cumulative GPA', description: 'Your overall GPA is dynamically calculated and pinned in the top header. You can switch between 4.0 and 5.0 scales in Settings.', side: "bottom" } },
-            { element: '#gradesContainer', popover: { title: '2. Entering Grades', description: 'Type grade percentages directly next to any unit or assignment. Check "Exclude" for pass/fail assignments.', side: "top" } }
+            { element: '#gradesContainer', popover: { title: '2. Entering Grades', description: 'Choose coursework from the Classes page with Include in Grades, then enter its percentage here. Check "Exclude" for pass/fail assignments. Hide completed classes in Settings to remove them from grade totals.', side: "top" } }
         ];
     } else if (page === 'calendar' || page === 'calendar.html') {
         steps = [

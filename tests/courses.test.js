@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { supabaseClient } from '../js/modules/config.js';
 import { generateBalancedStudyPlan } from '../js/modules/studyPlan.js';
 import {
     extractAssignmentChecklistSteps,
@@ -14,8 +15,16 @@ import {
     getAssignmentProgress,
     getCoursePacingProfile,
     getCoursePacingUpdates,
-    renderAssignmentCompletionControl
+    renderAssignmentCompletionControl,
+    renderAssignmentGradeabilityControl,
+    loadAssignments,
+    toggleAssignmentGradeable
 } from '../js/modules/courses.js';
+
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+});
 
 describe('Assignment instruction checklists', () => {
     it('extracts proposed steps from lines and sentence boundaries without inventing content', () => {
@@ -170,6 +179,143 @@ describe('Coursework completion control', () => {
         expect(control).toContain('aria-pressed="true"');
         expect(control).toContain("toggleAssignment('assignment-7', true, 'course-3')");
         expect(control).toContain('h-11 w-11');
+    });
+});
+
+describe('Coursework Grades selection', () => {
+    it('defaults missing and false gradeability flags to off and labels the item accessibly', () => {
+        const missingFlag = renderAssignmentGradeabilityControl({
+            id: 'lesson-1',
+            title: '↳ Lesson 1: <Cells & DNA>'
+        });
+        const optedIn = renderAssignmentGradeabilityControl({
+            id: 'lesson-2',
+            title: '↳ Lesson 2',
+            is_gradeable: true
+        });
+
+        expect(missingFlag).toContain('Include in Grades: ↳ Lesson 1: &lt;Cells &amp; DNA&gt;');
+        expect(missingFlag).toContain('data-saved-gradeable="false"');
+        expect(missingFlag).not.toMatch(/data-assignment-gradeable[^>]*\schecked(?:\s|>)/);
+        expect(missingFlag).toContain('toggleAssignmentGradeable(this.dataset.assignmentId, this.checked, this)');
+        expect(optedIn).toContain('data-saved-gradeable="true"');
+        expect(optedIn).toMatch(/data-assignment-gradeable[^>]*\schecked(?:\s|>)/);
+        expect(missingFlag).toContain('Include in Grades</span>');
+        expect(missingFlag).toContain('data-gradeability-status role="status" aria-live="polite"');
+    });
+
+    it('saves a lesson in place, updates the cached row, and preserves the rendered page', async () => {
+        const assignment = {
+            id: 'lesson-1', course_id: 'course-1', title: '↳ Lesson 1: Cells',
+            is_gradeable: false, is_completed: false, progress_percent: 0
+        };
+        const requests = [];
+        vi.spyOn(supabaseClient, 'from').mockImplementation((table) => {
+            let action = 'select';
+            const request = { table, action, payload: null, columns: null, filters: [] };
+            const query = {
+                update(payload) {
+                    action = 'update';
+                    request.action = action;
+                    request.payload = payload;
+                    return query;
+                },
+                select(columns) {
+                    request.columns = columns;
+                    return query;
+                },
+                eq(column, value) {
+                    request.filters.push({ column, value });
+                    return query;
+                },
+                maybeSingle() { return query; },
+                then(resolve, reject) {
+                    const result = request.action === 'update'
+                        ? { data: { id: assignment.id, is_gradeable: true }, error: null }
+                        : { data: [assignment], error: null };
+                    return Promise.resolve(result).then(resolve, reject);
+                }
+            };
+            requests.push(request);
+            return query;
+        });
+        const assignmentList = { innerHTML: '' };
+        const getElementById = vi.fn((id) => id === 'assignmentList' ? assignmentList : null);
+        vi.stubGlobal('document', {
+            getElementById
+        });
+        await loadAssignments('course-1');
+        const renderedPage = assignmentList.innerHTML;
+        const domReadCount = getElementById.mock.calls.length;
+        const status = { textContent: '', className: '', setAttribute: vi.fn() };
+        const input = {
+            checked: true,
+            disabled: false,
+            isConnected: true,
+            dataset: { assignmentId: 'lesson-1', savedGradeable: 'false' },
+            setAttribute: vi.fn(),
+            removeAttribute: vi.fn(),
+            closest: () => ({ querySelector: () => status })
+        };
+
+        await expect(toggleAssignmentGradeable('lesson-1', true, input)).resolves.toBe(true);
+
+        expect(requests[0]).toMatchObject({
+            table: 'assignments',
+            action: 'select',
+            columns: '*',
+            filters: [{ column: 'course_id', value: 'course-1' }]
+        });
+        expect(requests[1]).toMatchObject({
+            table: 'assignments',
+            action: 'update',
+            payload: { is_gradeable: true },
+            filters: [{ column: 'id', value: 'lesson-1' }]
+        });
+        expect(requests).toHaveLength(2);
+        expect(assignment.is_gradeable).toBe(true);
+        expect(input.dataset.savedGradeable).toBe('true');
+        expect(input.checked).toBe(true);
+        expect(input.isConnected).toBe(true);
+        expect(status.textContent).toBe('Included in Grades.');
+        expect(status.setAttribute).toHaveBeenCalledWith('role', 'status');
+        expect(status.setAttribute).toHaveBeenCalledWith('aria-live', 'polite');
+        expect(assignmentList.innerHTML).toBe(renderedPage);
+        expect(getElementById).toHaveBeenCalledTimes(domReadCount);
+        expect(input.disabled).toBe(false);
+        expect(input.removeAttribute).toHaveBeenCalledWith('aria-busy');
+    });
+
+    it('restores the prior checkbox state and announces save failures', async () => {
+        vi.spyOn(supabaseClient, 'from').mockImplementation(() => {
+            const query = {
+                update: () => query,
+                eq: () => query,
+                select: () => query,
+                maybeSingle: () => query,
+                then(resolve, reject) {
+                    return Promise.resolve({ data: null, error: new Error('permission denied') }).then(resolve, reject);
+                }
+            };
+            return query;
+        });
+        const status = { textContent: '', className: '', setAttribute: vi.fn() };
+        const input = {
+            checked: true,
+            disabled: false,
+            dataset: { savedGradeable: 'false' },
+            setAttribute: vi.fn(),
+            removeAttribute: vi.fn(),
+            closest: () => ({ querySelector: () => status })
+        };
+
+        await expect(toggleAssignmentGradeable('lesson-1', true, input)).resolves.toBe(false);
+
+        expect(input.checked).toBe(false);
+        expect(input.disabled).toBe(false);
+        expect(status.textContent).toContain('Could not save the Grades setting: permission denied');
+        expect(status.setAttribute).toHaveBeenCalledWith('role', 'alert');
+        expect(status.setAttribute).toHaveBeenCalledWith('aria-live', 'assertive');
     });
 });
 

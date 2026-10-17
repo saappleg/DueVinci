@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { normalizeRestoredAssignments } from '../js/modules/backup.js';
 
 describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
     let generateQuizQuestions;
@@ -95,6 +96,22 @@ describe('Quiz Generator, Backup Schema & Calendar ICS Utilities', () => {
             expect(validateBackupPayload(null).valid).toBe(false);
             expect(validateBackupPayload({ invalid: true }).valid).toBe(false);
             expect(validateBackupPayload({ data: { courses: 'not-an-array', assignments: [] } }).valid).toBe(false);
+        });
+
+        it('restores legacy gradeability from saved grades or categories while preserving explicit boolean choices', () => {
+            const restored = normalizeRestoredAssignments([
+                { id: 'graded-legacy', grade: 0 },
+                { id: 'categorized-legacy', grade_category_id: 'exams' },
+                { id: 'empty-legacy', grade: null, grade_category_id: '' },
+                { id: 'explicit-false', is_gradeable: false, grade: 95, grade_category_id: 'exams' },
+                { id: 'explicit-true', is_gradeable: true },
+                { id: 'non-boolean-with-data', is_gradeable: 'false', grade: '82' },
+                { id: 'non-boolean-empty', is_gradeable: 1, grade: '' }
+            ]);
+
+            expect(restored.map(({ is_gradeable }) => is_gradeable)).toEqual([
+                true, true, false, false, true, true, false
+            ]);
         });
 
         it('exports backup and cloud sync functions safely', async () => {
