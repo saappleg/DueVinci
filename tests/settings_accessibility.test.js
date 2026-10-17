@@ -8,6 +8,10 @@ const settingsSources = [
 ].map(([name, url]) => [name, readFileSync(fileURLToPath(url), 'utf8')]);
 
 describe('Settings modal markup', () => {
+    it.each(settingsSources)('%s associates the visible Profile photo label with its file input', (_name, source) => {
+        expect(source).toContain('<label for="profileAvatarInput" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>');
+    });
+
     it.each(settingsSources)('%s keeps the profile pane scrollable and connects form labels', (_name, source) => {
         expect(source).toContain('class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"');
         expect(source).toContain('class="settings-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain');
