@@ -872,7 +872,10 @@ export async function loadGradesPage(isFastRecalc = false) {
             </article>`;
     }).join('');
 
-    container.innerHTML = simBanner + renderTermInsights(gradeableAssignments) + (courseCards || '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add a course to start tracking grades.</p>');
+    const emptyCourseMessage = courses.length > 0 && hideCompletedCourses && visibleCourses.length === 0
+        ? 'All courses are hidden because they’re marked complete. Turn off “Hide completed classes” in Settings to see them here.'
+        : 'Add a course to start tracking grades.';
+    container.innerHTML = simBanner + renderTermInsights(gradeableAssignments) + (courseCards || `<p class="text-sm text-zinc-500 dark:text-zinc-400">${emptyCourseMessage}</p>`);
     updateGradeSummaries();
 }
 
