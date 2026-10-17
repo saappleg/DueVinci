@@ -12,6 +12,7 @@ let lastEventModalTrigger = null;
 let lastCalendarActionTrigger = null;
 let activeCalendarEvent = null;
 let calendarActionCourses = [];
+let calendarLoadGeneration = 0;
 
 async function getCalendarUser() {
     if (currentUser?.id) return currentUser;
@@ -603,15 +604,38 @@ export function initCalendar() {
     calendarInstance.render();
 }
 
+export function disposeCalendar() {
+    calendarLoadGeneration += 1;
+    closeCalendarEventActions();
+    closeEventModal();
+    calendarInstance?.destroy();
+    calendarInstance = null;
+    calendarActionCourses = [];
+    activeCalendarEvent = null;
+    lastEventModalTrigger = null;
+    lastCalendarActionTrigger = null;
+}
+
+export function initCalendarForm() {
+    const customEventForm = typeof document !== 'undefined' ? document.getElementById('customEventForm') : null;
+    if (!customEventForm || customEventForm.dataset.bound === 'true') return;
+    customEventForm.addEventListener('submit', saveCustomEvent);
+    customEventForm.dataset.bound = 'true';
+}
+
 export function setCalendarWeekStart(firstDay = getWeekStartDayIndex()) {
     if (calendarInstance) calendarInstance.setOption('firstDay', firstDay === 0 ? 0 : 1);
 }
 
 export async function loadCalendarCourses() {
     if (typeof document === 'undefined') return;
+    const generation = ++calendarLoadGeneration;
     const { data: courses } = await supabaseClient.from('courses').select('*');
+    if (generation !== calendarLoadGeneration) return;
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
+    if (generation !== calendarLoadGeneration) return;
     const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
+    if (generation !== calendarLoadGeneration) return;
 
     let calendarEvents = [];
     const courseMap = {};
@@ -640,12 +664,14 @@ export async function loadCalendarCourses() {
     // student intends to work, without changing the assignment itself.
     if (courses && assignments) {
         const calibration = await getStudyCalibrationContext();
+        if (generation !== calendarLoadGeneration) return;
         const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 21, null, { calibration });
         let syncedMoves = [];
         if (currentUser?.id) {
             const { data } = await supabaseClient.from('study_plan_moves')
                 .select('task_id, planned_for')
                 .eq('user_id', currentUser.id);
+            if (generation !== calendarLoadGeneration) return;
             syncedMoves = data || [];
         }
         const remoteMoveByTask = new Map(syncedMoves.filter((move) => move.planned_for).map((move) => [move.task_id, move.planned_for]));
@@ -661,7 +687,7 @@ export async function loadCalendarCourses() {
         }));
     }
 
-    if (calendarInstance) {
+    if (generation === calendarLoadGeneration && calendarInstance) {
         calendarInstance.removeAllEvents();
         calendarInstance.addEventSource(calendarEvents);
     }
@@ -860,10 +886,7 @@ _scope.saveCustomEvent = saveCustomEvent;
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        const customEventForm = document.getElementById('customEventForm');
-        if (customEventForm) {
-            customEventForm.addEventListener('submit', saveCustomEvent);
-        }
+        initCalendarForm();
     });
 }
 

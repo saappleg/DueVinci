@@ -1,10 +1,12 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.42';
+const CACHE_NAME = 'duevinci-v8.45';
 // Version runtime assets with the shell so query-versioned modules from a
 // previous release cannot survive activation and override the current code.
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
+// The optional 3D anatomy viewer, its manifest, and compressed model chunks
+// are cached on demand by the runtime cache; they are not part of PWA install.
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -56,6 +58,7 @@ const ASSETS_TO_CACHE = [
   './js/modules/offlineDb.js',
   './js/modules/profileAvatar.js',
   './js/modules/components.js',
+  './js/modules/navigation.js',
   './js/modules/backup.js',
   './js/modules/tour.js',
   './js/modules/reminders.js',
@@ -171,18 +174,38 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.open(CACHE_NAME).then((appCache) => appCache.match(request, { ignoreSearch: true })).then(async (cached) => {
-      if (cached) return cached;
-      const runtimeCached = await caches.open(RUNTIME_CACHE).then((cache) => cache.match(request));
-      if (runtimeCached) return runtimeCached;
-      return fetch(request).then((response) => {
+  let resolveRuntimeCacheLifetime;
+  const runtimeCacheLifetime = new Promise((resolve) => { resolveRuntimeCacheLifetime = resolve; });
+  event.waitUntil(runtimeCacheLifetime);
+  event.respondWith((async () => {
+    try {
+      const appCache = await caches.open(CACHE_NAME);
+      const cached = await appCache.match(request, { ignoreSearch: true });
+      if (cached) {
+        resolveRuntimeCacheLifetime();
+        return cached;
+      }
+      const runtimeCache = await caches.open(RUNTIME_CACHE);
+      const runtimeCached = await runtimeCache.match(request);
+      if (runtimeCached) {
+        resolveRuntimeCacheLifetime();
+        return runtimeCached;
+      }
+
+      const response = await fetch(request);
       if (response.ok || response.type === 'opaque') {
-        const copy = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+        void runtimeCache.put(request, response.clone())
+          .catch((error) => console.warn('Runtime cache write was skipped:', error.message || error))
+          .finally(resolveRuntimeCacheLifetime);
+      } else {
+        resolveRuntimeCacheLifetime();
       }
       return response;
-      });
-    }),
-  );
+    } catch (error) {
+      resolveRuntimeCacheLifetime();
+      const fallback = await caches.match(request);
+      if (fallback) return fallback;
+      throw error;
+    }
+  })());
 });

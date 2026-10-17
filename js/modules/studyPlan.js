@@ -1459,7 +1459,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <span class="text-3xl">📚</span>
                     <h4 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No Enrolled Courses Yet</h4>
                     <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">Add your classes and parse your syllabus to automatically balance your weekly study schedule.</p>
-                    <a href="courses/index.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <a href="courses/index.html" data-app-nav class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
                         + Add Courses
                     </a>
                 </div>

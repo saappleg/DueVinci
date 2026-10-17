@@ -1,4 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import {
+    ANATOMY_MODEL_SYSTEMS,
+    getAnatomyModelConcepts,
+    getAnatomyModelChunks,
+    getAnatomyModelSystems,
+    validateAnatomyManifest
+} from '../js/modules/anatomyViewer.js';
 import {
     ANATOMY_SYSTEMS,
     DOSAGE_PROBLEMS,
@@ -86,6 +94,50 @@ describe('Nursing Hub learning tools', () => {
         expect(ANATOMY_SYSTEMS).toHaveLength(11);
         expect(new Set(ANATOMY_SYSTEMS.map((system) => system.id)).size).toBe(11);
         expect(ANATOMY_SYSTEMS.find((system) => system.id === 'cardiovascular').structures).toContain('Heart');
+    });
+
+    it('exposes the anatomy model controls as a named group', () => {
+        const source = readFileSync(new URL('../js/modules/nursing.js', import.meta.url), 'utf8');
+        expect(source).toContain('role="group" aria-label="3D model controls"');
+    });
+
+    it('maps Nursing Hub topics to their atlas systems and includes the skin reference layer', () => {
+        expect(getAnatomyModelSystems('nervous')).toEqual(['nervous', 'sensory']);
+        expect(getAnatomyModelSystems('cardiovascular')).toEqual(['cardiac', 'arterial', 'venous']);
+        const manifest = {
+            chunks: [0, 1, 2].map(() => ({ bytes: 68, gzipBytes: 1, gzip: './model.bin.gz' })),
+            parts: [
+                { id: 'n1', name: 'Nerve', system: 'nervous', chunk: 0, positions: 0, normals: 36, indices: 56, vertexCount: 3, indexCount: 3 },
+                { id: 's1', name: 'Sensory structure', system: 'sensory', chunk: 1, positions: 0, normals: 36, indices: 56, vertexCount: 3, indexCount: 3 },
+                { id: 'skin', name: 'Skin', system: 'integumentary', chunk: 2, positions: 0, normals: 36, indices: 56, vertexCount: 3, indexCount: 3 },
+                { id: 'bone', name: 'Bone', system: 'skeletal', chunk: 0, positions: 0, normals: 36, indices: 56, vertexCount: 3, indexCount: 3 }
+            ],
+            concepts: [
+                { id: 'heart', name: 'heart', elements: ['n1', 's1'] },
+                { id: 'skin-concept', name: 'skin', elements: ['skin'] },
+                { id: 'bone-concept', name: 'bone organ', elements: ['bone'] }
+            ]
+        };
+
+        expect(getAnatomyModelChunks(manifest, 'nervous')).toEqual([0, 1, 2]);
+        expect(getAnatomyModelChunks(manifest, 'skeletal')).toEqual([0, 2]);
+        expect(getAnatomyModelConcepts(manifest, 'nervous').map((concept) => concept.name)).toContain('Heart');
+        expect(getAnatomyModelConcepts(manifest, 'skeletal').map((concept) => concept.name)).toContain('Bone organ');
+        expect(getAnatomyModelConcepts(manifest, 'nervous').find((concept) => concept.id === 'heart').visibleElements.map((part) => part.id)).toEqual(['n1', 's1']);
+        expect(Object.keys(ANATOMY_MODEL_SYSTEMS)).toHaveLength(11);
+    });
+
+    it('validates atlas buffer ranges and rejects malformed geometry metadata', () => {
+        const manifest = {
+            chunks: [{ bytes: 68, gzipBytes: 20, gzip: './body-0.bin.gz' }],
+            parts: [{ id: 'bone', name: 'Bone', system: 'skeletal', chunk: 0, positions: 0, normals: 36, indices: 56, vertexCount: 3, indexCount: 3 }],
+            concepts: [{ id: 'bone-concept', name: 'bone organ', elements: ['bone'] }]
+        };
+        expect(validateAnatomyManifest(manifest)).toBe(true);
+        expect(() => validateAnatomyManifest({ ...manifest, parts: [{ ...manifest.parts[0], indices: 60 }] })).toThrow(/indices range/);
+        expect(() => validateAnatomyManifest({ ...manifest, parts: [{ ...manifest.parts[0], system: 'unknown' }] })).toThrow(/invalid structure/);
+        expect(() => validateAnatomyManifest({ ...manifest, concepts: [{ id: 'bad', name: 'broken', elements: ['missing'] }] })).toThrow(/invalid named concept/);
+        expect(() => getAnatomyModelSystems('unknown')).toThrow(/Unknown anatomy system/);
     });
 
     it('sanitizes and bounds persisted workspace data', () => {
