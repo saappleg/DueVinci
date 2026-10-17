@@ -43,6 +43,11 @@
   Brightspace remains a calendar feed integration, not a course/grade importer.
 - Check course-only term rollover and calendar-event conversion with disposable
   data: old coursework and calendar events remain, and retries avoid duplicates.
+- With disposable coursework, confirm new lessons and assignments start out of
+  Grades, **Include in Grades** adds the selected row, and turning it off hides
+  the row without deleting its saved score or category. Complete a course, enable
+  **Hide completed classes**, and confirm the course disappears from Grades,
+  cumulative GPA, and term insights; turn the setting off and confirm it returns.
 
 
 ## Nursing Hub and theme checks

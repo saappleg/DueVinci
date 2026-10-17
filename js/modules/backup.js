@@ -34,6 +34,21 @@ export function validateBackupPayload(json) {
     return { valid: true };
 }
 
+export function normalizeRestoredAssignments(assignments = []) {
+    if (!Array.isArray(assignments)) return [];
+    return assignments.map((assignment) => {
+        if (!assignment || typeof assignment !== 'object' || Array.isArray(assignment)) return assignment;
+        if (typeof assignment.is_gradeable === 'boolean') return assignment;
+
+        const hasSavedGrade = assignment.grade !== null
+            && assignment.grade !== undefined
+            && String(assignment.grade).trim() !== '';
+        const hasSavedCategory = typeof assignment.grade_category_id === 'string'
+            && assignment.grade_category_id.trim() !== '';
+        return { ...assignment, is_gradeable: hasSavedGrade || hasSavedCategory };
+    });
+}
+
 export async function exportUserDataJSON() {
     try {
         const { data: courses, error: coursesError } = await supabaseClient.from('courses').select('*');
@@ -173,7 +188,7 @@ export async function importUserDataJSON(fileInput) {
             };
 
             await restoreTable('courses', json.data.courses);
-            await restoreTable('assignments', json.data.assignments);
+            await restoreTable('assignments', normalizeRestoredAssignments(json.data.assignments));
             await restoreTable('custom_events', json.data.customEvents);
 
             if (json.data.timers && Array.isArray(json.data.timers) && typeof localStorage !== 'undefined') {

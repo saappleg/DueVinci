@@ -96,6 +96,9 @@ course and assignment rows:
   coursework item.
 - `20261017022939_coursework_workflow_fields.sql` adds parent/child coursework
   relationships, editable progress from 0 to 100%, and optional instructions.
+- `20261017064026_assignment_gradeability.sql` adds a saved per-assignment gradebook
+  inclusion flag. Existing assignments with saved grades or category choices
+  remain included; other existing and new coursework starts unchecked.
 
 Apply these migrations before publishing the matching frontend. They preserve
 the existing owner-scoped course and assignment rows.

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added a saved per-coursework **Include in Grades** choice so students can keep lessons and imported coursework out of the grade tracker until they want to track them. Existing rows with saved grades or category assignments stay included.
+- Applied the **Hide completed classes** preference to the Grades page, including its GPA summary and term insights.
+
 ### Changed
 - Replaced the browser-side Tailwind compiler with a generated, pre-cached static stylesheet. CI and the Pages deployment now rebuild the CSS and reject stale committed output.
 - Updated Tailwind CSS to 3.4.19 and Vitest to 4.1.12, with reviewed transitive dependency resolutions and constructable calendar test mocks.

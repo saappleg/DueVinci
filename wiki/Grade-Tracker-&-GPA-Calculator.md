@@ -8,7 +8,11 @@ Open **Grade settings** on a course to enter category names and weights. The wei
 
 Within each category, DueVinci takes the arithmetic mean of included, non-empty percentage grades. The course average then combines the graded category averages using their configured weights. Categories without a graded item are omitted, and the remaining weights are normalized to calculate a current grade. **Exclude** removes an item from the category average.
 
-Grade entries are lesson-style coursework and assignments whose title or stored type identifies coursework such as a quiz, paper, exam, project, lab, reading, or other listed task. Imported LMS coursework is also available. Unit headers are not treated as grades unless they have a grade or category.
+Only coursework marked **Include in Grades** appears in the grade list and contributes to course averages, target-score estimates, term grade insights, and cumulative GPA. This keeps lessons, subtasks, and imported items out of the grade tracker until you choose them. New coursework starts unchecked. Existing items with a saved grade or grade category remain included after the upgrade, so their grade history stays visible.
+
+Use the **Include in Grades** checkbox on a course's coursework row to add or remove that item. Turning it off hides the row from grade calculations without deleting its saved score, category, or GPA-exclusion choice; turning it on again restores those values. A missing gradeability flag in an older offline cache keeps an item visible only when it already has a grade or category.
+
+The **Hide completed classes** setting in Settings also removes completed courses from the Grades page while enabled. Their course cards, coursework, contribution to cumulative GPA, and rows used by term insights are hidden until you show completed classes again.
 
 DueVinci stores only percentages, not points earned or possible. Therefore, assignments count equally inside a category; category weights are supported, but point-weighted assignment averages are not.
 
@@ -45,4 +49,4 @@ Simulated values remain in page memory and do not overwrite saved grades. Exclud
 
 ## Input and error behavior
 
-Grade fields include the course and coursework title in their accessible names, and grade/category/Exclude controls have enlarged targets. A load error offers **Try again** instead of presenting failed reads as an empty workspace. Grade settings are saved on the course row and item categories on assignment rows, subject to the existing account row-level security policies. The schema migration must be applied before using the new saved settings.
+Grade fields include the course and coursework title in their accessible names, and grade/category/Exclude controls have enlarged targets. A load error offers **Try again** instead of presenting failed reads as an empty workspace. Grade settings and gradebook inclusion are saved on the existing course and assignment rows, subject to the existing account row-level security policies. Apply the weighted-gradebook and gradebook-selection migrations before using these saved settings.

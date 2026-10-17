@@ -665,15 +665,29 @@ export async function updateAssignmentGradeCategory(select) {
     }
 }
 
-function isGradebookAssignment(assignment) {
-    const title = typeof assignment?.title === 'string' ? assignment.title : '';
-    const explicitType = String(assignment?.task_type || assignment?.type || '').toLowerCase();
-    return title.startsWith('↳')
-        || /lesson|exam|final|midterm|test|review|quiz|assignment|project|essay|paper|homework|lab|reading|presentation|report|discussion/i.test(title)
-        || parsePercent(assignment?.grade) !== null
-        || Boolean(assignment?.grade_category_id)
-        || Boolean(assignment?.lms_provider)
-        || Boolean(explicitType);
+export function isGradebookAssignment(assignment) {
+    if (assignment?.is_gradeable === true) return true;
+    if (assignment?.is_gradeable === false) return false;
+
+    // Rows cached before the gradeability field was introduced remain visible
+    // only when the student had already saved gradebook data for the item.
+    return parsePercent(assignment?.grade) !== null || Boolean(assignment?.grade_category_id);
+}
+
+export function filterGradePageData(courses = [], assignments = [], hideCompletedCourses = false) {
+    const visibleCourses = (Array.isArray(courses) ? courses : [])
+        .filter((course) => !hideCompletedCourses || course?.is_completed !== true);
+    const visibleCourseIds = new Set(visibleCourses
+        .map((course) => course?.id)
+        .filter((courseId) => courseId !== null && courseId !== undefined && String(courseId) !== '')
+        .map(String));
+    const visibleAssignments = (Array.isArray(assignments) ? assignments : [])
+        .filter((assignment) => assignment?.course_id !== null
+            && assignment?.course_id !== undefined
+            && visibleCourseIds.has(String(assignment.course_id))
+            && isGradebookAssignment(assignment));
+
+    return { courses: visibleCourses, assignments: visibleAssignments };
 }
 
 function getStudyHistoryForTermInsights() {
@@ -758,6 +772,11 @@ export async function loadGradesPage(isFastRecalc = false) {
         return;
     }
     loadedAssignments = assignments;
+    const hideCompletedCourses = typeof localStorage !== 'undefined'
+        && localStorage.getItem('duevinci_hide_completed_courses') === 'true';
+    const gradePageData = filterGradePageData(courses, assignments, hideCompletedCourses);
+    const visibleCourses = gradePageData.courses;
+    const gradeableAssignments = gradePageData.assignments;
 
     const simBanner = `
         <section class="mb-6 border-b border-zinc-200 pb-5 dark:border-brand-700">
@@ -777,8 +796,8 @@ export async function loadGradesPage(isFastRecalc = false) {
             </div>
         </section>`;
 
-    const courseCards = courses.map((course) => {
-        const cAssignments = assignments.filter((assignment) => assignment.course_id === course.id && isGradebookAssignment(assignment));
+    const courseCards = visibleCourses.map((course) => {
+        const cAssignments = gradeableAssignments.filter((assignment) => String(assignment.course_id) === String(course.id));
         const categories = getGradeCategories(course);
         const groupedAssignments = new Map();
         for (const assignment of cAssignments) {
@@ -834,7 +853,7 @@ export async function loadGradesPage(isFastRecalc = false) {
             };
         }), course);
         const averageLabel = average === null ? 'N/A' : `${average.toFixed(1)}%`;
-        const courseAssignments = assignments.filter((assignment) => assignment.course_id === course.id);
+        const courseAssignments = assignments.filter((assignment) => String(assignment.course_id) === String(course.id));
         return `
             <article data-grade-course="${escapeHtml(course.id)}" data-grade-categories="${escapeHtml(JSON.stringify(categories))}" data-credit-hours="${escapeHtml(getCourseCreditHours(course))}" class="mb-5 rounded-xl border border-zinc-200 bg-white p-5 dark:border-brand-700 dark:bg-brand-800">
                 <header class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-brand-700">
@@ -853,7 +872,7 @@ export async function loadGradesPage(isFastRecalc = false) {
             </article>`;
     }).join('');
 
-    container.innerHTML = simBanner + renderTermInsights(assignments) + (courseCards || '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add a course to start tracking grades.</p>');
+    container.innerHTML = simBanner + renderTermInsights(gradeableAssignments) + (courseCards || '<p class="text-sm text-zinc-500 dark:text-zinc-400">Add a course to start tracking grades.</p>');
     updateGradeSummaries();
 }
 

@@ -384,7 +384,7 @@ export function injectAppearanceSettingsExtras() {
                 <option value="5.0" ${currentGpaScale === '5.0' ? 'selected' : ''}>5.0 Scale</option>
             </select>
         </div>
-        <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Hide completed classes</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">Keep finished courses out of the Classes lists. Turn this off to show them again.</span></span><input type="checkbox" ${hideCompletedCourses ? 'checked' : ''} onchange="setHideCompletedCourses(this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>
+        <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900"><span><span class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Hide completed classes</span><span class="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">Keep finished courses out of the Classes and Grades lists. Turn this off to show them again.</span></span><input type="checkbox" ${hideCompletedCourses ? 'checked' : ''} onchange="setHideCompletedCourses(this.checked)" class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"></label>
         <section class="space-y-2 pt-3 border-t border-zinc-100 dark:border-brand-800">
             <div><h3 class="text-sm font-bold text-zinc-800 dark:text-white">Nursing Hub</h3><p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Optional nursing study tools. Turn it on to add rotations, fictional care-plan practice, dosage drills, flashcards, and anatomy review. Turning it off hides the Hub and keeps your drafts.</p></div>
             <p id="nursingHubToggleHelp" class="text-[11px] text-zinc-500 dark:text-zinc-400">Use fictional study cases only; never save real patient information here.</p>
@@ -407,6 +407,7 @@ export function setHideCompletedCourses(hidden) {
     localStorage.setItem('duevinci_hide_completed_courses', String(Boolean(hidden)));
     window.syncPreferencesNow?.();
     window.loadCoursesPage?.();
+    window.loadGradesPage?.();
 }
 
 export function updateWeekStartDay(value) {

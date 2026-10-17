@@ -6,8 +6,10 @@ import {
     calculateCreditWeightedGpa,
     calculateRequiredAssessmentScore,
     calculateTermInsights,
+    filterGradePageData,
     getCourseCreditHours,
     getGradeCategories,
+    isGradebookAssignment,
     renderGradeControlInputs,
     updateAssignmentGrade
 } from '../js/modules/grades.js';
@@ -80,6 +82,45 @@ describe('grade entry controls', () => {
         expect(status.textContent).toContain('Could not save grade: offline');
         expect(status.setAttribute).toHaveBeenCalledWith('role', 'alert');
         expect(eq).toHaveBeenCalledWith('id', 'grade-1');
+    });
+});
+
+describe('gradebook visibility', () => {
+    it('uses explicit gradeability and preserves only legacy items with saved gradebook data', () => {
+        expect(isGradebookAssignment({ is_gradeable: true, title: 'Lesson 1' })).toBe(true);
+        expect(isGradebookAssignment({
+            is_gradeable: false,
+            title: 'Final exam',
+            grade: 95,
+            grade_category_id: 'exams',
+            lms_provider: 'canvas'
+        })).toBe(false);
+        expect(isGradebookAssignment({ grade: 84 })).toBe(true);
+        expect(isGradebookAssignment({ grade_category_id: 'coursework' })).toBe(true);
+        expect(isGradebookAssignment({ title: 'Lesson 1', task_type: 'lesson', lms_provider: 'canvas' })).toBe(false);
+        expect(isGradebookAssignment({ grade: 'not-a-grade', grade_category_id: '' })).toBe(false);
+    });
+
+    it('removes completed courses and their gradeable items when the preference is enabled', () => {
+        const courses = [
+            { id: 'active-course', is_completed: false },
+            { id: 'completed-course', is_completed: true }
+        ];
+        const assignments = [
+            { id: 'active-grade', course_id: 'active-course', is_gradeable: true, grade: 90 },
+            { id: 'active-ungraded', course_id: 'active-course', is_gradeable: false, grade: null },
+            { id: 'completed-grade', course_id: 'completed-course', is_gradeable: true, grade: 80 },
+            { id: 'orphan-grade', course_id: 'missing-course', is_gradeable: true, grade: 75 }
+        ];
+
+        expect(filterGradePageData(courses, assignments, true)).toEqual({
+            courses: [courses[0]],
+            assignments: [assignments[0]]
+        });
+        expect(filterGradePageData(courses, assignments, false)).toEqual({
+            courses,
+            assignments: [assignments[0], assignments[2]]
+        });
     });
 });
 

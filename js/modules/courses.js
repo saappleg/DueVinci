@@ -281,6 +281,32 @@ export function renderAssignmentCompletionControl(assignment, courseId = null) {
     return `<button type="button" aria-label="Complete ${assignmentTitle}" aria-pressed="${isCompleted}" onclick="toggleAssignment('${assignmentId}', ${isCompleted}, ${courseIdArg})" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-brand-900"><span aria-hidden="true" class="flex h-5 w-5 items-center justify-center rounded border transition ${stateClasses}"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span></button>`;
 }
 
+export function renderAssignmentGradeabilityControl(assignment = {}) {
+    const assignmentId = escapeHtml(assignment?.id ?? '');
+    const assignmentTitle = escapeHtml(assignment?.title || 'Coursework item');
+    const isGradeable = assignment?.is_gradeable === true;
+
+    return `
+        <div data-gradeability-control class="flex min-h-11 flex-wrap items-center gap-2 border-t border-zinc-200/60 pt-2 dark:border-brand-700/60">
+            <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 pr-2 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+                <input type="checkbox" data-assignment-gradeable data-assignment-id="${assignmentId}" data-saved-gradeable="${isGradeable ? 'true' : 'false'}" aria-label="Include in Grades: ${assignmentTitle}" ${isGradeable ? 'checked' : ''} onchange="toggleAssignmentGradeable(this.dataset.assignmentId, this.checked, this)" class="h-4 w-4 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+                <span>Include in Grades</span>
+            </label>
+            <span data-gradeability-status role="status" aria-live="polite" class="text-[11px] text-zinc-500 dark:text-zinc-400"></span>
+        </div>`;
+}
+
+function setAssignmentGradeabilityStatus(input, message, isError = false) {
+    const status = input?.closest('[data-gradeability-control]')?.querySelector('[data-gradeability-status]');
+    if (!status) return;
+    status.textContent = message;
+    status.className = isError
+        ? 'text-[11px] text-rose-700 dark:text-rose-300'
+        : 'text-[11px] text-zinc-500 dark:text-zinc-400';
+    status.setAttribute('role', isError ? 'alert' : 'status');
+    status.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+}
+
 function safeCourseColor(value) {
     const color = String(value || '');
     return /^#[\da-f]{6}$/i.test(color) ? color : '#4f46e5';
@@ -2506,6 +2532,40 @@ export async function updateAssignmentType(assignId, taskType, courseId) {
     }
 }
 
+export async function toggleAssignmentGradeable(assignId, isGradeable, input) {
+    if (!assignId || !input) return false;
+    const savedValue = input.dataset?.savedGradeable === 'true';
+    const nextValue = Boolean(isGradeable);
+    input.disabled = true;
+    input.setAttribute?.('aria-busy', 'true');
+    setAssignmentGradeabilityStatus(input, 'Saving Grades setting.');
+
+    try {
+        const { data, error } = await supabaseClient.from('assignments')
+            .update({ is_gradeable: nextValue })
+            .eq('id', assignId)
+            .select('id, is_gradeable')
+            .maybeSingle();
+        if (error) throw error;
+        if (!data || data.is_gradeable !== nextValue) {
+            throw new Error('This coursework item was not updated. Reload the class and try again.');
+        }
+
+        if (input.dataset) input.dataset.savedGradeable = nextValue ? 'true' : 'false';
+        const cachedAssignment = courseProgressAssignments.find((assignment) => String(assignment.id) === String(assignId));
+        if (cachedAssignment) cachedAssignment.is_gradeable = nextValue;
+        setAssignmentGradeabilityStatus(input, nextValue ? 'Included in Grades.' : 'Removed from Grades.');
+        return true;
+    } catch (error) {
+        input.checked = savedValue;
+        setAssignmentGradeabilityStatus(input, `Could not save the Grades setting: ${error?.message || 'Please try again.'}`, true);
+        return false;
+    } finally {
+        input.disabled = false;
+        input.removeAttribute?.('aria-busy');
+    }
+}
+
 export async function deleteAssignment(assignId, courseId) {
     if (!confirm('Are you sure you want to delete this coursework item?')) return;
     await supabaseClient.from('assignments').delete().eq('id', assignId);
@@ -3057,6 +3117,7 @@ export async function loadAssignments(courseId, page = 1) {
                         <button type="button" onclick="deleteAssignment('${assignmentArg}', '${courseArg}')" class="text-zinc-400 hover:text-rose-500 p-1 transition" title="Delete Coursework Item">✕</button>
                     </div>
                 </div>
+                ${renderAssignmentGradeabilityControl(assign)}
                 ${subItemForm}
                 ${instructionsChecklistForm}
                 ${progressHtml}
@@ -3399,6 +3460,7 @@ if (typeof window !== 'undefined') {
     window.updateAssignmentDate = updateAssignmentDate;
     window.updateAssignmentPriority = updateAssignmentPriority;
     window.updateAssignmentEstimate = updateAssignmentEstimate;
+    window.toggleAssignmentGradeable = toggleAssignmentGradeable;
     window.updateAssignmentType = updateAssignmentType;
     window.updateAssignmentTitle = updateAssignmentTitle;
     window.editAssignmentTitlePrompt = editAssignmentTitlePrompt;
