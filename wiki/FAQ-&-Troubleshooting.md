@@ -16,11 +16,11 @@ Settings opens before optional preferences and subscription checks finish. Close
 
 ### How do I change the GPA scale?
 
-Open Settings → Appearance → **GPA Scale Target**, then choose 4.0 or 5.0. The current calculator scales average percentages; it does not implement a school's credit-weighted or letter-grade GPA policy. See [Grades & GPA](Grade-Tracker-&-GPA-Calculator).
+Open Settings → Appearance → **GPA Scale Target**, then choose 4.0 or 5.0. DueVinci supports configured grade-category weights and course-credit weighting, but scales percentages linearly and does not implement a school's letter-grade conversion or repeat-course policy. See [Grades & GPA](Grade-Tracker-&-GPA-Calculator).
 
 ### Can I use Google, Apple, or Outlook calendar files?
 
-Yes. Calendar → **Import .ICS** reviews dated rows before saving and skips matching title/date duplicates. **Export .ICS** downloads the currently loaded schedule as date-based entries. These files are not two-way account synchronization. Direct Google/Microsoft account connectors remain planned.
+Yes. Calendar → **Import .ICS** reviews dated rows before saving and skips matching title/date duplicates. **Export .ICS** downloads the currently loaded schedule as date-based entries. These files are not two-way account synchronization. Pro also supports read-only Google Calendar and Outlook connections once the provider OAuth clients and callback are configured: the first sync runs after you connect, and you start later syncs.
 
 Click a custom/imported calendar event, choose a class, and select **Create assignment** to add coursework while keeping the original event. A duplicate or out-of-window class date is reported instead of creating another assignment.
 
@@ -32,7 +32,7 @@ Choose **General study help** to avoid selected-course context. Selecting a cour
 
 ### Which study features need opt-in?
 
-Settings → Study & Reminders contains Pro personalized estimates and Canvas assignment change alerts. Personalization uses completed, linked study sessions and task completions; turning it off pauses personalization, while **Clear history** removes saved history through preference sync. Canvas alerts require browser push permission on each receiving device and follow a Canvas sync. They are not scheduled grade monitoring.
+Settings → Study & Reminders contains Pro personalized estimates and Canvas assignment/grade alerts. Personalization uses completed, linked study sessions and task completions; each save retains at most the newest 180 focus sessions and 120 task completions, while older entries may be dropped. Turning personalization off pauses it; **Clear history** removes saved history through preference sync. Assignment alerts follow a Canvas sync. Posted-grade alerts need an initial baseline, scheduled refresh, configured scheduler/Web Push secrets, and browser push permission on each receiving device.
 
 ## Troubleshooting
 

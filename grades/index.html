@@ -71,7 +71,10 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <div id="gpaBadgeContainer"></div>
+                    <div id="gpaBadgeContainer" class="shrink-0 text-right">
+                        <span class="block text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Estimated GPA</span>
+                        <span id="cumulativeGpaVal" aria-live="polite" class="text-sm font-extrabold text-zinc-800 dark:text-zinc-100">N/A / 4.0</span>
+                    </div>
                     <button type="button" onclick="logout()" aria-label="Sign out" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
                         <span class="hidden sm:inline">Sign out</span>
@@ -83,7 +86,7 @@
                 <div class="flex justify-between items-end mb-8">
                     <div>
                         <h2 class="text-3xl font-bold dark:text-white mb-1">Academic Performance</h2>
-                        <p class="text-zinc-500 dark:text-zinc-400 text-sm">Course averages and GPA calculator.</p>
+                        <p class="text-zinc-500 dark:text-zinc-400 text-sm">Weighted course averages, credit-hour GPA, and target score estimates.</p>
                     </div>
                 </div>
 

@@ -13,7 +13,7 @@ const supabaseUrl = (process.env.DUEVINCI_SMOKE_SUPABASE_URL || 'https://lzmsguz
 const anonKey = process.env.DUEVINCI_SMOKE_SUPABASE_ANON_KEY || 'sb_publishable_RMNFdMwGYzdOGBCMLgqO9Q_HhiHkEpZ';
 const skipSupportTicket = process.env.DUEVINCI_SMOKE_SKIP_SUPPORT === 'true';
 
-const requiredFiles = ['/', '/index.html', '/courses/', '/courses/index.html', '/grades/', '/calendar/', '/manifest.json', '/sw.js', '/js/app.js', '/assets/vendor/supabase-js.js'];
+const requiredFiles = ['/', '/index.html', '/about/', '/about/index.html', '/courses/', '/courses/index.html', '/grades/', '/calendar/', '/manifest.json', '/sw.js', '/js/app.js', '/assets/vendor/supabase-js.js'];
 const fail = (message) => { throw new Error(message); };
 
 async function request(url, options = {}) {

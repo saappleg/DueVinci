@@ -15,6 +15,8 @@ export const SUBSCRIPTION_CATALOG = Object.freeze({
     features: [
         'Canvas LMS connection and course syncing',
         'SNHU Brightspace calendar sync for course events and assignment due dates',
+        'Read-only Google Calendar and Outlook sync',
+        'Automatic Canvas coursework refresh and posted-grade alerts',
         'Assignment importing and due-date updates',
         'Opt-in Canvas assignment change alerts after sync',
         'Socratic Study Companion with selected-course context and notes',

@@ -33,6 +33,242 @@ function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
 }
 
+export function getAssignmentProgress(assignment = {}) {
+    if (assignment.is_completed) return 100;
+    const progress = Number(assignment.progress_percent);
+    return Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : 0;
+}
+
+export function extractAssignmentChecklistSteps(instructions, maxSteps = 20) {
+    if (typeof instructions !== 'string' || !instructions.trim()) return [];
+    const limit = Number.isInteger(maxSteps) && maxSteps > 0 ? Math.min(maxSteps, 100) : 20;
+
+    const candidates = instructions
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .flatMap((line) => line
+            .replace(/^\s*(?:instructions?\s*:\s*)/i, '')
+            .replace(/^\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)])\s+/, '')
+            .split(/(?<=[.!?])\s+(?=[A-Z0-9])|;\s+/))
+        .map((step) => step.trim().replace(/^[\s•*-]+|[\s•*-]+$/g, ''))
+        .filter(Boolean);
+
+    const seen = new Set();
+    const steps = [];
+    for (const candidate of candidates) {
+        const key = candidate.toLocaleLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        steps.push(candidate);
+        if (steps.length >= limit) break;
+    }
+    return steps;
+}
+
+export function normalizeAssignmentChecklistProposalLines(proposals, maxSteps = 20) {
+    if (typeof proposals !== 'string') return [];
+    const limit = Number.isInteger(maxSteps) && maxSteps > 0 ? Math.min(maxSteps, 100) : 20;
+    const seen = new Set();
+    const steps = [];
+    for (const line of proposals.replace(/\r\n?/g, '\n').split('\n')) {
+        const title = line.trim().replace(/^\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)])\s+/, '').trim();
+        const key = title.toLocaleLowerCase();
+        if (!title || seen.has(key)) continue;
+        seen.add(key);
+        steps.push(title);
+        if (steps.length >= limit) break;
+    }
+    return steps;
+}
+
+export function getNewAssignmentChecklistSteps(proposals, parentAssignment, existingAssignments = []) {
+    const parentId = String(parentAssignment?.id ?? '');
+    const parentUnit = parentAssignment?.unit_number;
+    const parentDate = String(parentAssignment?.due_date || '').slice(0, 10);
+    const existingTitles = new Set((Array.isArray(existingAssignments) ? existingAssignments : [])
+        .filter((assignment) => {
+            if (String(assignment?.parent_assignment_id ?? '') === parentId && parentId) return true;
+            if (assignment?.parent_assignment_id || !String(assignment?.title || '').trim().startsWith('↳')) return false;
+            if (parentUnit !== null && parentUnit !== undefined) {
+                if (assignment.unit_number !== null && assignment.unit_number !== undefined) {
+                    return String(assignment.unit_number) === String(parentUnit);
+                }
+                return Boolean(parentDate && String(assignment.due_date || '').slice(0, 10) === parentDate);
+            }
+            if (parentDate) return String(assignment.due_date || '').slice(0, 10) === parentDate;
+            return true;
+        })
+        .map((assignment) => String(assignment.title || '').replace(/^\s*↳\s*/, '').trim().toLocaleLowerCase())
+        .filter(Boolean));
+    return normalizeAssignmentChecklistProposalLines(proposals)
+        .filter((step) => !existingTitles.has(step.toLocaleLowerCase()));
+}
+
+export function normalizeSyllabusReviewUnits(units = [], baseDate = new Date()) {
+    if (!Array.isArray(units)) return [];
+    return units.map((unit, index) => {
+        const rawNumber = Number.parseInt(unit?.num, 10);
+        const number = Number.isInteger(rawNumber) && rawNumber > 0 ? rawNumber : index + 1;
+        const lessons = Array.isArray(unit?.lessons) ? unit.lessons : [];
+        let fallbackDate = new Date(baseDate);
+        fallbackDate.setDate(fallbackDate.getDate() + ((index + 1) * 7));
+        const dateStr = smartParseDate(String(unit?.dateStr || unit?.startDateStr || '')) || getLocalDateKey(fallbackDate);
+        const endDateStr = smartParseDate(String(unit?.endDateStr || ''));
+        const spreadLessonDates = spreadDatesAcrossRange(dateStr, endDateStr, lessons.length);
+        return {
+            num: number,
+            title: String(unit?.title || unit?.name || 'Untitled unit').trim(),
+            dateStr,
+            endDateStr,
+            lessons: lessons.map((lesson, lessonIndex) => {
+                const lessonTitle = typeof lesson === 'string' ? lesson : String(lesson?.title || lesson?.name || '');
+                const explicitDate = typeof lesson === 'object' && lesson
+                    ? smartParseDate(String(lesson.dateStr || lesson.dueDate || ''))
+                    : null;
+                return {
+                    title: lessonTitle.trim(),
+                    dateStr: explicitDate || spreadLessonDates[lessonIndex] || dateStr,
+                    autoDate: !explicitDate
+                };
+            }).filter((lesson) => lesson.title)
+        };
+    }).filter((unit) => unit.title).sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+}
+
+export async function importReviewedCourseworkUnits(reviewedUnits, course, courseId, {
+    userId = currentUser?.id,
+    adjustedDateCount = { count: 0 },
+    formatUnitTitle = (unit, index) => `Unit ${unit.num || index + 1}: ${unit.title}`,
+    insertAssignments = (rows, returnRows = false) => {
+        const query = supabaseClient.from('assignments').insert(rows);
+        return returnRows ? query.select() : query;
+    }
+} = {}) {
+    const result = {
+        unitsInserted: 0,
+        lessonsInserted: 0,
+        failedUnits: 0,
+        failedLessons: 0,
+        skippedLessons: 0,
+        errors: []
+    };
+
+    const rows = Array.isArray(reviewedUnits) ? reviewedUnits : [];
+    for (let index = 0; index < rows.length; index++) {
+        const unit = rows[index];
+        const unitNumber = unit.num || index + 1;
+        const unitTitle = String(formatUnitTitle(unit, index) || '').trim();
+        const targetDate = constrainImportedCourseDate(unit.dateStr, course, adjustedDateCount);
+        const endDate = constrainImportedCourseDate(unit.endDateStr, course, adjustedDateCount);
+        let unitResponse;
+        try {
+            unitResponse = await insertAssignments([{
+                course_id: courseId,
+                user_id: userId,
+                title: unitTitle,
+                unit_number: unitNumber,
+                due_date: endDate || targetDate
+            }], true);
+        } catch (error) {
+            unitResponse = { error };
+        }
+
+        if (unitResponse?.error || !unitResponse?.data?.[0]) {
+            result.failedUnits++;
+            result.skippedLessons += Array.isArray(unit.lessons) ? unit.lessons.length : 0;
+            result.errors.push(`Unit "${unitTitle}": ${unitResponse?.error?.message || 'The saved unit row was not returned.'}`);
+            continue;
+        }
+        result.unitsInserted++;
+
+        const lessons = Array.isArray(unit.lessons) ? unit.lessons : [];
+        const lessonDates = spreadDatesAcrossRange(targetDate, endDate, lessons.length);
+        let lessonNumber = 1;
+        for (let lessonIndex = 0; lessonIndex < lessons.length; lessonIndex++) {
+            const lesson = lessons[lessonIndex];
+            const lessonTitle = String(lesson?.title || '').trim();
+            const formattedTitle = lessonTitle.toLowerCase().startsWith('lesson')
+                ? lessonTitle
+                : `Lesson ${lessonNumber}: ${lessonTitle}`;
+            const lessonDate = lesson?.dateStr
+                ? constrainImportedCourseDate(lesson.dateStr, course, adjustedDateCount)
+                : (lessonDates[lessonIndex] || targetDate);
+            let lessonResponse;
+            try {
+                lessonResponse = await insertAssignments([{
+                    course_id: courseId,
+                    user_id: userId,
+                    title: `↳ ${formattedTitle}`,
+                    unit_number: unitNumber,
+                    due_date: lessonDate
+                }]);
+            } catch (error) {
+                lessonResponse = { error };
+            }
+            if (lessonResponse?.error) {
+                result.failedLessons++;
+                result.errors.push(`Lesson "${formattedTitle}": ${lessonResponse.error.message || 'The lesson row could not be saved.'}`);
+            } else {
+                result.lessonsInserted++;
+            }
+            lessonNumber++;
+        }
+    }
+    return result;
+}
+
+export function formatCourseworkImportStatus(result = {}) {
+    const unitsInserted = Math.max(0, Number(result.unitsInserted) || 0);
+    const lessonsInserted = Math.max(0, Number(result.lessonsInserted) || 0);
+    const failedUnits = Math.max(0, Number(result.failedUnits) || 0);
+    const failedLessons = Math.max(0, Number(result.failedLessons) || 0);
+    const skippedLessons = Math.max(0, Number(result.skippedLessons) || 0);
+    const hasFailures = failedUnits > 0 || failedLessons > 0;
+    const savedCount = unitsInserted + lessonsInserted;
+    const countLabel = (count, singular) => `${count} ${singular}${count === 1 ? '' : 's'}`;
+    if (!hasFailures) {
+        return {
+            tone: 'success',
+            message: savedCount
+                ? `Imported ${countLabel(unitsInserted, 'unit')} and ${countLabel(lessonsInserted, 'lesson')}.`
+                : 'No coursework rows were selected.'
+        };
+    }
+    const outcome = savedCount ? 'Partially imported.' : 'Coursework import failed.';
+    const skipped = skippedLessons ? ` ${countLabel(skippedLessons, 'lesson')} skipped because its unit could not be saved.` : '';
+    const reasons = (Array.isArray(result.errors) ? result.errors : []).slice(0, 2).join(' ');
+    return {
+        tone: savedCount ? 'warning' : 'error',
+        message: `${outcome} ${countLabel(unitsInserted, 'unit')} and ${countLabel(lessonsInserted, 'lesson')} saved; ${countLabel(failedUnits, 'unit')} and ${countLabel(failedLessons, 'lesson')} failed.${skipped}${reasons ? ` ${reasons}` : ''}`
+    };
+}
+
+export function buildWeeklyRecurrenceDates(startDate, repeatUntil, maxOccurrences = 53) {
+    const toTimestamp = (value) => {
+        const dateKey = String(value || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+        const timestamp = Date.parse(`${dateKey}T00:00:00Z`);
+        return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === dateKey
+            ? timestamp
+            : null;
+    };
+    const start = toTimestamp(startDate);
+    const end = toTimestamp(repeatUntil);
+    if (start === null || end === null) return { dates: [], error: 'Choose a valid due date and repeat-through date.' };
+    if (end - start < 7 * 24 * 60 * 60 * 1000) {
+        return { dates: [], error: 'Choose a repeat-through date at least one week after the first due date.' };
+    }
+
+    const dates = [];
+    for (let timestamp = start; timestamp <= end; timestamp += 7 * 24 * 60 * 60 * 1000) {
+        dates.push(new Date(timestamp).toISOString().slice(0, 10));
+        if (dates.length > maxOccurrences) {
+            return { dates: [], error: `Weekly repeats are limited to ${maxOccurrences} occurrences at a time.` };
+        }
+    }
+    return { dates, error: null };
+}
+
 export function renderAssignmentCompletionControl(assignment, courseId = null) {
     const assignmentId = inlineArg(assignment?.id ?? '');
     const assignmentTitle = escapeHtml(assignment?.title || 'Coursework item');
@@ -119,6 +355,8 @@ function getCourseworkLessonNumber(item, course) {
 export function compareCourseworkOrder(a, b, courses = []) {
     const courseA = courses.find((course) => course.id === a?.course_id);
     const courseB = courses.find((course) => course.id === b?.course_id);
+    if (String(a?.parent_assignment_id || '') === String(b?.id || '') && b?.id != null) return 1;
+    if (String(b?.parent_assignment_id || '') === String(a?.id || '') && a?.id != null) return -1;
     const unitDiff = getUnitNumber(a) - getUnitNumber(b);
     if (unitDiff !== 0) return unitDiff;
 
@@ -190,6 +428,26 @@ function applyCourseDateBoundsToInput(input, course) {
     if (!input.value || !isDateWithinCourseWindow(input.value, course)) {
         input.value = isValid ? clampDateToCourseWindow(getLocalDateKey(), course) : getLocalDateKey();
     }
+}
+
+export function updateAssignmentRecurrenceControls() {
+    if (typeof document === 'undefined') return;
+    const recurrenceInput = document.getElementById('assignRecurrence');
+    const repeatUntilInput = document.getElementById('assignRepeatUntil');
+    const repeatUntilLabel = document.getElementById('assignRepeatUntilLabel');
+    const dueDateInput = document.getElementById('assignDate');
+    if (!recurrenceInput || !repeatUntilInput) return;
+
+    const isWeekly = recurrenceInput.value === 'weekly';
+    repeatUntilInput.disabled = !isWeekly;
+    repeatUntilInput.required = isWeekly;
+    repeatUntilLabel?.classList.toggle('hidden', !isWeekly);
+    repeatUntilInput.min = dueDateInput?.value || '';
+
+    const courseId = document.getElementById('editCourseId')?.value;
+    const course = localCourses.find((item) => item.id === courseId);
+    const bounds = course ? getCourseDateBounds(course) : null;
+    repeatUntilInput.max = bounds?.isValid && bounds.endDate ? bounds.endDate : '';
 }
 
 function isCourseHiddenByArchive(course, archivedTerms = getArchivedTermNames(customTerms)) {
@@ -291,6 +549,168 @@ function confirmSyllabusImport(parsedData, metadataOnly) {
     const remainder = units.length > 8 ? `\n• +${units.length - 8} more` : '';
     const action = metadataOnly ? 'save this course metadata' : 'save this metadata and add these coursework units';
     return window.confirm(`Review AI import before continuing:\n\nDescription: ${description}\n\nObjectives: ${objectives}${metadataOnly ? '' : `\n\nUnits to add:\n${unitPreview || 'No units found.'}${remainder}`}\n\nContinue to ${action}?`);
+}
+
+function buildSyllabusReviewDialog(units, course) {
+    const dialog = document.createElement('dialog');
+    dialog.id = 'syllabusReviewDialog';
+    dialog.setAttribute('aria-labelledby', 'syllabusReviewTitle');
+    dialog.className = 'w-[min(96vw,56rem)] max-h-[90vh] rounded-xl border border-zinc-300 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-black/60 dark:border-brand-600 dark:bg-brand-800 dark:text-zinc-100';
+    const bounds = getCourseDateBounds(course || {});
+    const minDate = bounds.isValid ? bounds.startDate : '';
+    const maxDate = bounds.isValid ? bounds.endDate : '';
+    const groups = units.map((unit, unitIndex) => `
+        <fieldset class="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-brand-600" data-unit-index="${unitIndex}">
+            <legend class="px-1 text-xs font-bold">${unitIndex + 1}. ${escapeHtml(unit.title)}</legend>
+            <label class="flex min-h-11 items-center gap-2 text-xs font-semibold"><input type="checkbox" data-field="unit-selected" checked class="h-4 w-4 accent-indigo-600"> Include unit</label>
+            <div class="grid gap-2 sm:grid-cols-2">
+                <label class="flex flex-col gap-1 text-[11px] font-semibold">Unit title<input data-field="unit-title" maxlength="500" required value="${escapeHtml(unit.title)}" class="h-11 rounded border border-zinc-300 bg-white px-2.5 text-sm dark:border-brand-600 dark:bg-brand-900"></label>
+                <label class="flex flex-col gap-1 text-[11px] font-semibold">Unit number<input data-field="unit-number" type="number" min="1" max="9999" value="${unit.num}" class="h-11 rounded border border-zinc-300 bg-white px-2.5 text-sm dark:border-brand-600 dark:bg-brand-900"></label>
+                <label class="flex flex-col gap-1 text-[11px] font-semibold">Start date<input data-field="unit-start" type="date" required value="${escapeHtml(unit.dateStr || '')}" min="${escapeHtml(minDate)}" max="${escapeHtml(maxDate)}" class="h-11 rounded border border-zinc-300 bg-white px-2.5 font-mono text-sm dark:border-brand-600 dark:bg-brand-900"></label>
+                <label class="flex flex-col gap-1 text-[11px] font-semibold">End date<input data-field="unit-end" type="date" value="${escapeHtml(unit.endDateStr || '')}" min="${escapeHtml(minDate)}" max="${escapeHtml(maxDate)}" class="h-11 rounded border border-zinc-300 bg-white px-2.5 font-mono text-sm dark:border-brand-600 dark:bg-brand-900"></label>
+            </div>
+            ${unit.lessons.length ? `<div class="space-y-2 border-t border-zinc-200 pt-3 dark:border-brand-600"><p class="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">Lesson rows</p>${unit.lessons.map((lesson, lessonIndex) => `
+                <div class="grid gap-2 rounded-md bg-zinc-50 p-2 dark:bg-brand-900 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center" data-lesson-index="${lessonIndex}">
+                    <label class="flex min-h-11 items-center gap-2 text-[11px] font-semibold"><input type="checkbox" data-field="lesson-selected" checked class="h-4 w-4 accent-indigo-600"> Include</label>
+                    <label class="flex min-w-0 flex-col gap-1 text-[11px] font-semibold">Lesson title<input data-field="lesson-title" maxlength="500" required value="${escapeHtml(lesson.title)}" class="h-11 w-full rounded border border-zinc-300 bg-white px-2.5 text-sm dark:border-brand-600 dark:bg-brand-800"></label>
+                    <label class="flex flex-col gap-1 text-[11px] font-semibold">Due date<input data-field="lesson-date" data-auto-date="${lesson.autoDate}" type="date" value="${escapeHtml(lesson.dateStr || '')}" min="${escapeHtml(minDate)}" max="${escapeHtml(maxDate)}" class="h-11 rounded border border-zinc-300 bg-white px-2.5 font-mono text-sm dark:border-brand-600 dark:bg-brand-800"></label>
+                </div>`).join('')}</div>` : '<p class="text-[11px] text-zinc-500 dark:text-zinc-400">No lesson rows were extracted.</p>'}
+        </fieldset>`).join('');
+
+    dialog.innerHTML = `
+        <section class="flex max-h-[90vh] flex-col">
+            <header class="border-b border-zinc-200 p-4 dark:border-brand-600">
+                <h2 id="syllabusReviewTitle" class="text-base font-bold">Review extracted coursework for ${escapeHtml(course?.code || course?.name || 'this class')}</h2>
+                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">Edit titles and dates, or clear Include to skip a row. Nothing is saved until you import the selected rows.</p>
+            </header>
+            <div class="min-h-0 space-y-3 overflow-y-auto p-4">${groups || '<p class="text-sm text-zinc-500">No coursework rows were extracted.</p>'}</div>
+            <p id="syllabusReviewError" tabindex="-1" class="hidden px-4 text-xs font-semibold text-red-600 dark:text-red-400" role="alert"></p>
+            <footer class="flex flex-col-reverse gap-2 border-t border-zinc-200 p-4 dark:border-brand-600 sm:flex-row sm:justify-end">
+                <button type="button" data-action="cancel" class="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold hover:bg-zinc-100 dark:border-brand-600 dark:hover:bg-brand-700">Cancel import</button>
+                <button type="button" data-action="import" class="min-h-11 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-500">Import selected rows</button>
+            </footer>
+        </section>`;
+    document.body.appendChild(dialog);
+    return dialog;
+}
+
+export function reviewSyllabusUnits(units, course) {
+    const reviewUnits = normalizeSyllabusReviewUnits(units);
+    if (!reviewUnits.length) return Promise.resolve([]);
+    if (typeof document === 'undefined' || typeof window === 'undefined') return Promise.resolve(null);
+
+    const dialog = buildSyllabusReviewDialog(reviewUnits, course);
+    const errorEl = dialog.querySelector('#syllabusReviewError');
+    const close = (result) => {
+        dialog.returnValue = result;
+        dialog.close(result);
+    };
+    const readReviewedRows = () => {
+        const reviewed = [];
+        for (const group of dialog.querySelectorAll('[data-unit-index]')) {
+            const includeUnit = group.querySelector('[data-field="unit-selected"]');
+            if (!includeUnit.checked) continue;
+            const title = group.querySelector('[data-field="unit-title"]').value.trim();
+            if (!title) return { error: 'Add a title to each selected unit row.' };
+            const unitNumberValue = group.querySelector('[data-field="unit-number"]').value;
+            const unitNumber = unitNumberValue ? Number.parseInt(unitNumberValue, 10) : Number(group.dataset.unitIndex) + 1;
+            const startDate = group.querySelector('[data-field="unit-start"]').value || null;
+            const endDate = group.querySelector('[data-field="unit-end"]').value || null;
+            if (!startDate) return { error: 'Choose a start date for each selected unit row.' };
+            if (startDate && endDate && endDate < startDate) return { error: 'A unit end date must be on or after its start date.' };
+            const lessonRows = [];
+            for (const row of group.querySelectorAll('[data-lesson-index]')) {
+                if (!row.querySelector('[data-field="lesson-selected"]').checked) continue;
+                const lessonTitle = row.querySelector('[data-field="lesson-title"]').value.trim();
+                if (!lessonTitle) return { error: 'Add a title to each selected lesson row.' };
+                lessonRows.push({
+                    title: lessonTitle,
+                    dateStr: row.querySelector('[data-field="lesson-date"]').value || null
+                });
+            }
+            reviewed.push({
+                num: Number.isInteger(unitNumber) && unitNumber > 0 ? unitNumber : Number(group.dataset.unitIndex) + 1,
+                title,
+                dateStr: startDate,
+                endDateStr: endDate,
+                lessons: lessonRows
+            });
+        }
+        return { rows: reviewed };
+    };
+
+    for (const group of dialog.querySelectorAll('[data-unit-index]')) {
+        const unitCheckbox = group.querySelector('[data-field="unit-selected"]');
+        const unitTitle = group.querySelector('[data-field="unit-title"]');
+        const unitStart = group.querySelector('[data-field="unit-start"]');
+        const lessonRows = [...group.querySelectorAll('[data-lesson-index]')];
+        const syncUnitSelection = () => {
+            unitTitle.required = unitCheckbox.checked;
+            unitStart.required = unitCheckbox.checked;
+            for (const row of lessonRows) {
+                const selected = row.querySelector('[data-field="lesson-selected"]');
+                const title = row.querySelector('[data-field="lesson-title"]');
+                selected.disabled = !unitCheckbox.checked;
+                title.required = unitCheckbox.checked && selected.checked;
+            }
+        };
+        unitCheckbox.addEventListener('change', syncUnitSelection);
+        unitTitle.addEventListener('input', () => { unitTitle.setCustomValidity(''); });
+        for (const row of lessonRows) {
+            const selected = row.querySelector('[data-field="lesson-selected"]');
+            const title = row.querySelector('[data-field="lesson-title"]');
+            selected.addEventListener('change', () => { title.required = unitCheckbox.checked && selected.checked; });
+            title.addEventListener('input', () => { title.setCustomValidity(''); });
+        }
+        syncUnitSelection();
+    }
+
+    for (const group of dialog.querySelectorAll('[data-unit-index]')) {
+        const startInput = group.querySelector('[data-field="unit-start"]');
+        const endInput = group.querySelector('[data-field="unit-end"]');
+        const updateSuggestedLessonDates = () => {
+            endInput.min = startInput.value || minDate;
+            const lessonRows = [...group.querySelectorAll('[data-lesson-index]')];
+            const suggestedDates = spreadDatesAcrossRange(startInput.value, endInput.value, lessonRows.length);
+            lessonRows.forEach((row, index) => {
+                const dateInput = row.querySelector('[data-field="lesson-date"]');
+                if (dateInput.dataset.autoDate === 'true') dateInput.value = suggestedDates[index] || startInput.value;
+            });
+        };
+        startInput.addEventListener('change', updateSuggestedLessonDates);
+        endInput.addEventListener('change', updateSuggestedLessonDates);
+        for (const dateInput of group.querySelectorAll('[data-field="lesson-date"]')) {
+            dateInput.addEventListener('change', () => { dateInput.dataset.autoDate = 'false'; });
+        }
+    }
+
+    return new Promise((resolve) => {
+        const onClose = () => {
+            dialog.removeEventListener('close', onClose);
+            const result = dialog.returnValue === 'import' ? readReviewedRows() : null;
+            dialog.remove();
+            resolve(result?.rows ?? (result?.error ? { error: result.error } : null));
+        };
+        dialog.addEventListener('close', onClose);
+        dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => close('cancel'));
+        dialog.querySelector('[data-action="import"]').addEventListener('click', () => {
+            const result = readReviewedRows();
+            if (result.error) {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+                errorEl.focus();
+                return;
+            }
+            close('import');
+        });
+        dialog.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => errorEl.classList.add('hidden')));
+        dialog.addEventListener('cancel', (event) => {
+            event.preventDefault();
+            close('cancel');
+        });
+        dialog.showModal();
+        dialog.querySelector('[data-field="unit-selected"]')?.focus();
+    });
 }
 
 async function getPlannerUser() {
@@ -566,7 +986,7 @@ export function initCourseForm() {
 export async function loadCoursesPage() {
     const [{ data: courses }, { data: assignments }] = await Promise.all([
         supabaseClient.from('courses').select('*').order('created_at', { ascending: false }),
-        supabaseClient.from('assignments').select('id, course_id, title, due_date, is_completed, unit_number, task_type, estimated_minutes'),
+        supabaseClient.from('assignments').select('id, course_id, parent_assignment_id, progress_percent, title, due_date, is_completed, unit_number, task_type, estimated_minutes'),
     ]);
     localCourses = courses || [];
     courseProgressAssignments = assignments || [];
@@ -787,10 +1207,12 @@ export function renderAlphabeticals() {
             })()
             : allCourseAssignments.filter(isCourseProgressItem);
         const completedTasks = course.is_completed ? progressTasks.length : progressTasks.filter((assignment) => assignment.is_completed).length;
-        const progressPercent = progressTasks.length ? Math.round((completedTasks / progressTasks.length) * 100) : 0;
+        const progressPercent = course.is_completed ? 100 : (progressTasks.length
+            ? Math.round(progressTasks.reduce((sum, assignment) => sum + getAssignmentProgress(assignment), 0) / progressTasks.length)
+            : 0);
         const progressLabel = isWeeklyCourse(course) ? 'Week in progress' : 'Coursework';
         const progressHtml = progressTasks.length ? `<div role="progressbar" aria-label="${escapeHtml(course.code)} ${progressLabel.toLowerCase()} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progressPercent}" class="mt-2 min-w-32 flex-1">
-            <div class="mb-1 flex justify-between gap-2 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400"><span>${progressLabel}</span><span>${completedTasks}/${progressTasks.length} complete</span></div>
+            <div class="mb-1 flex justify-between gap-2 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400"><span>${progressLabel}</span><span>${completedTasks}/${progressTasks.length} complete · ${progressPercent}% progress</span></div>
             <div class="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-brand-700"><div class="h-full rounded-full transition-all" style="width:${progressPercent}%;background-color:${courseColor}"></div></div>
         </div>` : '';
         listEl.innerHTML += `
@@ -1271,6 +1693,14 @@ export function openCourseModal(courseId) {
     document.getElementById('modalCourseTitle').innerHTML = `<span>${escapeHtml(course.emoji || '📚')}</span> ${escapeHtml(course.code)} ${completionBadge}`;
 
     document.getElementById('editCourseId').value = course.id;
+    const assignmentForm = document.getElementById('addAssignmentForm');
+    if (assignmentForm && assignmentForm.dataset.courseId !== String(course.id)) {
+        assignmentForm.dataset.courseId = String(course.id);
+        const recurrenceInput = document.getElementById('assignRecurrence');
+        const repeatUntilInput = document.getElementById('assignRepeatUntil');
+        if (recurrenceInput) recurrenceInput.value = 'none';
+        if (repeatUntilInput) repeatUntilInput.value = '';
+    }
     document.getElementById('editCourseEmoji').value = course.emoji || '📚';
     document.getElementById('editCourseCode').value = course.code;
     document.getElementById('editCourseColor').value = course.color;
@@ -1287,6 +1717,7 @@ export function openCourseModal(courseId) {
     if (startDateInput) startDateInput.value = String(course.start_date || '').slice(0, 10);
     if (endDateInput) endDateInput.value = String(course.end_date || '').slice(0, 10);
     applyCourseDateBoundsToInput(document.getElementById('assignDate'), course);
+    updateAssignmentRecurrenceControls();
 
     const descInput = document.getElementById('editCourseDescription');
     if (descInput) descInput.value = course.description || '';
@@ -1559,12 +1990,28 @@ export async function parseSyllabusPDF() {
             return;
         }
 
+        let reviewedUnits = [];
+        if (!isMetadataOnly) {
+            if (!course || !getCourseDateBounds(course).isValid) {
+                statusMsg.textContent = 'Fix the class and term date ranges before importing coursework.';
+                statusMsg.className = 'text-xs text-center mt-2 text-red-500';
+                return;
+            }
+            reviewedUnits = await reviewSyllabusUnits(parsedData.units || [], course);
+            if (reviewedUnits === null) {
+                statusMsg.textContent = 'Import canceled. No course data was changed.';
+                statusMsg.className = 'text-xs text-center mt-2 text-zinc-500';
+                return;
+            }
+        }
+
         let updates = {};
         if (parsedData.description) updates.description = parsedData.description;
         if (parsedData.objectives) updates.objectives = parsedData.objectives;
 
         if (Object.keys(updates).length > 0) {
-            await supabaseClient.from('courses').update(updates).eq('id', courseId);
+            const { error: updateError } = await supabaseClient.from('courses').update(updates).eq('id', courseId);
+            if (updateError) throw new Error(`Could not save course metadata: ${updateError.message || 'Please try again.'}`);
             const cachedCourse = localCourses.find(c => c.id === courseId);
             if (cachedCourse) {
                 if (parsedData.description) cachedCourse.description = parsedData.description;
@@ -1580,66 +2027,22 @@ export async function parseSyllabusPDF() {
             return;
         }
 
-        if (!course || !getCourseDateBounds(course).isValid) {
-            statusMsg.textContent = 'Fix the class and term date ranges before importing coursework.';
-            statusMsg.className = 'text-xs text-center mt-2 text-red-500';
-            return;
-        }
-
-        let baseDate = new Date();
-        if (parsedData.units && parsedData.units.length > 0) {
-            parsedData.units.sort((a, b) => {
-                if (!a.dateStr || !b.dateStr) return 0;
-                return new Date(a.dateStr) - new Date(b.dateStr);
-            });
-
-            for (let i = 0; i < parsedData.units.length; i++) {
-                let u = parsedData.units[i];
-                let targetDate = u.dateStr ? smartParseDate(u.dateStr) : null;
-                if (!targetDate) {
-                    let fallbackDate = new Date(baseDate);
-                    fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
-                    targetDate = getLocalDateKey(fallbackDate);
-                }
-                targetDate = constrainImportedCourseDate(targetDate, course, adjustedDateCount);
-                // Resolve optional end date for range spreading
-                let endDate = u.endDateStr ? smartParseDate(u.endDateStr) : null;
-                endDate = constrainImportedCourseDate(endDate, course, adjustedDateCount);
-
-                const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
-                    course_id: courseId, user_id: currentUser.id,
-                    title: `Unit ${u.num || i + 1}: ${u.title}`,
-                    unit_number: u.num || i + 1,
-                    due_date: endDate || targetDate  // unit header lands on the end of the range
-                }]).select();
-
-                if (insertedUnit && insertedUnit[0] && u.lessons) {
-                    const lessonDates = spreadDatesAcrossRange(targetDate, endDate, u.lessons.length);
-                    let lessonNum = 1;
-                    for (let li = 0; li < u.lessons.length; li++) {
-                        let lessonTitle = u.lessons[li];
-                        let formattedTitle = lessonTitle.toLowerCase().startsWith('lesson') ? lessonTitle : `Lesson ${lessonNum}: ${lessonTitle}`;
-                        await supabaseClient.from('assignments').insert([{
-                            course_id: courseId, user_id: currentUser.id,
-                            title: `↳ ${formattedTitle}`,
-                            unit_number: u.num || i + 1,
-                            due_date: lessonDates[li] || targetDate
-                        }]);
-                        lessonNum++;
-                    }
-                }
-            }
-        }
-
-        statusMsg.textContent = `Successfully imported curriculum via secure Edge Function.${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
-        statusMsg.className = "text-xs text-center mt-2 text-green-500";
+        const importResult = await importReviewedCourseworkUnits(reviewedUnits, course, courseId, {
+            userId: currentUser?.id,
+            adjustedDateCount,
+            formatUnitTitle: (unit, index) => `Unit ${unit.num || index + 1}: ${unit.title}`
+        });
+        const importStatus = formatCourseworkImportStatus(importResult);
+        const metadataPrefix = Object.keys(updates).length ? 'Course metadata saved. ' : '';
+        statusMsg.textContent = `${metadataPrefix}${importStatus.message}${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
+        statusMsg.className = `text-xs text-center mt-2 ${importStatus.tone === 'error' ? 'text-red-500' : importStatus.tone === 'warning' ? 'text-amber-600 dark:text-amber-300' : 'text-green-500'}`;
         openCourseModal(courseId);
         loadCoursesPage();
         loadAssignments(courseId, 1);
 
     } catch (err) {
         console.error(err);
-        statusMsg.textContent = "Error parsing file or contacting Edge Function.";
+        statusMsg.textContent = err?.message || "Error parsing file or contacting Edge Function.";
         statusMsg.className = "text-xs text-center mt-2 text-red-500";
     }
 }
@@ -1680,59 +2083,36 @@ export async function parseLessonsImage(inputElement) {
             const rawResponse = responseData.result;
             const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsedData = JSON.parse(cleanJson);
-            let baseDate = new Date();
-
-            if (parsedData.units && parsedData.units.length > 0) {
-                parsedData.units.sort((a, b) => {
-                    if (!a.dateStr || !b.dateStr) return 0;
-                    return new Date(a.dateStr) - new Date(b.dateStr);
-                });
-
-                for (let i = 0; i < parsedData.units.length; i++) {
-                    let wk = parsedData.units[i];
-                    let targetDate = wk.dateStr ? smartParseDate(wk.dateStr) : null;
-                    if (!targetDate) {
-                        let fallbackDate = new Date(baseDate);
-                        fallbackDate.setDate(baseDate.getDate() + ((i + 1) * 7));
-                    targetDate = getLocalDateKey(fallbackDate);
-                    }
-                    targetDate = constrainImportedCourseDate(targetDate, course, adjustedDateCount);
-                    // Resolve optional end date for range spreading
-                    let endDate = wk.endDateStr ? smartParseDate(wk.endDateStr) : null;
-                    endDate = constrainImportedCourseDate(endDate, course, adjustedDateCount);
-
-                    const { data: insertedUnit } = await supabaseClient.from('assignments').insert([{
-                        course_id: courseId, user_id: currentUser.id,
-                        title: wk.title || `Week ${wk.num}`,
-                        unit_number: wk.num,
-                        due_date: endDate || targetDate  // unit header lands on end of range
-                    }]).select();
-
-                    if (insertedUnit && insertedUnit[0] && wk.lessons) {
-                        const lessonDates = spreadDatesAcrossRange(targetDate, endDate, wk.lessons.length);
-                        let lessonNum = 1;
-                        for (let li = 0; li < wk.lessons.length; li++) {
-                            let l = wk.lessons[li];
-                            let formattedTitle = l.toLowerCase().startsWith('lesson') ? l : `Lesson ${lessonNum}: ${l}`;
-                            await supabaseClient.from('assignments').insert([{
-                                course_id: courseId, user_id: currentUser.id,
-                                title: `↳ ${formattedTitle}`,
-                                unit_number: wk.num,
-                                due_date: lessonDates[li] || targetDate
-                            }]);
-                            lessonNum++;
-                        }
-                    }
-                }
+            if (!confirmSyllabusImport(parsedData, false)) {
+                statusMsg.textContent = 'Import canceled. Review the extracted rows and try again when ready.';
+                statusMsg.className = 'text-xs text-center mt-2 text-zinc-500';
+                return;
             }
 
-            statusMsg.textContent = `Successfully imported lessons via secure Edge Function.${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
-            statusMsg.className = "text-xs text-center mt-2 text-green-500";
+            const imageUnits = (Array.isArray(parsedData.units) ? parsedData.units : []).map((unit, index) => ({
+                ...unit,
+                title: unit?.title || unit?.name || `Week ${unit?.num || index + 1}`
+            }));
+            const reviewedUnits = await reviewSyllabusUnits(imageUnits, course);
+            if (reviewedUnits === null) {
+                statusMsg.textContent = 'Import canceled. No coursework was added.';
+                statusMsg.className = 'text-xs text-center mt-2 text-zinc-500';
+                return;
+            }
+
+            const importResult = await importReviewedCourseworkUnits(reviewedUnits, course, courseId, {
+                userId: currentUser?.id,
+                adjustedDateCount,
+                formatUnitTitle: (unit) => unit.title || `Week ${unit.num}`
+            });
+            const importStatus = formatCourseworkImportStatus(importResult);
+            statusMsg.textContent = `${importStatus.message}${adjustedDateCount.count ? ` ${adjustedDateCount.count} imported due date${adjustedDateCount.count === 1 ? ' was' : 's were'} adjusted to fit the class and term dates.` : ''}`;
+            statusMsg.className = `text-xs text-center mt-2 ${importStatus.tone === 'error' ? 'text-red-500' : importStatus.tone === 'warning' ? 'text-amber-600 dark:text-amber-300' : 'text-green-500'}`;
             loadAssignments(courseId, 1);
 
         } catch (err) {
             console.error(err);
-            statusMsg.textContent = "Error scanning image with Edge Function.";
+            statusMsg.textContent = err?.message || "Error scanning image with Edge Function.";
             statusMsg.className = "text-xs text-center mt-2 text-red-500";
         }
     };
@@ -1935,13 +2315,14 @@ export async function toggleCourseComplete(courseId, currentState) {
 
 export async function toggleAssignment(assignId, currentState, courseId) {
     const newState = !currentState;
-    const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
+    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
     if (error) {
         console.error('Could not update coursework completion:', error);
         return;
     }
     const cachedAssignment = courseProgressAssignments.find((assignment) => assignment.id === assignId);
-    if (cachedAssignment) cachedAssignment.is_completed = newState;
+    if (cachedAssignment) Object.assign(cachedAssignment, updates);
     if (newState) {
         let localType = '';
         try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[assignId] || ''; } catch { /* Use the synced assignment type below. */ }
@@ -1960,6 +2341,43 @@ export async function toggleAssignment(assignId, currentState, courseId) {
     const page = getCurrentPageName();
     if (page === 'index' || page === 'index.html') loadDashboardStats();
     else if (courseId) loadAssignments(courseId, currentAssignmentPage);
+}
+
+export async function updateAssignmentProgress(assignId, rawProgress, courseId) {
+    if (!assignId) return;
+    const progress = Number(rawProgress);
+    if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
+        alert('Progress must be a whole number from 0 to 100.');
+        if (courseId) loadAssignments(courseId, currentAssignmentPage);
+        return;
+    }
+
+    const updates = { progress_percent: progress, is_completed: progress === 100 };
+    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
+    if (error) {
+        alert(`Could not save progress: ${error.message || 'Please try again.'}`);
+        if (courseId) loadAssignments(courseId, currentAssignmentPage);
+        return;
+    }
+
+    const cachedAssignment = courseProgressAssignments.find((assignment) => String(assignment.id) === String(assignId));
+    if (cachedAssignment) Object.assign(cachedAssignment, updates);
+    if (progress === 100 && cachedAssignment) {
+        recordStudyPlanCompletionIfEntitled({
+            taskId: assignId,
+            courseId: cachedAssignment.course_id || courseId,
+            taskType: cachedAssignment.task_type || cachedAssignment.type || '',
+            title: cachedAssignment.title || '',
+            estimatedMinutes: cachedAssignment.estimated_minutes,
+        });
+        fireConfetti();
+    } else if (progress < 100) {
+        removeStudyPlanCompletion(assignId);
+    }
+
+    renderAlphabeticals();
+    if (courseId) await loadAssignments(courseId, currentAssignmentPage);
+    if (typeof window !== 'undefined') window.renderStudyPlanDashboardWidget?.('studyPlanWidgetContainer');
 }
 
 export async function updateAssignmentDate(assignId, newDate, courseId) {
@@ -2097,49 +2515,92 @@ export async function deleteAssignment(assignId, courseId) {
 
 export async function submitAddAssignment(event) {
     if (event) event.preventDefault();
-    const courseId = document.getElementById('editCourseId')?.value;
-    const titleInput = document.getElementById('assignTitle');
-    const unitInput = document.getElementById('assignUnit');
-    const typeInput = document.getElementById('assignType');
-    const priorityInput = document.getElementById('assignPriority');
-    const dateInput = document.getElementById('assignDate');
-
-    const title = titleInput?.value.trim();
-    const unitNum = unitInput?.value ? parseInt(unitInput.value, 10) : null;
-    const taskType = typeInput?.value || 'lesson';
-    const priority = priorityInput?.value || 'medium';
-    const dueDate = dateInput?.value ? parseInputDate(dateInput.value) : getLocalDateKey();
-
-    if (!courseId || !title) {
-        alert('Please provide a title for the unit or lesson.');
-        return;
+    if (typeof document === 'undefined') return;
+    const form = document.getElementById('addAssignmentForm');
+    if (!form || form.dataset.submitting === 'true') return;
+    form.dataset.submitting = 'true';
+    const submitButton = form.querySelector('button[type="submit"]');
+    const submitLabel = submitButton?.querySelector('span');
+    const originalLabel = submitLabel?.textContent || '+ Add Lesson / Coursework';
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitLabel.textContent = 'Adding…';
     }
-    const course = localCourses.find((item) => item.id === courseId);
-    if (course && !isDateWithinCourseWindow(dueDate, course)) {
-        alert('Choose a due date inside this class and term date range.');
-        return;
-    }
+    try {
+        const courseId = document.getElementById('editCourseId')?.value;
+        const titleInput = document.getElementById('assignTitle');
+        const unitInput = document.getElementById('assignUnit');
+        const typeInput = document.getElementById('assignType');
+        const priorityInput = document.getElementById('assignPriority');
+        const dateInput = document.getElementById('assignDate');
+        const recurrenceInput = document.getElementById('assignRecurrence');
+        const repeatUntilInput = document.getElementById('assignRepeatUntil');
 
-    const user = await getPlannerUser();
-    if (!user) return;
+        const title = titleInput?.value.trim();
+        const unitNum = unitInput?.value ? parseInt(unitInput.value, 10) : null;
+        const taskType = typeInput?.value || 'lesson';
+        const priority = priorityInput?.value || 'medium';
+        const dueDate = dateInput?.value ? parseInputDate(dateInput.value) : getLocalDateKey();
 
-    await supabaseClient.from('assignments').insert([{
-        course_id: courseId,
-        user_id: user.id,
-        title: title,
-        unit_number: unitNum,
-        task_type: taskType,
-        type: taskType,
-        priority: priority,
-        due_date: dueDate,
-        is_completed: false
-    }]);
+        if (!courseId || !title) {
+            alert('Please provide a title for the unit or lesson.');
+            return;
+        }
 
-    if (titleInput) titleInput.value = '';
-    loadAssignments(courseId, currentAssignmentPage);
-    loadDashboardStats();
-    if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
-        window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+        const recurrence = recurrenceInput?.value || 'none';
+        const recurrenceResult = recurrence === 'weekly'
+            ? buildWeeklyRecurrenceDates(dateInput?.value, repeatUntilInput?.value)
+            : { dates: [dueDate], error: null };
+        if (recurrenceResult.error) {
+            alert(recurrenceResult.error);
+            return;
+        }
+
+        const course = localCourses.find((item) => item.id === courseId);
+        if (course && recurrenceResult.dates.some((date) => !isDateWithinCourseWindow(date, course))) {
+            alert('Every repeat date must fall inside this class and term date range. Adjust the repeat-through date.');
+            return;
+        }
+
+        const user = await getPlannerUser();
+        if (!user) return;
+
+        const rows = recurrenceResult.dates.map((date) => ({
+            course_id: courseId,
+            user_id: user.id,
+            title,
+            unit_number: unitNum,
+            task_type: taskType,
+            type: taskType,
+            priority,
+            due_date: date,
+            is_completed: false,
+            progress_percent: 0,
+            parent_assignment_id: null,
+        }));
+        const { error } = await supabaseClient.from('assignments').insert(rows);
+        if (error) {
+            alert(`Could not add this coursework: ${error.message || 'Please try again.'}`);
+            return;
+        }
+
+        if (titleInput) titleInput.value = '';
+        if (recurrenceInput) recurrenceInput.value = 'none';
+        if (repeatUntilInput) repeatUntilInput.value = '';
+        updateAssignmentRecurrenceControls();
+        loadAssignments(courseId, currentAssignmentPage);
+        loadDashboardStats();
+        if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
+            window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+        }
+    } catch (error) {
+        alert(`Could not add this coursework: ${error.message || 'Please try again.'}`);
+    } finally {
+        delete form.dataset.submitting;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitLabel.textContent = originalLabel;
+        }
     }
 }
 
@@ -2154,30 +2615,174 @@ export async function addSubItem(parentId, courseId) {
 
     if (!title) return;
 
-    const { data: parentAssign } = await supabaseClient.from('assignments').select('unit_number, due_date').eq('id', parentId).single();
+    const { data: parentAssign, error: parentError } = await supabaseClient.from('assignments')
+        .select('id, course_id, unit_number, due_date, parent_assignment_id')
+        .eq('id', parentId)
+        .eq('course_id', courseId)
+        .single();
+    if (parentError || !parentAssign || parentAssign.parent_assignment_id) {
+        alert('Choose a top-level coursework item in this class to add a subtask.');
+        return;
+    }
     const unitNum = parentAssign ? parentAssign.unit_number : null;
-    const dueDate = parentAssign ? parentAssign.due_date : getLocalDateKey();
+    const course = localCourses.find((item) => item.id === courseId);
+    const parentDueDate = parentAssign.due_date || getLocalDateKey();
+    const dueDate = !parentAssign.due_date && course
+        ? clampDateToCourseWindow(parentDueDate, course)
+        : parentDueDate;
+    if (course && !isDateWithinCourseWindow(dueDate, course)) {
+        alert('The parent item has a date outside this class and term date range. Update its date before adding a subtask.');
+        return;
+    }
 
     const user = await getPlannerUser();
     if (!user) return;
 
-    await supabaseClient.from('assignments').insert([{
+    const { error } = await supabaseClient.from('assignments').insert([{
         course_id: courseId,
         user_id: user.id,
         title: `↳ ${title}`,
+        parent_assignment_id: parentAssign.id,
         unit_number: unitNum,
         task_type: taskType,
         type: taskType,
         priority: priority,
         due_date: dueDate,
-        is_completed: false
+        is_completed: false,
+        progress_percent: 0
     }]);
+
+    if (error) {
+        alert(`Could not add this subtask: ${error.message || 'Please try again.'}`);
+        return;
+    }
 
     if (inputEl) inputEl.value = '';
     loadAssignments(courseId, currentAssignmentPage);
     loadDashboardStats();
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
         window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+}
+
+export async function saveAssignmentInstructions(assignId) {
+    const input = document.getElementById(`assignmentInstructions-${assignId}`);
+    const status = document.getElementById(`assignmentChecklistStatus-${assignId}`);
+    if (!input || !assignId) return;
+    const instructions = input.value.trim();
+    const { error } = await supabaseClient.from('assignments').update({ instructions }).eq('id', assignId);
+    if (error) {
+        if (status) {
+            status.textContent = `Could not save instructions: ${error.message || 'Please try again.'}`;
+            status.className = 'mt-2 text-[11px] text-red-600 dark:text-red-400';
+        }
+        return;
+    }
+    const cachedAssignment = courseProgressAssignments.find((assignment) => String(assignment.id) === String(assignId));
+    if (cachedAssignment) cachedAssignment.instructions = instructions;
+    if (status) {
+        status.textContent = 'Instructions saved.';
+        status.className = 'mt-2 text-[11px] text-emerald-700 dark:text-emerald-300';
+    }
+}
+
+export function draftAssignmentChecklist(assignId) {
+    const instructions = document.getElementById(`assignmentInstructions-${assignId}`)?.value || '';
+    const proposal = document.getElementById(`assignmentChecklistProposal-${assignId}`);
+    const status = document.getElementById(`assignmentChecklistStatus-${assignId}`);
+    if (!proposal) return;
+    const steps = extractAssignmentChecklistSteps(instructions);
+    proposal.value = steps.join('\n');
+    if (status) {
+        status.textContent = steps.length
+            ? `${steps.length} proposed step${steps.length === 1 ? '' : 's'} extracted. Edit or remove lines before adding them.`
+            : 'No steps were found. Add checklist lines manually if needed.';
+        status.className = 'mt-2 text-[11px] text-zinc-600 dark:text-zinc-300';
+    }
+}
+
+export async function addAssignmentChecklistSubtasks(assignId, courseId) {
+    const proposal = document.getElementById(`assignmentChecklistProposal-${assignId}`);
+    const instructionsInput = document.getElementById(`assignmentInstructions-${assignId}`);
+    const status = document.getElementById(`assignmentChecklistStatus-${assignId}`);
+    const addButton = document.getElementById(`assignmentChecklistAdd-${assignId}`);
+    if (!proposal || !assignId || addButton?.disabled) return;
+    const steps = normalizeAssignmentChecklistProposalLines(proposal.value);
+    if (!steps.length) {
+        if (status) {
+            status.textContent = 'Add at least one checklist step before saving.';
+            status.className = 'mt-2 text-[11px] text-amber-700 dark:text-amber-300';
+        }
+        return;
+    }
+    if (steps.some((step) => step.length > 240)) {
+        if (status) {
+            status.textContent = 'Shorten each step to 240 characters or fewer before adding it.';
+            status.className = 'mt-2 text-[11px] text-amber-700 dark:text-amber-300';
+        }
+        return;
+    }
+    if (addButton) addButton.disabled = true;
+    try {
+        const [{ data: parent, error: parentError }, { data: existingAssignments, error: assignmentsError }] = await Promise.all([
+            supabaseClient.from('assignments').select('id, course_id, user_id, unit_number, due_date, task_type, parent_assignment_id')
+                .eq('id', assignId).eq('course_id', courseId).single(),
+            supabaseClient.from('assignments').select('title, parent_assignment_id, unit_number, due_date').eq('course_id', courseId)
+        ]);
+        if (parentError || assignmentsError || !parent || parent.parent_assignment_id) {
+            throw new Error('Could not load this top-level coursework item. Refresh and try again.');
+        }
+        const newSteps = getNewAssignmentChecklistSteps(steps.join('\n'), parent, existingAssignments || []);
+        if (!newSteps.length) {
+            if (status) {
+                status.textContent = 'These checklist steps already exist as subtasks.';
+                status.className = 'mt-2 text-[11px] text-zinc-600 dark:text-zinc-300';
+            }
+            return;
+        }
+        const user = await getPlannerUser();
+        if (!user) throw new Error('Sign in before saving checklist subtasks.');
+        const instructions = instructionsInput?.value.trim() || '';
+        const { error: instructionsError } = await supabaseClient.from('assignments')
+            .update({ instructions }).eq('id', parent.id);
+        if (instructionsError) throw new Error(`Could not save the instructions: ${instructionsError.message || 'Please try again.'}`);
+        const cachedAssignment = courseProgressAssignments.find((assignment) => String(assignment.id) === String(parent.id));
+        if (cachedAssignment) cachedAssignment.instructions = instructions;
+        const parentCourse = localCourses.find((course) => course.id === courseId);
+        const parentDueDate = parent.due_date || getLocalDateKey();
+        const dueDate = !parent.due_date && parentCourse
+            ? clampDateToCourseWindow(parentDueDate, parentCourse)
+            : parentDueDate;
+        if (parentCourse && !isDateWithinCourseWindow(dueDate, parentCourse)) {
+            throw new Error('The parent item has a date outside this class and term date range. Update its date before adding checklist subtasks.');
+        }
+        const rows = newSteps.map((step) => ({
+            course_id: parent.course_id,
+            user_id: parent.user_id || user.id,
+            title: `↳ ${step}`,
+            parent_assignment_id: parent.id,
+            unit_number: parent.unit_number,
+            task_type: parent.task_type || 'assignment',
+            type: parent.task_type || 'assignment',
+            priority: 'medium',
+            due_date: dueDate,
+            is_completed: false,
+            progress_percent: 0
+        }));
+        const { error } = await supabaseClient.from('assignments').insert(rows);
+        if (error) throw error;
+        if (status) {
+            status.textContent = `${rows.length} reviewed subtask${rows.length === 1 ? '' : 's'} added.`;
+            status.className = 'mt-2 text-[11px] text-emerald-700 dark:text-emerald-300';
+        }
+        await loadAssignments(courseId, currentAssignmentPage);
+    } catch (error) {
+        if (status) {
+            status.textContent = `Could not add checklist subtasks: ${error.message || 'Please try again.'}`;
+            status.className = 'mt-2 text-[11px] text-red-600 dark:text-red-400';
+        }
+    } finally {
+        if (addButton) addButton.disabled = false;
     }
 }
 
@@ -2305,7 +2910,9 @@ export async function loadAssignments(courseId, page = 1) {
         const effortValue = Number.isInteger(Number(assign.estimated_minutes)) && assign.estimated_minutes !== null
             ? escapeHtml(assign.estimated_minutes)
             : '';
-        const isSubItem = assign.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(assign));
+        const isSubItem = Boolean(assign.parent_assignment_id)
+            || String(assign.title || '').startsWith('↳')
+            || (weeklyCourse && isWeeklyImportedItem(assign));
         const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${weeklyCourse ? 'Week' : 'Unit'} ${escapeHtml(assign.unit_number)}</span>` : '';
         const canvasBadge = assign.lms_provider === 'canvas'
             ? '<span class="text-[10px] bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-semibold shrink-0" title="Imported from Canvas">↻ Canvas</span>'
@@ -2335,42 +2942,88 @@ export async function loadAssignments(courseId, page = 1) {
         if (currentPriority === 'urgent') currentPriority = 'high';
         if (currentPriority === 'normal') currentPriority = 'medium';
 
-        let checkboxHtml = '';
-        if (isSubItem) {
-            checkboxHtml = renderAssignmentCompletionControl({ ...assign, title: displayTitle }, courseId);
-        } else {
-            const unitLessons = assignments.filter(a => a.unit_number === assign.unit_number && (a.title.startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(a))));
-            const allDone = unitLessons.length > 0 && unitLessons.every(l => l.is_completed);
-            const unitClass = allDone ? "bg-green-500 text-white border-green-500" : "bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent";
-            checkboxHtml = `<div class="w-5 h-5 rounded border transition flex items-center justify-center shrink-0 ${unitClass}" title="Automatically completed when all unit lessons are done"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+        const linkedSubtasks = assignments.filter((item) => String(item.parent_assignment_id || '') === String(assign.id));
+        const legacyUnitLessons = assign.unit_number == null ? [] : assignments.filter((item) =>
+            item.id !== assign.id
+            && item.unit_number === assign.unit_number
+            && (String(item.title || '').startsWith('↳') || (weeklyCourse && isWeeklyImportedItem(item)))
+        );
+        const childAssignments = [...new Map([...linkedSubtasks, ...legacyUnitLessons].map((item) => [item.id, item])).values()];
+        const isCourseUnitHeader = /^(?:unit|week|wk|module|mod|chapter)\s*#?\d+\b/i.test(String(assign.title || '').trim());
+        const isAggregateParent = !isSubItem && isCourseUnitHeader && childAssignments.length > 0;
+        const childProgress = childAssignments.length
+            ? Math.round(childAssignments.reduce((sum, item) => sum + getAssignmentProgress(item), 0) / childAssignments.length)
+            : 0;
+        const isCompletedForDisplay = isAggregateParent
+            ? childAssignments.every((item) => getAssignmentProgress(item) === 100)
+            : Boolean(assign.is_completed);
+        const progressValue = isAggregateParent ? childProgress : getAssignmentProgress(assign);
 
-            if (assign.is_completed !== allDone) {
-                supabaseClient.from('assignments').update({ is_completed: allDone }).eq('id', assign.id);
-                assign.is_completed = allDone;
+        let checkboxHtml = '';
+        if (isAggregateParent) {
+            const stateClasses = isCompletedForDisplay
+                ? 'bg-green-500 text-white border-green-500'
+                : 'bg-zinc-200 dark:bg-brand-700 text-zinc-400 border-transparent';
+            checkboxHtml = `<span aria-label="${escapeHtml(displayTitle)}: ${progressValue}% through subtasks" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${stateClasses}" title="Progress follows linked subtasks"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>`;
+            const parentUpdates = { is_completed: isCompletedForDisplay, progress_percent: childProgress };
+            if (assign.is_completed !== parentUpdates.is_completed || Number(assign.progress_percent) !== childProgress) {
+                supabaseClient.from('assignments').update(parentUpdates).eq('id', assign.id);
+                Object.assign(assign, parentUpdates);
             }
+        } else {
+            checkboxHtml = renderAssignmentCompletionControl({ ...assign, title: displayTitle }, courseId);
         }
 
-        const tClass = assign.is_completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200 font-bold";
+        const tClass = isCompletedForDisplay ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200 font-bold";
+        const progressId = `assignmentProgress-${assignmentIdAttr}`;
+        const progressHtml = `
+            <div class="mt-2 flex items-center gap-2 border-t border-zinc-200/60 pt-2 dark:border-brand-700/60">
+                <label for="${progressId}" class="w-20 shrink-0 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">${isAggregateParent ? 'Subtask progress' : 'Progress'}</label>
+                <input id="${progressId}" type="range" min="0" max="100" step="1" value="${progressValue}" aria-label="Progress for ${escapeHtml(displayTitle)}" ${isAggregateParent ? 'disabled' : ''} oninput="this.nextElementSibling.value = this.value + '%'" onchange="updateAssignmentProgress('${assignmentArg}', this.value, '${courseArg}')" class="h-11 min-w-0 flex-1 accent-indigo-600 disabled:opacity-70">
+                <output for="${progressId}" class="w-10 text-right text-[11px] font-semibold tabular-nums text-zinc-700 dark:text-zinc-200" aria-live="polite">${progressValue}%</output>
+                ${isAggregateParent ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${childAssignments.filter((item) => getAssignmentProgress(item) === 100).length}/${childAssignments.length} lessons</span>` : (linkedSubtasks.length ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400">${linkedSubtasks.filter((item) => getAssignmentProgress(item) === 100).length}/${linkedSubtasks.length} subtasks complete</span>` : '')}
+            </div>`;
 
         let subItemForm = '';
-        if (!isSubItem && assign.unit_number) {
+        let instructionsChecklistForm = '';
+        if (!isSubItem) {
             subItemForm = `
-                <div class="mt-2 pt-2 border-t border-zinc-200/60 dark:border-brand-700/60 flex flex-wrap items-center gap-1.5">
-                    <input type="text" id="subInput-${assignmentIdAttr}" placeholder="+ Add lesson (e.g. ↳ Lesson 1: Concept)..." class="flex-1 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-xs min-w-[140px]">
-                    <select id="subType-${assignmentIdAttr}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Lesson Type">
-                        <option value="lesson">📖 Lesson</option>
-                        <option value="review">📝 Review</option>
-                        <option value="exam">🎯 Exam</option>
-                        <option value="lab">🔬 Lab</option>
-                        <option value="assignment">💻 Assign</option>
-                    </select>
-                    <select id="subPriority-${assignmentIdAttr}" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded p-1 text-[11px] font-medium" title="Priority">
-                        <option value="medium">⚡ Normal</option>
-                        <option value="high">🔥 Urgent</option>
-                        <option value="low">🌱 Low</option>
-                    </select>
-                    <button type="button" onclick="addSubItem('${assignmentArg}', '${courseArg}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-sm">+ Add</button>
-                </div>`;
+                <details class="mt-2 border-t border-zinc-200/60 pt-1 dark:border-brand-700/60">
+                    <summary class="flex min-h-11 cursor-pointer items-center text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Add a subtask</summary>
+                    <div class="flex flex-wrap items-center gap-1.5 pb-1">
+                        <input type="text" id="subInput-${assignmentIdAttr}" aria-label="Subtask title for ${escapeHtml(displayTitle)}" placeholder="Subtask title" class="h-11 min-w-[140px] flex-1 rounded border border-zinc-300 p-2 text-xs dark:border-brand-600 dark:bg-brand-900 dark:text-white">
+                        <select id="subType-${assignmentIdAttr}" class="min-h-11 rounded border border-zinc-300 p-2 text-[11px] font-medium dark:border-brand-600 dark:bg-brand-900 dark:text-white" title="Subtask Type">
+                            <option value="lesson">📖 Lesson</option>
+                            <option value="review">📝 Review</option>
+                            <option value="exam">🎯 Exam</option>
+                            <option value="lab">🔬 Lab</option>
+                            <option value="assignment">💻 Assign</option>
+                        </select>
+                        <select id="subPriority-${assignmentIdAttr}" class="min-h-11 rounded border border-zinc-300 p-2 text-[11px] font-medium dark:border-brand-600 dark:bg-brand-900 dark:text-white" title="Priority">
+                            <option value="medium">⚡ Normal</option>
+                            <option value="high">🔥 Urgent</option>
+                            <option value="low">🌱 Low</option>
+                        </select>
+                        <button type="button" onclick="addSubItem('${assignmentArg}', '${courseArg}')" class="min-h-11 rounded bg-indigo-600 px-3 text-xs font-bold text-white transition hover:bg-indigo-500">Add subtask</button>
+                    </div>
+                </details>`;
+            instructionsChecklistForm = `
+                <details class="mt-2 border-t border-zinc-200/60 pt-1 dark:border-brand-700/60">
+                    <summary class="flex min-h-11 cursor-pointer items-center text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Instructions &amp; checklist</summary>
+                    <div class="space-y-2 pb-2">
+                        <label for="assignmentInstructions-${assignmentIdAttr}" class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Assignment instructions</label>
+                        <textarea id="assignmentInstructions-${assignmentIdAttr}" rows="4" maxlength="20000" aria-label="Assignment instructions for ${escapeHtml(displayTitle)}" placeholder="Paste or write the assignment instructions here." class="min-h-24 w-full rounded border border-zinc-300 bg-white p-2 text-xs leading-relaxed dark:border-brand-600 dark:bg-brand-900 dark:text-white">${escapeHtml(assign.instructions || '')}</textarea>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="saveAssignmentInstructions('${assignmentArg}')" class="min-h-11 rounded border border-zinc-300 px-3 text-xs font-semibold hover:bg-zinc-100 dark:border-brand-600 dark:hover:bg-brand-800">Save instructions</button>
+                            <button type="button" onclick="draftAssignmentChecklist('${assignmentArg}')" class="min-h-11 rounded border border-indigo-300 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30">Extract checklist steps</button>
+                        </div>
+                        <label for="assignmentChecklistProposal-${assignmentIdAttr}" class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Review and edit up to 20 proposed steps, one per line</label>
+                        <textarea id="assignmentChecklistProposal-${assignmentIdAttr}" rows="4" aria-label="Editable checklist proposals for ${escapeHtml(displayTitle)}" placeholder="Extracted steps appear here. You can also write your own." class="min-h-24 w-full rounded border border-zinc-300 bg-white p-2 text-xs leading-relaxed dark:border-brand-600 dark:bg-brand-900 dark:text-white"></textarea>
+                        <button id="assignmentChecklistAdd-${assignmentIdAttr}" type="button" onclick="addAssignmentChecklistSubtasks('${assignmentArg}', '${courseArg}')" class="min-h-11 rounded bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-500">Add reviewed steps as subtasks</button>
+                        <p id="assignmentChecklistStatus-${assignmentIdAttr}" class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+                        <p class="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400">Step extraction runs on this device using line and sentence boundaries. Review every line; nothing is added until you choose the button above.</p>
+                    </div>
+                </details>`;
         }
 
         listEl.innerHTML += `
@@ -2403,6 +3056,8 @@ export async function loadAssignments(courseId, page = 1) {
                     </div>
                 </div>
                 ${subItemForm}
+                ${instructionsChecklistForm}
+                ${progressHtml}
             </div>`;
     });
 
@@ -2737,6 +3392,8 @@ if (typeof window !== 'undefined') {
     window.rescheduleOverdueToThisWeek = rescheduleOverdueToThisWeek;
     window.toggleCourseComplete = toggleCourseComplete;
     window.toggleAssignment = toggleAssignment;
+    window.updateAssignmentProgress = updateAssignmentProgress;
+    window.updateAssignmentRecurrenceControls = updateAssignmentRecurrenceControls;
     window.updateAssignmentDate = updateAssignmentDate;
     window.updateAssignmentPriority = updateAssignmentPriority;
     window.updateAssignmentEstimate = updateAssignmentEstimate;
@@ -2746,6 +3403,9 @@ if (typeof window !== 'undefined') {
     window.deleteAssignment = deleteAssignment;
     window.submitAddAssignment = submitAddAssignment;
     window.addSubItem = addSubItem;
+    window.saveAssignmentInstructions = saveAssignmentInstructions;
+    window.draftAssignmentChecklist = draftAssignmentChecklist;
+    window.addAssignmentChecklistSubtasks = addAssignmentChecklistSubtasks;
     window.changeAssignmentPage = changeAssignmentPage;
     window.loadAssignments = loadAssignments;
 }

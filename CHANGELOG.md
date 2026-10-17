@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added the optional Nursing Hub with rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, flashcards, anatomy review, and a quick-review queue built from existing study progress. Never enter real patient information.
 - Added field-specific degree palettes and decorative themes, Sunday/Monday week-start preferences, and responsive dashboard scroll aids.
-- Added opt-in Pro study-plan estimates calibrated from focus history, using records from the previous 90 days.
-- Added opt-in Canvas notifications for new assignments and changed due dates after a Canvas sync.
+- Added opt-in Pro study-plan estimates calibrated from focus history, using records from the previous 90 days. The newest 180 focus sessions and 120 task completions are retained; older entries may be dropped.
+- Added weighted grade categories, credit-weighted GPA estimates, target-score calculations, and 90-day term insights.
+- Added recurring coursework entries, subtasks and partial progress, editable checklists from assignment instructions, reviewed syllabus imports and WGU/Maestro browser-import rows, timed note-based mock exams, and Anki text/CSV exchange. Canvas sync directly imports assignments for selected courses; it does not use the browser importer's row-review flow.
+- Added source-checked course excerpts to Socratic Tutor replies, opt-in Canvas assignment and due-date alerts after sync, scheduled refresh, and posted-grade alerts after a baseline. Read-only Google Calendar and Outlook sync imports events once after connection; later syncs are started by the user.
+- Added a public feature overview and updated privacy disclosures for connected calendars, Canvas grade snapshots, and optional study-plan history.
 - Added Pro sync for SNHU Brightspace calendar feeds.
 - Added free course-only term rollover and manual conversion of a calendar event into a linked assignment.
 

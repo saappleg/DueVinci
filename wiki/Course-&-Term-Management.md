@@ -9,7 +9,7 @@ Named term and optional date window
  └── Class, pacing profile, and optional date window
       ├── Units, lessons, reviews, exams, and assignments
       ├── Due dates, priority, effort estimates, and completion
-      ├── Percentage grades and GPA exclusion
+      ├── Weighted grade categories, credits, and GPA exclusion
       ├── Notes, resources, description, and objectives
       └── Note-derived quizzes and flashcards
 ```
@@ -30,8 +30,20 @@ Rollover copies class shells: name/code, icon/color, and pacing type. Old course
 
 ## Assignment management
 
-Coursework supports a title, unit, date, task type, priority, effort estimate, and completion state. Dates can be planned in curriculum order or rescheduled using the existing controls. Grades accepts percentage values and an Exclude choice; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains the calculation limits.
+Coursework supports a title, unit, date, task type, priority, effort estimate, a 0–100% progress value, and completion. Marking an item complete sets progress to 100%; marking it incomplete resets progress to 0%. Partially completed work uses a proportional remaining-time estimate in the Smart Study Plan.
 
-The current UI does not provide custom weighted grading categories, credit-hour accounting, a Pending/In Progress/Graded status workflow, or drag-and-drop category sorting. Use the existing manual fields and [syllabus import](AI-Syllabus-&-Document-Parser) for the supported workflow.
+Use **Add subtask** on a top-level coursework item to break it into separately scheduled work. Subtasks keep their own due date, completion, and progress, and appear directly after their parent when ordered. Deleting a parent keeps its subtasks as standalone coursework.
+
+Open **Instructions & checklist** to save assignment instructions. **Extract checklist steps** splits the text into candidate lines on this device; it does not use AI or invent missing details. Review and edit the proposal text before choosing **Add reviewed steps as subtasks**. Duplicate steps already linked to that assignment are skipped.
+
+Choose **Every week** when adding coursework to create weekly instances through a selected end date. Each date becomes a regular, independently editable assignment and must fit inside the class and term date window. A single action is limited to 53 instances; later repeats are not generated automatically.
+
+Syllabus PDF and image imports open a review dialog for each extracted unit and lesson row. Edit titles and dates or clear a row's Include checkbox before importing. Canceling the review leaves course metadata and coursework unchanged; selected due dates continue to follow the class and term date bounds.
+
+Instructions, progress, and parent links are synced with assignment records, kept by the offline cache, and included in full data backups. Apply `supabase/migrations/20261017022939_coursework_workflow_fields.sql` before deploying the UI changes so the new assignment fields exist.
+
+Grades accepts percentage values and an Exclude choice. Course category weights and credit hours are configurable in the Grades page; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains how the estimates work and their limits. The saved settings require `supabase/migrations/20261017022938_weighted_gradebook_and_gpa.sql`.
+
+The current UI does not provide a Pending/In Progress/Graded status workflow or drag-and-drop category sorting. Use the existing manual fields and [syllabus import](AI-Syllabus-&-Document-Parser) for the supported workflow.
 
 Calendar events can be explicitly [converted to assignments](Calendar-&-Schedule-Sync), preserving the original event. DueVinci Pro adds connected Canvas imports; the free course/task workflow remains available without a subscription.

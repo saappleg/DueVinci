@@ -8,6 +8,8 @@ const FEATURE_KEYS = [
   'daily_brief',
   'lms_change_alerts',
   'study_plan_calibration',
+  'calendar_sync',
+  'canvas_auto_sync',
 ]
 const PROFILE_FIELDS = 'subscription_status, subscription_plan, trial_end, trial_started_at, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_cancel_at, subscription_cancel_at_period_end, canvas_domain, canvas_last_synced_at, updated_at'
 

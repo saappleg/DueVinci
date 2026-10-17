@@ -14,8 +14,8 @@ The free Smart Study Plan turns incomplete, dated coursework into daily study bl
 1. **Deadlines constrain the plan.** Due work stays on or before its deadline within a usable date window; overdue work is surfaced rather than silently given a later deadline.
 2. **Earlier deadlines take priority.** Unit numbering does not override an earlier due date.
 3. **Lessons keep curriculum order.** Unit and lesson metadata help sequence blocks.
-4. **Work spreads across available days.** Rest days are preferences when a deadline leaves no other feasible day; protected dates and course windows also constrain placement.
-5. **Study dates differ from due dates.** Moving a study block does not itself rewrite the assignment deadline. Review warnings when dates leave no feasible placement.
+4. **Rest and protected dates stay clear.** If no eligible day exists in a unit's current plan, course, and deadline window, its future coursework stays unscheduled and the plan shows an infeasibility warning. Review rest days, protected dates, or course/date windows to make room.
+5. **Study dates differ from due dates.** Due-today and overdue work stays on today even when it is a rest day; the planner does not move it later. Moving a study block does not rewrite its deadline.
 
 ## 7-Day Workload & Stress Radar
 

@@ -2,7 +2,7 @@
 
 [Report a security concern](mailto:support@duevinci.tech)
 
-> **Implementation notes updated October 16, 2026.** This document describes
+> **Implementation notes updated October 17, 2026.** This document describes
 > current data handling; it is not a security certification.
 
 ---
@@ -46,9 +46,11 @@ must not be placed in browser code or public issue reports.
 AI features run through secure server‑side Edge Functions:
 
 - **Secure Edge Functions** – Documents are processed in Deno Edge Functions, keeping API keys hidden.
-- **Google Gemini API** – Used for syllabus parsing and the Socratic Study Companion. DueVinci does not train models on student inputs; Google’s handling of prompts and outputs depends on the applicable Gemini service tier and terms. Do not represent AI inputs as exempt from provider processing.
+- **Google Gemini API** – Used for syllabus parsing and the Socratic Study Companion. When a student selects a course, its saved description, objectives, notes, and assignment details are sent with the Tutor question. Returned course excerpts are checked against the selected source text and shown with the reply; the interface identifies responses without a supporting course source. Tutor conversation history remains on the current page. DueVinci does not train models on student inputs; Google’s handling of prompts and outputs depends on the applicable Gemini service tier and terms. Do not represent AI inputs as exempt from provider processing.
 - **Canvas LMS** – A user-provided access token is encrypted before server-side storage and used only to retrieve the authorized Canvas coursework.
 - **SNHU Brightspace** – The private calendar-feed URL is encrypted before server-side storage. The browser can request status or sync without reading the saved URL back. Feed URLs must be treated as credentials.
+- **Google Calendar and Outlook** – OAuth access/refresh tokens and short-lived PKCE verifiers are encrypted and stored in server-only tables. The integration requests read-only access and stores provider event IDs, titles, and dates; it does not import descriptions, locations, attendees, or attachments. Disconnect removes saved tokens and hides imported rows. Google token revocation is requested during disconnect; Microsoft provider consent can be removed from the user's Microsoft My Apps page.
+- **Canvas grade alerts** – Optional server-side snapshots contain assignment/course identifiers, title, grade, score, points possible, and posted/observed times. They exclude submission text and comments and are available only to service-role Edge Functions.
 - **Stripe and Resend** – Stripe processes subscription payments; Resend delivers support emails. DueVinci does not store full payment-card numbers.
 
 ---
@@ -69,7 +71,7 @@ through an RLS-protected preferences record:
 - **Active Retention** – Data persists while your account is active.
 - **Academic Deletion** – Supported deletions remove cloud records when online; offline mutations must reconnect and replay before cloud deletion is complete.
 - **Account Deletion** – The deletion endpoint removes server-held account data and credentials before deleting Auth, with billing cancellation where required. The current browser clears its account cache after success. Preference/history rows cascade with account deletion; offline copies on other devices and previously downloaded backups require separate removal. Provider-held data may remain subject to the provider's policy or legal obligations.
-- **Study History** – The personalization calculation uses recent records from the previous 90 days. Storage is bounded to 180 focus sessions and 120 task completions; the calculation window is not an automatic 90-day deletion policy. Turning personalization off pauses it without clearing history. **Clear history** removes the local copy and requests account preference synchronization; allow synchronization to finish to propagate the clear.
+- **Study History** – The personalization calculation uses recent records from the previous 90 days. Each save retains the newest 180 focus sessions and 120 task completions; older entries may be dropped. The calculation window is not an automatic 90-day deletion policy. Turning personalization off pauses it without clearing history. **Clear history** removes the local copy and requests account preference synchronization; allow synchronization to finish to propagate the clear.
 - **Tutor** – Conversation history remains in the current page. The account usage ledger is separate; a daily cleanup removes rows whose last update is older than 12 months.
 - **Support Tickets** – Resolved or closed tickets are automatically deleted 90 days after resolution.
 - **Client Error Reports** – Browser diagnostic events are automatically deleted 90 days after creation.
@@ -88,4 +90,4 @@ For questions or concerns, contact the team:
 - Email: <support@duevinci.tech>
 
 ---
-*Last Updated: October 16, 2026*
+*Last Updated: October 17, 2026*

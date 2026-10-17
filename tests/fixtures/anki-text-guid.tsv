@@ -1,0 +1,12 @@
+#separator:Tab
+#html:false
+#columns:GUID	Front	Back	Tags
+#guid column:1
+#tags column:4
+guid-1	Mitochondria	Cellular structures that generate ATP.	biology
+guid-2	Photosynthesis	Process that converts light into stored chemical energy.	biology
+guid-3	Mitochondria	Cellular structures that generate ATP.	biology
+guid-4	Mitochondria	A conflicting definition.	biology
+guid-5	Missing answer		biology
+guid-6	"Term with ""quote"" and tab	inside"	"Line one
+Line two"	biology

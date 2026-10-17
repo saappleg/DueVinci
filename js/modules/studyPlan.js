@@ -427,7 +427,12 @@ function estimatedMinutes(task, calibration = null) {
     const base = Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480
         ? savedEstimate
         : type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
-    return getPersonalizedStudyEstimate({ ...task, taskType: type }, base, calibration);
+    const estimate = getPersonalizedStudyEstimate({ ...task, taskType: type }, base, calibration);
+    const progress = task.is_completed
+        ? 100
+        : Math.max(0, Math.min(100, Number.isFinite(Number(task.progress_percent)) ? Number(task.progress_percent) : 0));
+    if (progress >= 100) return 0;
+    return progress > 0 ? Math.max(5, Math.ceil(estimate * (100 - progress) / 100)) : estimate;
 }
 
 function taskMovePriority(task) {
@@ -637,6 +642,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     const pendingAssignments = getCurrentStudyWeekAssignments(courses, assignments, baseDate);
     if (pendingAssignments.length === 0) {
         const emptyPlan = [];
+        emptyPlan.unplacedDueToRestDays = [];
         for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
             const currentDate = new Date(baseDate);
             currentDate.setDate(baseDate.getDate() + dayOffset);
@@ -665,6 +671,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     // Initialize day buckets
     const days = [];
+    const unplacedDueToRestDays = [];
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
         const currentDate = new Date(baseDate);
         currentDate.setDate(baseDate.getDate() + dayOffset);
@@ -907,7 +914,10 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
             // Protected dates and recurring rest days stay clear even when a
             // deadline leaves no eligible study day in the current window.
-            if (activeDayIndices.length === 0) return;
+            if (activeDayIndices.length === 0) {
+                unitTaskList.forEach((task) => unplacedDueToRestDays.push({ task }));
+                return;
+            }
 
             // Distribute unit tasks evenly across active days available
             const tasksPerActiveDay = Math.max(1, Math.ceil(unitTaskList.length / activeDayIndices.length));
@@ -983,6 +993,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         day.totalMinutes = totalMins;
     });
 
+    days.unplacedDueToRestDays = unplacedDueToRestDays;
     cachedStudyPlan = days;
     return days;
 }
@@ -1281,6 +1292,12 @@ function getPlanSnapshot(plan = []) {
     }])));
 }
 
+export function getStudyPlanInfeasibilityWarning(plan = []) {
+    const count = plan?.unplacedDueToRestDays?.length || 0;
+    if (count === 0) return '';
+    return `${count} future coursework item${count === 1 ? '' : 's'} could not be scheduled because all available days in the current plan, course, and deadline windows are marked as rest days or protected. Review rest days, protected dates, and class or term date windows.`;
+}
+
 function getActiveManualMoveCount() {
     return Object.values(getManualStudyMoves()).filter((move) => move?.date).length;
 }
@@ -1304,7 +1321,7 @@ export function closeStudyPlanUpdateModal() {
     modal?.classList.remove('flex');
 }
 
-function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves }) {
+function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves, infeasibilityWarning }) {
     if (typeof document === 'undefined') return;
     ensureStudyPlanUpdateModalExists();
     const modal = document.getElementById('studyPlanUpdateModal');
@@ -1312,7 +1329,15 @@ function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves 
     const movedHtml = moved.length
         ? `<ul class="mt-4 max-h-40 space-y-2 overflow-y-auto text-left">${moved.slice(0, 5).map(({ title, from, to }) => `<li class="rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><strong>${escapeHtml(title)}</strong><span class="text-zinc-500 dark:text-zinc-400"> moved from ${escapeHtml(from)} to ${escapeHtml(to)}.</span></li>`).join('')}${moved.length > 5 ? `<li class="text-xs text-zinc-500">Plus ${moved.length - 5} more adjusted session${moved.length - 5 === 1 ? '' : 's'}.</li>` : ''}</ul>`
         : '<p class="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-300">Everything is already in its best available slot. The plan still reflects your latest coursework, deadlines, and rest days.</p>';
-    modal.innerHTML = `<section class="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-2xl dark:bg-indigo-500/20">${moved.length ? '✨' : '✓'}</div><h2 class="mt-4 text-xl font-extrabold text-zinc-900 dark:text-white">${moved.length ? 'Your week was rebalanced' : 'Your plan is up to date'}</h2><p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">${totalBlocks} study session${totalBlocks === 1 ? '' : 's'} across ${activeDays} active day${activeDays === 1 ? '' : 's'}.</p>${movedHtml}${manualMoves ? `<p class="mt-4 text-xs text-indigo-600 dark:text-indigo-300">Your ${manualMoves} manual placement${manualMoves === 1 ? '' : 's'} ${manualMoves === 1 ? 'was' : 'were'} kept.</p>` : ''}<button type="button" onclick="closeStudyPlanUpdateModal()" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button></section>`;
+    const hasInfeasibility = Boolean(infeasibilityWarning);
+    const heading = hasInfeasibility
+        ? 'Some coursework could not be scheduled'
+        : (moved.length ? 'Your week was rebalanced' : 'Your plan is up to date');
+    const statusHtml = hasInfeasibility
+        ? `<p role="alert" class="mt-3 text-left text-sm leading-relaxed text-amber-800 dark:text-amber-200">${escapeHtml(infeasibilityWarning)}</p>`
+        : movedHtml;
+    const otherMovesHtml = hasInfeasibility && moved.length ? movedHtml : '';
+    modal.innerHTML = `<section class="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${hasInfeasibility ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200' : 'bg-indigo-100 dark:bg-indigo-500/20'} text-2xl">${hasInfeasibility ? '!' : (moved.length ? '✨' : '✓')}</div><h2 class="mt-4 text-xl font-extrabold text-zinc-900 dark:text-white">${heading}</h2><p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">${totalBlocks} study session${totalBlocks === 1 ? '' : 's'} across ${activeDays} active day${activeDays === 1 ? '' : 's'}.</p>${statusHtml}${otherMovesHtml}${manualMoves ? `<p class="mt-4 text-xs text-indigo-600 dark:text-indigo-300">Your ${manualMoves} manual placement${manualMoves === 1 ? '' : 's'} ${manualMoves === 1 ? 'was' : 'were'} kept.</p>` : ''}<button type="button" onclick="closeStudyPlanUpdateModal()" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button></section>`;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -1327,15 +1352,20 @@ export async function refreshStudyPlan() {
         .map(([taskId, next]) => ({ title: next.title, from: previous.get(taskId).date, to: next.date }));
     const totalBlocks = [...current.values()].length;
     const activeDays = (plan || cachedStudyPlan).filter((day) => !day.isRestDay && day.totalMinutes > 0).length;
-    const message = moved.length
-        ? `Plan refreshed: ${moved.length} session${moved.length === 1 ? '' : 's'} rebalanced across your available study days.`
-        : `Plan refreshed: ${totalBlocks} session${totalBlocks === 1 ? '' : 's'} are already balanced around deadlines and rest days.`;
+    const infeasibilityWarning = getStudyPlanInfeasibilityWarning(plan || cachedStudyPlan);
+    const message = infeasibilityWarning
+        ? `Plan refreshed: ${infeasibilityWarning}${moved.length ? ` ${moved.length} other session${moved.length === 1 ? '' : 's'} rebalanced.` : ''}`
+        : moved.length
+            ? `Plan refreshed: ${moved.length} session${moved.length === 1 ? '' : 's'} rebalanced across your available study days.`
+            : `Plan refreshed: ${totalBlocks} session${totalBlocks === 1 ? '' : 's'} are already balanced around deadlines and rest days.`;
     const notice = document.getElementById('studyPlanNotice');
     if (notice) {
         notice.textContent = message;
-        notice.className = 'text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold';
+        notice.className = infeasibilityWarning
+            ? 'text-[11px] text-amber-800 dark:text-amber-300 font-semibold'
+            : 'text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold';
     }
-    showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves: getActiveManualMoveCount() });
+    showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves: getActiveManualMoveCount(), infeasibilityWarning });
     return plan;
 }
 
@@ -1370,7 +1400,8 @@ export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '', taskId
 export async function toggleStudyPlanAssignment(assignId, currentState, courseId, dateStr) {
     if (!supabaseClient) return;
     const newState = !currentState;
-    const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
+    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
     if (error) {
         console.error('Could not update study-plan coursework:', error);
         return;
@@ -1470,6 +1501,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
 
     const calibration = await getStudyCalibrationContext();
     const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5, null, { calibration });
+    const infeasibilityWarning = getStudyPlanInfeasibilityWarning(plan);
 
     let daysHtml = '';
     plan.forEach(day => {
@@ -1566,7 +1598,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <button type="button" onclick="refreshStudyPlan()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh plan</button>
                 </div>
             </div>
-            <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
+            <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${infeasibilityWarning ? 'text-amber-800 dark:text-amber-300 font-semibold' : (studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400')}">${infeasibilityWarning || studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
             <div class="flex flex-wrap items-center gap-1.5" aria-label="Protected no-study dates">${noStudyDatesHtml}</div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}

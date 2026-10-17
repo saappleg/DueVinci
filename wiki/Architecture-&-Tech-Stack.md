@@ -43,7 +43,7 @@ flowchart TD
 | `academics.js`, `studyPlan.js`, `courseDates.js` | Academic summaries, workload, sequence/deadline planning and date windows |
 | `courses.js`, `termRollover.js` | Class/term UI, syllabus import, old-term-preserving class-shell copies |
 | `calendar.js` | Calendar UI, date-based `.ics` handling and event-to-assignment conversion |
-| `grades.js` | Percentage averages, linear GPA scaling and temporary What-If values |
+| `grades.js` | Weighted category averages, credit-weighted GPA estimates, target-score and 90-day insight calculations, and temporary What-If values |
 | `flashcards.js` | Note-derived study content, SM-2 calculations and account-scoped mastery |
 | `timers.js`, `studyCalibration.js` | Countdown timers and opt-in Pro duration estimates from completed linked work |
 | `nursing.js`, `degreeThemes.js` | Optional fictional Nursing workspace and field themes |
@@ -66,6 +66,6 @@ The repository also contains `supabase/functions/`, `supabase/migrations/`, `tes
 
 Authenticated Edge Functions handle syllabus/Tutor requests, Canvas/Brightspace connections, billing, support and push-related operations. Privileged keys and encrypted provider connection secrets remain server-side. Model availability, credentials, entitlements, and deployment state affect provider features independently of static page availability.
 
-Canvas imports courses/dated assignments; optional change alerts follow sync. Brightspace is SNHU calendar-only import with user/provider-scoped stale-entry handling. Stripe provides subscription checkout/portal/webhook operations. Direct Google/Microsoft calendar account OAuth remains planned.
+Canvas imports courses and dated assignments directly for selected courses; optional assignment alerts follow sync, and opted-in accounts can use scheduled refresh and posted-grade alerts after provider configuration. Brightspace is SNHU calendar-only import with user/provider-scoped stale-entry handling. Google and Microsoft calendar OAuth sync is read-only; the first sync follows connection, while later syncs are user-started. Provider OAuth, scheduler, and Web Push credentials must be configured in the backend before those integrations and alerts can run. Stripe provides subscription checkout/portal/webhook operations.
 
 See the [readiness map](https://github.com/saappleg/DueVinci/blob/main/docs/FEATURE_READINESS.md), [operations guide](https://github.com/saappleg/DueVinci/blob/main/docs/OPERATIONS.md), and [Privacy Policy](https://duevinci.tech/legal/privacy.html). Nursing practice is fictional only; never store patient information.

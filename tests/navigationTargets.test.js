@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { getAppRouteName, pinAppScreenToViewport, resolveAppRouteHref, resolveSameOriginAssetUrl } from '../js/modules/navigation.js';
 
+
 const readSource = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 function findTagClasses(source, tag, attribute, value) {
@@ -124,4 +125,5 @@ describe('client-side route matching', () => {
         expect(readSource('js/modules/easterEggs.js')).not.toMatch(/action: \(\) => \{ window\.location\.href/);
         expect(readSource('js/modules/tour.js')).not.toMatch(/onboarding(?:AddClass|ImportSyllabus|Tutor).*window\.location\.href/);
     });
+
 });

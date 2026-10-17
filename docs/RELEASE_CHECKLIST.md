@@ -34,8 +34,10 @@
 - Keep the free planner usable when a subscription is inactive, expired, canceled, or past due.
 - Check the opt-in personalized study plan's pause and clear-history controls.
   Its recent-data calculation window does not automatically delete stored study
-  history. Verify opted-in Canvas assignment alerts after an explicit sync;
-  scheduled refresh and posted-grade alerts are not current features.
+  history, though each save retains at most the newest 180 focus sessions and
+  120 task completions. Verify opted-in Canvas assignment alerts after an explicit
+  or scheduled sync, and posted-grade alerts after the first baseline with the
+  scheduler, VAPID secrets, and receiving-device browser permission configured.
 - Check a valid empty Brightspace feed retires older events for that account
   and provider, while malformed feeds or failed saves do not retire older rows.
   Brightspace remains a calendar feed integration, not a course/grade importer.

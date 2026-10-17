@@ -793,6 +793,51 @@ export function ensureSettingsModalExists() {
                             <p id="brightspaceSyncMessage" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
                         </div>
 
+                        <div id="calendarProvidersArea" class="hidden space-y-3 border-t border-zinc-200 pt-4 dark:border-brand-700">
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Google Calendar and Outlook · Pro</h3>
+                                <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">Read-only sync imports event titles and dates from your default calendar, from 30 days ago through 180 days ahead. DueVinci does not edit your provider calendar. Disconnect removes the saved token and hides imported events.</p>
+                            </div>
+                            <div class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-brand-700 dark:border-brand-700">
+                                <section class="space-y-2 p-3" aria-labelledby="googleCalendarTitle">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0"><h4 id="googleCalendarTitle" class="text-xs font-bold text-zinc-900 dark:text-white">Google Calendar</h4><p id="googleCalendarStatus" class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Checking connection…</p></div>
+                                        <button id="calendarGoogleConnectButton" type="button" onclick="connectCalendarProvider('google')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Connect</button>
+                                    </div>
+                                    <div id="googleCalendarConnectedArea" class="hidden flex flex-wrap gap-2">
+                                        <button id="googleCalendarSyncButton" type="button" onclick="syncCalendarProvider('google')" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Sync now</button>
+                                        <button id="googleCalendarDisconnectButton" type="button" onclick="disconnectCalendarProvider('google')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Disconnect</button>
+                                    </div>
+                                </section>
+                                <section class="space-y-2 p-3" aria-labelledby="outlookCalendarTitle">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0"><h4 id="outlookCalendarTitle" class="text-xs font-bold text-zinc-900 dark:text-white">Microsoft Outlook</h4><p id="outlookCalendarStatus" class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Checking connection…</p></div>
+                                        <button id="calendarOutlookConnectButton" type="button" onclick="connectCalendarProvider('outlook')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Connect</button>
+                                    </div>
+                                    <div id="outlookCalendarConnectedArea" class="hidden flex flex-wrap gap-2">
+                                        <button id="outlookCalendarSyncButton" type="button" onclick="syncCalendarProvider('outlook')" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Sync now</button>
+                                        <button id="outlookCalendarDisconnectButton" type="button" onclick="disconnectCalendarProvider('outlook')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Disconnect</button>
+                                    </div>
+                                </section>
+                            </div>
+                            <p id="calendarProviderSyncMessage" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+                        </div>
+
+                        <div id="canvasAutoSyncArea" class="hidden space-y-3 border-t border-zinc-200 pt-4 dark:border-brand-700">
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Automatic Canvas refresh · Pro</h3>
+                                <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">DueVinci checks selected Canvas courses about once an hour. If enabled, it can send a browser push alert when Canvas posts or changes a grade. Refresh only reads your selected courses and submissions.</p>
+                            </div>
+                            <label class="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-700 dark:border-brand-700 dark:text-zinc-200">
+                                <span>Refresh my selected Canvas courses automatically</span><input id="canvasAutoSyncEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600">
+                            </label>
+                            <label class="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-700 dark:border-brand-700 dark:text-zinc-200">
+                                <span>Alert me when a Canvas grade is posted</span><input id="canvasGradeAlertsEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600">
+                            </label>
+                            <button type="button" id="canvasAutoSyncSaveButton" onclick="saveCanvasAutoSyncSettings()" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Save refresh settings</button>
+                            <p id="canvasAutoSyncStatus" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+                        </div>
+
                         <!-- Canvas Sync Modal -->
                         <div id="canvasSyncModal" aria-hidden="true" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                             <div role="dialog" aria-modal="true" aria-labelledby="canvasSyncModalTitle" class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -933,6 +978,7 @@ export function openSettingsModal() {
         refreshReminderSettings();
         Promise.resolve(window.refreshStudyCalibrationSettings?.()).catch(() => {});
         Promise.resolve(window.refreshLmsChangeAlertSettings?.()).catch(() => {});
+        Promise.resolve(window.refreshCalendarProviderSettings?.()).catch(() => {});
 
         const dfSelect = document.getElementById('dateFormatSelect');
         if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';

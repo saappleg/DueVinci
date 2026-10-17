@@ -4,7 +4,7 @@ DueVinci’s browser importer is being tested as a separate extension project:
 
 <https://github.com/saappleg/duevinci-coursework-importer>
 
-The first adapters support WGU pacing-guide documents and Maestro’s weekly course pages. The extension scans only after the student clicks **Scan current course page**, shows a review list, and sends only selected rows to the signed-in DueVinci account. It does not collect grades, submissions, student details, or whole-page HTML.
+The first adapters support WGU pacing-guide documents and Maestro’s weekly course pages. This browser importer is separate from Canvas sync: it scans only after the student clicks **Scan current course page**, shows a review list, and sends only selected rows to the signed-in DueVinci account. Canvas sync instead imports assignments directly for the courses the student selects. The browser importer does not collect grades, submissions, student details, or whole-page HTML.
 
 ## Beta rollout
 

@@ -267,8 +267,20 @@
                                     <option value="low">🌱 Low</option>
                                 </select>
                                 <label for="assignDate" class="sr-only">Due date</label>
-                                <input type="date" id="assignDate" required class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
+                                <input type="date" id="assignDate" required onchange="updateAssignmentRecurrenceControls()" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
                             </div>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <label for="assignRecurrence" class="flex flex-col gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Repeat
+                                    <select id="assignRecurrence" onchange="updateAssignmentRecurrenceControls()" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-2.5 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white">
+                                        <option value="none">Does not repeat</option>
+                                        <option value="weekly">Every week</option>
+                                    </select>
+                                </label>
+                                <label id="assignRepeatUntilLabel" for="assignRepeatUntil" class="hidden flex flex-col gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Repeat through
+                                    <input id="assignRepeatUntil" type="date" disabled onchange="updateAssignmentRecurrenceControls()" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-2.5 text-xs font-mono dark:border-brand-600 dark:bg-brand-800 dark:text-white">
+                                </label>
+                            </div>
+                            <p class="text-[10px] text-zinc-500 dark:text-zinc-400">Weekly repeats create separate due-date items through the selected date, within this class and term window.</p>
                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5">
                                 <span>+ Add Lesson / Coursework</span>
                             </button>

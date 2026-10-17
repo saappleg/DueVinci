@@ -33,6 +33,29 @@ effect, confirm that the release fits its authorized exception first.
   project links and secrets separate. The migrations extend existing academic
   tables; see the [backend setup notes](../supabase/README.md) before provisioning
   a new project.
+- [ ] Before enabling calendar or scheduled Canvas features, verify the
+  Production Edge Function secret vault contains `APP_URL`,
+  `CANVAS_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_CLIENT_ID`,
+  `GOOGLE_CALENDAR_CLIENT_SECRET`, `MICROSOFT_CALENDAR_CLIENT_ID`, and
+  `MICROSOFT_CALENDAR_CLIENT_SECRET`. Register this exact callback in both
+  Production OAuth clients:
+  `https://lzmsguzlmjmedlaybckc.supabase.co/functions/v1/calendar-oauth-callback`.
+  Confirm the configured read-only provider scopes using
+  [the integration runbook](CALENDAR_INTEGRATIONS.md). Verify values in the
+  vault without printing or copying them into logs. Missing or invalid provider
+  credentials prevent that provider's calendar connection and sync; a callback
+  mismatch prevents OAuth from completing.
+- [ ] For scheduled Canvas refresh, verify `CANVAS_SCHEDULER_SECRET` is set as
+  an Edge Function secret and that Supabase Vault contains
+  `duevinci_project_url` plus `duevinci_canvas_scheduler_secret` with the
+  matching scheduler secret. The cron job skips calls when either Vault entry
+  is missing, and the worker rejects a mismatched secret; scheduled coursework
+  refresh and posted-grade alerts will not run.
+- [ ] For Canvas push alerts, verify `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, and
+  `VAPID_PRIVATE_KEY` in the Production Edge Function secret vault, without
+  exposing their values. Without them, push alerts cannot be delivered. Canvas
+  assignment rows may still be imported, but a failed posted-grade alert leaves
+  its grade snapshot unchanged so a later refresh can retry it.
 - [ ] Deploy the functions changed by the approved release after their required
   migrations. Include shared helper/parser changes in the deployed bundle.
   Review Tutor/Gemini, Canvas, Brightspace, billing, and deletion functions as

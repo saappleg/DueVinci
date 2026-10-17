@@ -41,10 +41,21 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Stage committed static site files
+        run: |
+          site_root="$RUNNER_TEMP/duevinci-static-site"
+          mkdir -p "$site_root"
+          site_paths=(CNAME index.html llms.txt manifest.json robots.txt sitemap.xml sw.js assets calendar components courses grades js legal nursing tutor)
+          if git cat-file -e HEAD:about 2>/dev/null; then
+            site_paths+=(about)
+          fi
+          git archive --format=tar HEAD -- "${site_paths[@]}" | tar -xf - -C "$site_root"
+          test -s "$site_root/about/index.html"
+
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: ${{ runner.temp }}/duevinci-static-site
 
       - name: Deploy to GitHub Pages
         id: deployment

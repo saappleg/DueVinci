@@ -95,4 +95,23 @@ describe('Service worker release updates', () => {
         await Promise.all(lifetimePromises);
         expect(lifetimeResolved).toBe(true);
     });
+
+    it('precaches and serves the About route from the current shell', async () => {
+        const worker = createWorker();
+        await finishLifecycle(worker.handlers.get('install'));
+        expect(worker.appCache.add.mock.calls.some(([request]) => request.url.endsWith('/about/index.html'))).toBe(true);
+
+        worker.appCache.match.mockImplementation(async (request) =>
+            request === './about/index.html' ? new Response('About page') : undefined);
+        let response;
+        const lifetimePromises = [];
+        worker.handlers.get('fetch')({
+            request: { url: 'https://duevinci.tech/about/', method: 'GET', mode: 'navigate' },
+            respondWith: (promise) => { response = promise; },
+            waitUntil: (promise) => { lifetimePromises.push(promise); },
+        });
+
+        expect(await (await response).text()).toBe('About page');
+        await Promise.all(lifetimePromises);
+    });
 });

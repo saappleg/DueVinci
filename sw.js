@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.45';
+const CACHE_NAME = 'duevinci-v8.46';
 // Version runtime assets with the shell so query-versioned modules from a
 // previous release cannot survive activation and override the current code.
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
@@ -10,6 +10,7 @@ const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './about/index.html',
   './courses/index.html',
   './grades/index.html',
   './calendar/index.html',
@@ -139,7 +140,8 @@ self.addEventListener('fetch', (event) => {
         // same request URL as the pre-cached /courses/index.html document.
         // Resolve every app route before attempting the network.
         const route = new URL(request.url).pathname.replace(/\/+$/, '');
-        const routeAsset = route.endsWith('/courses') ? './courses/index.html'
+        const routeAsset = route.endsWith('/about') ? './about/index.html'
+          : route.endsWith('/courses') ? './courses/index.html'
           : route.endsWith('/grades') ? './grades/index.html'
             : route.endsWith('/calendar') ? './calendar/index.html'
               : route.endsWith('/tutor') ? './tutor/index.html'
