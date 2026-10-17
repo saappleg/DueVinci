@@ -78,6 +78,17 @@ function providerFrom(value: unknown): CalendarProvider {
   throw new Error('Choose Google Calendar or Outlook.')
 }
 
+function calendarProviderConfigured(provider: CalendarProvider) {
+  const [clientIdName, clientSecretName] = provider === 'google'
+    ? ['GOOGLE_CALENDAR_CLIENT_ID', 'GOOGLE_CALENDAR_CLIENT_SECRET']
+    : ['MICROSOFT_CALENDAR_CLIENT_ID', 'MICROSOFT_CALENDAR_CLIENT_SECRET']
+  return Boolean(Deno.env.get(clientIdName)?.trim() && Deno.env.get(clientSecretName)?.trim())
+}
+
+function providerNotConfiguredMessage(provider: CalendarProvider) {
+  return `${provider === 'google' ? 'Google Calendar' : 'Outlook'} is not configured yet. Try again later.`
+}
+
 function callbackUri() {
   const base = Deno.env.get('SUPABASE_URL')
   if (!base) throw new Error('Calendar OAuth callback is not configured.')
@@ -285,9 +296,10 @@ Deno.serve(async (req) => {
       if (profileError || connectionsError) throw new Error('Calendar connection status could not be loaded.')
       const featureEnabled = isSubscriptionActive(profile) && await hasFeature(admin, profile || {}, 'calendar_sync')
       const connectionRows = (connections || []).filter(isCalendarStatusConnection)
-      const byProvider = Object.fromEntries(['google', 'outlook'].map((provider) => {
+      const byProvider = Object.fromEntries((['google', 'outlook'] as const).map((provider) => {
         const connection = connectionRows.find((item) => item.provider === provider)
         return [provider, {
+          configured: calendarProviderConfigured(provider),
           connected: Boolean(connection),
           lastSyncedAt: connection?.last_synced_at || null,
           lastSyncCount: connection?.last_sync_count || 0,
@@ -305,7 +317,10 @@ Deno.serve(async (req) => {
     }
 
     const { admin, user } = await requireFeature(req, 'calendar_sync')
-    if (action === 'authorize') return json(await authorizeCalendar(admin, user.id, provider))
+    if (action === 'authorize') {
+      if (!calendarProviderConfigured(provider)) throw new Error(providerNotConfiguredMessage(provider))
+      return json(await authorizeCalendar(admin, user.id, provider))
+    }
     if (action !== 'sync') throw new Error('Unsupported calendar integration action.')
 
     const claim = await claimCalendarConnection(

@@ -2,7 +2,7 @@
 
 [Report a security concern](mailto:support@duevinci.tech)
 
-> **Implementation notes updated October 16, 2026.** This document describes
+> **Implementation notes updated October 17, 2026.** This document describes
 > current data handling; it is not a security certification.
 
 ---
@@ -90,4 +90,4 @@ For questions or concerns, contact the team:
 - Email: <support@duevinci.tech>
 
 ---
-*Last Updated: October 16, 2026*
+*Last Updated: October 17, 2026*

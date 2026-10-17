@@ -116,6 +116,23 @@ describe('Study Companion loading and announcements', () => {
         expect(elements.tutorWorkspace.classList.contains('hidden')).toBe(true);
     });
 
+    it('restores the current-page conversation when the page loads again', async () => {
+        let resolveReply;
+        mocks.invoke.mockImplementation(() => new Promise((resolve) => { resolveReply = resolve; }));
+        elements.tutorInput.value = 'Explain a fictional study topic';
+        const reply = submitTutorMessage();
+        resolveReply({ data: { reply: 'What do you already know?' }, error: null });
+        await reply;
+
+        mocks.invoke.mockResolvedValue({ data: { usage: { usedThisMonth: 1, monthlyLimit: 10, usedToday: 1, dailyLimit: 4 } }, error: null });
+        elements.tutorMessages = element();
+        await loadTutorPage();
+        expect(elements.tutorMessages.children.map((message) => message.children[0].textContent)).toEqual([
+            'Explain a fictional study topic',
+            'What do you already know?',
+        ]);
+    });
+
     it('announces pending replies and prevents a second concurrent submission', async () => {
         let resolveReply;
         mocks.invoke.mockImplementation(() => new Promise((resolve) => { resolveReply = resolve; }));

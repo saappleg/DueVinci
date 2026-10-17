@@ -1,6 +1,14 @@
 import { authenticatedUser, corsHeaders, hasFeature, isSubscriptionActive, json, requireFeature } from '../_shared/canvas.ts'
 import { isMockCanvasConnection } from '../_shared/mock_canvas.ts'
 
+function hasConfiguredSecret(name: string) {
+  return Boolean(Deno.env.get(name)?.trim())
+}
+
+function isWebPushConfigured() {
+  return ['VAPID_SUBJECT', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'].every(hasConfiguredSecret)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Use POST for Canvas refresh settings.' }, 405)
@@ -18,6 +26,8 @@ Deno.serve(async (req) => {
       const featureEnabled = isSubscriptionActive(profile) && await hasFeature(admin, profile || {}, 'canvas_auto_sync')
       return json({
         featureEnabled,
+        schedulerConfigured: hasConfiguredSecret('CANVAS_SCHEDULER_SECRET'),
+        webPushConfigured: isWebPushConfigured(),
         connected: Boolean(connection) && !isMockCanvasConnection(connection.canvas_domain || ''),
         mockConnection: Boolean(connection) && isMockCanvasConnection(connection.canvas_domain || ''),
         autoSyncEnabled: connection?.auto_sync_enabled === true,
@@ -34,6 +44,12 @@ Deno.serve(async (req) => {
     const { admin, user } = autoSyncEnabled || gradeAlertsEnabled
       ? await requireFeature(req, 'canvas_auto_sync')
       : await authenticatedUser(req)
+    if (autoSyncEnabled && !hasConfiguredSecret('CANVAS_SCHEDULER_SECRET')) {
+      throw new Error('Automatic Canvas refresh is not configured yet. Try again later.')
+    }
+    if (gradeAlertsEnabled && !isWebPushConfigured()) {
+      throw new Error('Canvas grade alerts are not configured yet. Try again later.')
+    }
     if (gradeAlertsEnabled && !autoSyncEnabled) throw new Error('Turn on automatic Canvas refresh before enabling grade alerts.')
     const { data: connection, error: connectionError } = await admin.from('canvas_connections')
       .select('user_id,canvas_domain').eq('user_id', user.id).maybeSingle()

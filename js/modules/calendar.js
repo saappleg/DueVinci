@@ -14,6 +14,7 @@ let lastCalendarActionTrigger = null;
 let activeCalendarEvent = null;
 let calendarActionCourses = [];
 let calendarProviderStatus = null;
+let calendarLoadGeneration = 0;
 
 async function getCalendarUser() {
     if (currentUser?.id) return currentUser;
@@ -84,14 +85,30 @@ function renderCalendarProviderStatus() {
     ['google', 'outlook'].forEach((provider) => {
         const status = calendarProviderStatus?.providers?.[provider] || {};
         const connectButton = document.getElementById(provider === 'google' ? 'calendarGoogleConnectButton' : 'calendarOutlookConnectButton');
+        const providerConfigured = status.configured === true;
         connectButton?.classList.toggle('hidden', Boolean(status.connected && (!status.needsReconnect || !calendarProviderStatus?.featureEnabled)));
-        if (connectButton) connectButton.textContent = status.needsReconnect ? 'Reconnect' : 'Connect';
+        if (connectButton) {
+            connectButton.textContent = status.needsReconnect ? 'Reconnect' : 'Connect';
+            connectButton.disabled = !providerConfigured || !calendarProviderStatus?.featureEnabled;
+            connectButton.title = providerConfigured ? '' : 'Calendar provider setup is incomplete';
+            connectButton.classList.toggle('opacity-50', connectButton.disabled);
+            connectButton.classList.toggle('cursor-not-allowed', connectButton.disabled);
+        }
         const connectedArea = document.getElementById(`${provider}CalendarConnectedArea`);
         connectedArea?.classList.toggle('hidden', !status.connected);
-        document.getElementById(`${provider}CalendarSyncButton`)?.classList.toggle('hidden', status.needsReconnect === true);
+        const syncButton = document.getElementById(`${provider}CalendarSyncButton`);
+        syncButton?.classList.toggle('hidden', status.needsReconnect === true);
+        if (syncButton) {
+            syncButton.disabled = !providerConfigured;
+            syncButton.title = providerConfigured ? '' : 'Calendar provider setup is incomplete';
+        }
         const detail = document.getElementById(`${provider}CalendarStatus`);
         if (!detail) return;
-        if (!status.connected) {
+        if (!providerConfigured) {
+            detail.textContent = status.connected
+                ? `${providerNames[provider]} setup is incomplete. Sync and reconnect are unavailable; disconnect is still available.`
+                : `${providerNames[provider]} setup is incomplete. Contact support before connecting.`;
+        } else if (!status.connected) {
             detail.textContent = calendarProviderStatus?.featureEnabled
                 ? `Connect your ${providerNames[provider]} account to import its default calendar.`
                 : 'An active Pro plan is required to connect this calendar.';
@@ -119,7 +136,11 @@ export async function refreshCalendarProviderSettings() {
             featureEnabled: status.featureEnabled === true && (!snapshot || hasSubscriptionFeature(snapshot, 'calendar_sync')),
         };
         renderCalendarProviderStatus();
-        if (calendarProviderStatus.featureEnabled) setCalendarProviderMessage('Connect a provider to sync events. DueVinci imports event titles and dates only; it does not edit your provider calendar.');
+        const unconfiguredProviders = ['google', 'outlook']
+            .filter((provider) => calendarProviderStatus.providers?.[provider]?.configured !== true)
+            .map((provider) => provider === 'google' ? 'Google Calendar' : 'Outlook');
+        if (calendarProviderStatus.featureEnabled && unconfiguredProviders.length) setCalendarProviderMessage(`${unconfiguredProviders.join(' and ')} setup is incomplete. Connect is unavailable until configured.`);
+        else if (calendarProviderStatus.featureEnabled) setCalendarProviderMessage('Connect a provider to sync events. DueVinci imports event titles and dates only; it does not edit your provider calendar.');
         else if (['google', 'outlook'].some((provider) => calendarProviderStatus.providers?.[provider]?.connected)) setCalendarProviderMessage('Pro access is required to sync connected calendars. You can disconnect them here.');
         else setCalendarProviderMessage('Google and Outlook sync are included with DueVinci Pro.');
     } catch (error) {
@@ -132,6 +153,10 @@ export async function refreshCalendarProviderSettings() {
 export async function connectCalendarProvider(provider) {
     if (!['google', 'outlook'].includes(provider)) return;
     const button = document.getElementById(provider === 'google' ? 'calendarGoogleConnectButton' : 'calendarOutlookConnectButton');
+    if (calendarProviderStatus?.providers?.[provider]?.configured !== true) {
+        setCalendarProviderMessage(`${provider === 'google' ? 'Google Calendar' : 'Outlook'} setup is incomplete. Contact support before connecting.`, 'error');
+        return;
+    }
     if (button) { button.disabled = true; button.textContent = 'Opening provider…'; }
     setCalendarProviderMessage(`Opening ${provider === 'google' ? 'Google Calendar' : 'Outlook'} authorization…`);
     try {
@@ -142,13 +167,21 @@ export async function connectCalendarProvider(provider) {
         window.location.assign(result.authorizationUrl);
     } catch (error) {
         setCalendarProviderMessage(error.message || 'Could not start calendar authorization.', 'error');
-        if (button) { button.disabled = false; button.textContent = 'Connect'; }
+        if (button) {
+            button.disabled = calendarProviderStatus?.providers?.[provider]?.configured !== true
+                || calendarProviderStatus?.featureEnabled !== true;
+            button.textContent = calendarProviderStatus?.providers?.[provider]?.needsReconnect ? 'Reconnect' : 'Connect';
+        }
     }
 }
 
 export async function syncCalendarProvider(provider) {
     if (!['google', 'outlook'].includes(provider)) return;
     const button = document.getElementById(`${provider}CalendarSyncButton`);
+    if (calendarProviderStatus?.providers?.[provider]?.configured !== true) {
+        setCalendarProviderMessage(`${provider === 'google' ? 'Google Calendar' : 'Outlook'} setup is incomplete. Sync is unavailable.`, 'error');
+        return;
+    }
     if (button) { button.disabled = true; button.textContent = 'Syncing…'; }
     setCalendarProviderMessage(`Syncing ${provider === 'google' ? 'Google Calendar' : 'Outlook'} events…`);
     try {
@@ -164,7 +197,10 @@ export async function syncCalendarProvider(provider) {
         await refreshCalendarProviderSettings();
         setCalendarProviderMessage(error.message || 'Could not sync this calendar.', 'error');
     } finally {
-        if (button) { button.disabled = false; button.textContent = 'Sync now'; }
+        if (button) {
+            button.disabled = calendarProviderStatus?.providers?.[provider]?.configured !== true;
+            button.textContent = 'Sync now';
+        }
     }
 }
 
@@ -795,15 +831,38 @@ export function initCalendar() {
     calendarInstance.render();
 }
 
+export function disposeCalendar() {
+    calendarLoadGeneration += 1;
+    closeCalendarEventActions();
+    closeEventModal();
+    calendarInstance?.destroy();
+    calendarInstance = null;
+    calendarActionCourses = [];
+    activeCalendarEvent = null;
+    lastEventModalTrigger = null;
+    lastCalendarActionTrigger = null;
+}
+
+export function initCalendarForm() {
+    const customEventForm = typeof document !== 'undefined' ? document.getElementById('customEventForm') : null;
+    if (!customEventForm || customEventForm.dataset.bound === 'true') return;
+    customEventForm.addEventListener('submit', saveCustomEvent);
+    customEventForm.dataset.bound = 'true';
+}
+
 export function setCalendarWeekStart(firstDay = getWeekStartDayIndex()) {
     if (calendarInstance) calendarInstance.setOption('firstDay', firstDay === 0 ? 0 : 1);
 }
 
 export async function loadCalendarCourses() {
     if (typeof document === 'undefined') return;
+    const generation = ++calendarLoadGeneration;
     const { data: courses } = await supabaseClient.from('courses').select('*');
+    if (generation !== calendarLoadGeneration) return;
     const { data: assignments } = await supabaseClient.from('assignments').select('*');
+    if (generation !== calendarLoadGeneration) return;
     const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
+    if (generation !== calendarLoadGeneration) return;
 
     let calendarEvents = [];
     const courseMap = {};
@@ -832,12 +891,14 @@ export async function loadCalendarCourses() {
     // student intends to work, without changing the assignment itself.
     if (courses && assignments) {
         const calibration = await getStudyCalibrationContext();
+        if (generation !== calendarLoadGeneration) return;
         const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 21, null, { calibration });
         let syncedMoves = [];
         if (currentUser?.id) {
             const { data } = await supabaseClient.from('study_plan_moves')
                 .select('task_id, planned_for')
                 .eq('user_id', currentUser.id);
+            if (generation !== calendarLoadGeneration) return;
             syncedMoves = data || [];
         }
         const remoteMoveByTask = new Map(syncedMoves.filter((move) => move.planned_for).map((move) => [move.task_id, move.planned_for]));
@@ -853,7 +914,7 @@ export async function loadCalendarCourses() {
         }));
     }
 
-    if (calendarInstance) {
+    if (generation === calendarLoadGeneration && calendarInstance) {
         calendarInstance.removeAllEvents();
         calendarInstance.addEventSource(calendarEvents);
     }
@@ -1052,10 +1113,7 @@ _scope.saveCustomEvent = saveCustomEvent;
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        const customEventForm = document.getElementById('customEventForm');
-        if (customEventForm) {
-            customEventForm.addEventListener('submit', saveCustomEvent);
-        }
+        initCalendarForm();
     });
 }
 

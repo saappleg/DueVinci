@@ -331,6 +331,8 @@ let workspaceRecoveryAvailable = false;
 let activeTab = 'overview';
 let activeSystemId = 'cardiovascular';
 let showAnatomyAnswer = false;
+let activeAnatomyViewer = null;
+let anatomyViewerGeneration = 0;
 let showCardAnswer = false;
 let activeFlashcardId = '';
 let activeReviewQueue = null;
@@ -603,9 +605,27 @@ function renderAnatomyTab() {
     const systemButtons = ANATOMY_SYSTEMS.map((item) => {
         const active = item.id === system.id;
         const complete = workspace.completedSystems.includes(item.id);
-        return '<button type="button" data-system-id="' + item.id + '" aria-pressed="' + active + '" aria-controls="anatomy-system-detail" class="flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ' + (active ? 'border-indigo-400 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800') + '"><span>' + item.icon + '</span><span class="min-w-0 flex-1">' + escapeHtml(item.name) + '</span>' + (complete ? '<span aria-label="Reviewed">✓</span>' : '') + '</button>';
+        return '<button type="button" data-system-id="' + item.id + '" aria-pressed="' + active + '" aria-controls="anatomy-system-detail" class="flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ' + (active ? 'border-indigo-400 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-300 dark:border-brand-700 dark:bg-brand-800') + '"><span>' + item.icon + '</span><span class="min-w-0 flex-1">' + escapeHtml(item.name) + '</span>' + (complete ? '<span aria-label="Reviewed">✓</span>' : '') + '</button>';
     }).join('');
-    const detail = '<article id="anatomy-system-detail" aria-labelledby="anatomy-system-title" class="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-7"><div class="flex items-start gap-4"><span class="text-4xl" aria-hidden="true">' + system.icon + '</span><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Body system</p><h3 id="anatomy-system-title" class="text-xl font-black text-zinc-900 dark:text-white">' + escapeHtml(system.name) + '</h3></div></div>' +
+    const viewer = '<section data-anatomy-viewer data-system-id="' + system.id + '" data-system-name="' + escapeHtml(system.name) + '" aria-labelledby="anatomy-viewer-title" class="mt-5 border-t border-zinc-200 pt-5 dark:border-brand-700">' +
+        '<div class="flex flex-wrap items-baseline justify-between gap-2"><h4 id="anatomy-viewer-title" class="text-base font-bold text-zinc-900 dark:text-white">3D reference model</h4><p class="text-xs text-zinc-500 dark:text-zinc-400">Drag or pinch to rotate; zoom with the wheel or controls.</p></div>' +
+        '<div class="relative mt-3 aspect-[4/3] w-full min-h-[300px] max-h-[520px] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 dark:border-brand-600 dark:bg-brand-900"><div data-anatomy-canvas-host class="h-full w-full touch-none"></div><p data-anatomy-error role="alert" class="hidden absolute inset-x-3 top-3 rounded-lg border border-rose-300 bg-white p-3 text-sm text-rose-800 shadow-sm dark:border-rose-800 dark:bg-brand-900 dark:text-rose-200"></p></div>' +
+        '<div class="mt-3 flex flex-wrap gap-2" role="group" aria-label="3D model controls">' +
+            '<button type="button" data-viewer-action="rotate-left" disabled aria-label="Rotate model left" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:hover:bg-brand-700">Rotate left</button>' +
+            '<button type="button" data-viewer-action="rotate-right" disabled aria-label="Rotate model right" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:hover:bg-brand-700">Rotate right</button>' +
+            '<button type="button" data-viewer-action="zoom-out" disabled aria-label="Zoom out" class="min-h-11 min-w-11 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:hover:bg-brand-700">−</button>' +
+            '<button type="button" data-viewer-action="zoom-in" disabled aria-label="Zoom in" class="min-h-11 min-w-11 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:hover:bg-brand-700">+</button>' +
+            '<button type="button" data-viewer-action="reset" disabled aria-label="Reset model view" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:hover:bg-brand-700">Reset view</button>' +
+        '</div>' +
+        '<div class="mt-3 grid gap-3 sm:grid-cols-2"><label class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Find a structure<input type="search" data-anatomy-search disabled autocomplete="off" placeholder="Type a structure name" class="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:text-white dark:placeholder:text-zinc-400"></label>' +
+        '<label class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Structure results<select data-anatomy-structure disabled class="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option>Loading structure names…</option></select></label></div>' +
+        '<p data-anatomy-search-status class="mt-1 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">Structure search becomes available after the model loads.</p>' +
+        '<p data-anatomy-selection class="mt-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200" role="status" aria-live="polite">Select a structure below or click a visible structure in the model.</p>' +
+        '<p data-anatomy-status class="mt-2 text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">Preparing the 3D anatomy reference…</p>' +
+        '<p class="mt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Search structure names only. Never enter patient information here. This adult male reference does not show all anatomy or individual variation; use your assigned course materials for complete coverage.</p>' +
+        '<details class="mt-3 text-xs leading-5 text-zinc-600 dark:text-zinc-300"><summary class="min-h-11 cursor-pointer py-2 font-semibold text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-200">Model attribution and license</summary><p>BodyParts3D © The Database Center for Life Science, licensed under <a class="font-semibold text-indigo-700 underline dark:text-indigo-300" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>. Prepared model assets are from <a class="font-semibold text-indigo-700 underline dark:text-indigo-300" href="https://github.com/ashemag/human-atlas/tree/1c38bf35c254a891200d3cedecfd57abebe83d8d/public/models" target="_blank" rel="noopener noreferrer">Human Atlas</a>, revision 1c38bf3. See the <a class="font-semibold text-indigo-700 underline dark:text-indigo-300" href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html" target="_blank" rel="noopener noreferrer">BodyParts3D license and attribution</a>.</p></details>' +
+        '</section>';
+    const detail = '<article id="anatomy-system-detail" aria-labelledby="anatomy-system-title" class="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-7"><div class="flex items-start gap-4"><span class="text-4xl" aria-hidden="true">' + system.icon + '</span><div><p class="text-xs font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Body system</p><h3 id="anatomy-system-title" class="text-xl font-black text-zinc-900 dark:text-white">' + escapeHtml(system.name) + '</h3></div></div>' + viewer +
         '<dl class="mt-5 space-y-4"><div><dt class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Big picture</dt><dd class="mt-1 text-sm leading-6">' + escapeHtml(system.focus) + '</dd></div><div><dt class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Structures to review</dt><dd class="mt-1 text-sm leading-6">' + escapeHtml(system.structures) + '</dd></div></dl>' +
         '<div class="mt-5 rounded-xl bg-zinc-50 p-4 dark:bg-brand-900"><p class="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Quick self-check</p><p class="mt-2 text-sm font-semibold">' + escapeHtml(system.check) + '</p>' +
         (showAnatomyAnswer ? '<p class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/20">' + escapeHtml(system.answer) + '</p>' : '') +
@@ -708,6 +728,7 @@ function findRestoredFocusTarget(container, source) {
 function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
     const container = document.getElementById('nursingHub');
     if (!container) return;
+    disposeAnatomyViewer();
     const previousScrollTop = container.scrollTop;
     const body = activeTab === 'review' ? renderReviewTab()
         : activeTab === 'clinical' ? renderClinicalTab()
@@ -722,6 +743,7 @@ function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
     container.innerHTML = '<div class="mx-auto max-w-6xl"><nav aria-label="Nursing Hub tools" class="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-brand-700 dark:bg-brand-900/90">' +
         TAB_DEFINITIONS.map((tab) => renderNursingTabButton(tab, activeTab)).join('') +
         '</nav>' + reviewReturn + body + '</div>';
+    mountAnatomyViewerWhenReady(container);
     container.scrollTop = resetScroll ? 0 : previousScrollTop;
     const restored = findRestoredFocusTarget(container, focusTarget);
     if (focusTarget) {
@@ -730,6 +752,38 @@ function renderActiveTab({ focusTarget = null, resetScroll = false } = {}) {
         target?.focus({ preventScroll: true });
         if (target?.matches('[data-nursing-tab]')) target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+}
+
+function disposeAnatomyViewer() {
+    anatomyViewerGeneration += 1;
+    activeAnatomyViewer?.dispose();
+    activeAnatomyViewer = null;
+}
+
+export function disposeNursingPage() {
+    nursingLoadGeneration += 1;
+    workspaceSaveSequence += 1;
+    workspaceUserId = '';
+    disposeAnatomyViewer();
+}
+
+function mountAnatomyViewerWhenReady(container) {
+    const root = container.querySelector('[data-anatomy-viewer]');
+    if (!root) return;
+    const generation = anatomyViewerGeneration;
+    import('./anatomyViewer.js').then(({ mountAnatomyViewer }) => {
+        if (generation !== anatomyViewerGeneration || !root.isConnected) return;
+        activeAnatomyViewer = mountAnatomyViewer(root, root.dataset.systemId);
+    }).catch(() => {
+        if (generation !== anatomyViewerGeneration || !root.isConnected) return;
+        const error = root.querySelector('[data-anatomy-error]');
+        if (error) {
+            error.textContent = 'The 3D viewer could not be opened. The text anatomy review is still available.';
+            error.classList.remove('hidden');
+        }
+        const status = root.querySelector('[data-anatomy-status]');
+        if (status) status.textContent = '3D model unavailable. The text review is still available.';
+    });
 }
 
 function formValue(form, name) {
@@ -993,6 +1047,7 @@ let nursingLoadGeneration = 0;
 export async function loadNursingPage() {
     const container = document.getElementById('nursingHub');
     if (!container) return;
+    disposeAnatomyViewer();
     const loadGeneration = ++nursingLoadGeneration;
     // Invalidate the previous account's editor immediately. Delegated event
     // listeners remain attached to the container, so clear its interactive
@@ -1009,7 +1064,7 @@ export async function loadNursingPage() {
     let isVisible = false;
     try { isVisible = typeof localStorage !== 'undefined' && localStorage.getItem('duevinci_workspace_nursing_hub') === 'visible'; } catch { /* Keep the optional feature off when storage is unavailable. */ }
     if (!isVisible) {
-        container.innerHTML = '<section class="mx-auto max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-8"><p class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Optional workspace feature</p><h2 class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">Nursing Hub is turned off</h2><p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">Enable it to add clinical rotation tracking, fictional care-plan practice, dosage drills, flashcards, and anatomy review to your workspace. It will stay out of your sidebar until you opt in.</p><p class="mt-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Use fictional study cases only. Do not save real patient information here.</p><div class="mt-5 flex flex-wrap gap-2"><button type="button" onclick="setWorkspaceFeatureVisibility(\'nursing_hub\', true)" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500">Enable Nursing Hub</button><a href="../index.html" class="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-700">Back to dashboard</a></div></section>';
+        container.innerHTML = '<section class="mx-auto max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-brand-700 dark:bg-brand-800 sm:p-8"><p class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Optional workspace feature</p><h2 class="mt-2 text-2xl font-black text-zinc-900 dark:text-white">Nursing Hub is turned off</h2><p class="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">Enable it to add clinical rotation tracking, fictional care-plan practice, dosage drills, flashcards, and anatomy review to your workspace. It will stay out of your sidebar until you opt in.</p><p class="mt-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Use fictional study cases only. Do not save real patient information here.</p><div class="mt-5 flex flex-wrap gap-2"><button type="button" onclick="setWorkspaceFeatureVisibility(\'nursing_hub\', true)" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500">Enable Nursing Hub</button><a href="../index.html" data-app-nav class="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold hover:bg-zinc-50 dark:border-brand-600 dark:hover:bg-brand-700">Back to dashboard</a></div></section>';
         container.removeAttribute('aria-busy');
         return;
     }

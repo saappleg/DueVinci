@@ -152,15 +152,25 @@ export async function initCanvasAutoSyncSettings() {
         autoInput.checked = status.autoSyncEnabled === true;
         gradeInput.checked = status.gradeAlertsEnabled === true;
         const withinCourseLimit = status.importedCourseCount <= (status.maxCourseCount || 100);
-        const canTurnOn = status.featureEnabled && status.connected && status.importedCourseCount > 0 && withinCourseLimit;
+        const schedulerConfigured = status.schedulerConfigured === true;
+        const webPushConfigured = status.webPushConfigured === true;
+        const canTurnOn = status.featureEnabled && status.connected && status.importedCourseCount > 0 && withinCourseLimit && schedulerConfigured;
         autoInput.disabled = !status.connected || (!canTurnOn && !status.autoSyncEnabled);
-        gradeInput.disabled = !status.connected || !status.autoSyncEnabled || (!status.featureEnabled && !status.gradeAlertsEnabled);
+        gradeInput.disabled = !status.connected || !status.autoSyncEnabled
+            || (!status.featureEnabled && !status.gradeAlertsEnabled)
+            || (!webPushConfigured && !status.gradeAlertsEnabled);
         if (status.lastError) {
             setCanvasAutoSyncMessage(status.lastError, 'error');
         } else if (status.mockConnection) {
             setCanvasAutoSyncMessage('Automatic refresh is not available for the development demo connection.');
         } else if (!status.connected) {
             setCanvasAutoSyncMessage('Connect Canvas to set up automatic refresh.');
+        } else if (!schedulerConfigured && !webPushConfigured) {
+            setCanvasAutoSyncMessage('Automatic Canvas refresh and grade alerts are not configured yet. Existing settings can still be turned off.');
+        } else if (!schedulerConfigured) {
+            setCanvasAutoSyncMessage('Automatic Canvas refresh is not configured yet. Existing settings can still be turned off.');
+        } else if (!webPushConfigured) {
+            setCanvasAutoSyncMessage('Canvas grade alerts are not configured yet. Automatic refresh remains available; existing alerts can still be turned off.');
         } else if (!status.featureEnabled) {
             setCanvasAutoSyncMessage('An active Pro plan is required to turn on refresh. Existing settings can be turned off here.');
         } else if (!status.importedCourseCount) {
@@ -178,7 +188,9 @@ export async function initCanvasAutoSyncSettings() {
             });
             autoInput.dataset.bound = 'true';
         }
-        gradeInput.dataset.locked = String(!status.connected || (!status.featureEnabled && !status.gradeAlertsEnabled));
+        gradeInput.dataset.locked = String(!status.connected
+            || (!status.featureEnabled && !status.gradeAlertsEnabled)
+            || (!webPushConfigured && !status.gradeAlertsEnabled));
     } catch (error) {
         area.classList.remove('hidden');
         autoInput.disabled = true;

@@ -106,7 +106,11 @@ export async function loadTutorPage() {
         if (courseSelect) {
             courseSelect.innerHTML = '<option value="">General study help</option>' + (courses || []).map((course) => `<option value="${escapeHtml(course.id)}">${escapeHtml(course.code || course.name)}${course.code ? ` · ${escapeHtml(course.name)}` : ''}</option>`).join('');
         }
-        if (!conversation.length && !document.getElementById('tutorMessages')?.children.length) addMessage('model', 'Pick a course and tell me what you are working through. I’ll guide you with questions and small steps.');
+        const feed = document.getElementById('tutorMessages');
+        if (feed && !feed.children.length) {
+            if (conversation.length) conversation.forEach(({ role, text }) => addMessage(role, text));
+            else addMessage('model', 'Pick a course and tell me what you are working through. I’ll guide you with questions and small steps.');
+        }
         try { await loadTutorUsage(); } catch { renderTutorUsage(null); }
     } catch {
         loadError?.classList.remove('hidden');

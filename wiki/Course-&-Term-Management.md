@@ -9,7 +9,7 @@ Named term and optional date window
  └── Class, pacing profile, and optional date window
       ├── Units, lessons, reviews, exams, and assignments
       ├── Due dates, priority, effort estimates, and completion
-      ├── Percentage grades and GPA exclusion
+      ├── Weighted grade categories, credits, and GPA exclusion
       ├── Notes, resources, description, and objectives
       └── Note-derived quizzes and flashcards
 ```
@@ -42,8 +42,8 @@ Syllabus PDF and image imports open a review dialog for each extracted unit and 
 
 Instructions, progress, and parent links are synced with assignment records, kept by the offline cache, and included in full data backups. Apply `supabase/migrations/20261017022939_coursework_workflow_fields.sql` before deploying the UI changes so the new assignment fields exist.
 
-Grades accepts percentage values and an Exclude choice; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains the calculation limits.
+Grades accepts percentage values and an Exclude choice. Course category weights and credit hours are configurable in the Grades page; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains how the estimates work and their limits. The saved settings require `supabase/migrations/20261017022938_weighted_gradebook_and_gpa.sql`.
 
-The current UI does not provide custom weighted grading categories, credit-hour accounting, a Pending/In Progress/Graded status workflow, or drag-and-drop category sorting. Use the existing manual fields and [syllabus import](AI-Syllabus-&-Document-Parser) for the supported workflow.
+The current UI does not provide a Pending/In Progress/Graded status workflow or drag-and-drop category sorting. Use the existing manual fields and [syllabus import](AI-Syllabus-&-Document-Parser) for the supported workflow.
 
 Calendar events can be explicitly [converted to assignments](Calendar-&-Schedule-Sync), preserving the original event. DueVinci Pro adds connected Canvas imports; the free course/task workflow remains available without a subscription.

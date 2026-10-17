@@ -66,13 +66,17 @@ export function filterCommandPalette(query) {
     if (!results) return;
     const q = (query || '').toLowerCase().trim();
     const base = getBasePath();
+    const navigateTo = (path) => {
+        if (typeof window.navigateApp === 'function') return window.navigateApp(path);
+        window.location.href = path;
+    };
 
     const items = [
-        { title: 'Dashboard', desc: 'Jump to main study dashboard', action: () => { window.location.href = base + 'index.html'; }, icon: '📊' },
-        { title: 'Classes & Coursework', desc: 'Manage courses, syllabus AI, and lessons', action: () => { window.location.href = base + 'courses/index.html'; }, icon: '📚' },
-        { title: 'Grades & GPA Tracker', desc: 'View course averages and GPA simulator', action: () => { window.location.href = base + 'grades/index.html'; }, icon: '🎓' },
-        { title: 'Master Calendar', desc: 'Deadlines, events, and .ics export', action: () => { window.location.href = base + 'calendar/index.html'; }, icon: '📅' },
-        { title: 'Study Companion', desc: 'Get Socratic tutoring with your subscription', action: () => { window.location.href = base + 'tutor/index.html'; }, icon: '🧠' },
+        { title: 'Dashboard', desc: 'Jump to main study dashboard', action: () => navigateTo(base + 'index.html'), icon: '📊' },
+        { title: 'Classes & Coursework', desc: 'Manage courses, syllabus AI, and lessons', action: () => navigateTo(base + 'courses/index.html'), icon: '📚' },
+        { title: 'Grades & GPA Tracker', desc: 'View course averages and GPA simulator', action: () => navigateTo(base + 'grades/index.html'), icon: '🎓' },
+        { title: 'Master Calendar', desc: 'Deadlines, events, and .ics export', action: () => navigateTo(base + 'calendar/index.html'), icon: '📅' },
+        { title: 'Study Companion', desc: 'Get Socratic tutoring with your subscription', action: () => navigateTo(base + 'tutor/index.html'), icon: '🧠' },
         { title: 'What\'s New', desc: 'View latest features in version 2.6', action: () => { if (typeof window.openWhatsNewModal === 'function') window.openWhatsNewModal(); }, icon: '✨' },
         { title: '/party', desc: 'Trigger celebratory confetti storm', action: () => { fireConfetti(); }, icon: '🎉' },
         { title: '/inspire', desc: 'Leonardo da Vinci wisdom quote', action: () => { alert('"Learning never exhausts the mind." — Leonardo da Vinci'); }, icon: '📜' },

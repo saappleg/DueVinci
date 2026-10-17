@@ -4,7 +4,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 
 > **Our Mission:** Empower students and lifelong learners with an intelligent, ambient, and frictionless academic hub—unifying course management, cognitive science (SM-2 spaced repetition), AI document analysis, and focus mastery in a beautiful, privacy-first interface.
 
-> **Free Core Commitment:** Course and lesson setup, course-only term rollover, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar-event-to-assignment conversion, calendar import/export, timers, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
+> **Free Core Commitment:** Course and lesson setup, course-only term rollover, due-date tracking, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, weighted grade categories and GPA estimates, calendar-event-to-assignment conversion, calendar import/export, timers, flashcards, and portable backups remain free. Optional AI and third-party integrations may evolve independently of this core.
 
 ---
 
@@ -28,7 +28,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - [x] **Smart Study Planner & Balancer** – Automated study block distribution, exam countdowns, and cognitive workload balancing.
 - [x] **Due-Date Safety & 7-Day Workload Radar** – Deadline-first scheduling, rest-day handling, timestamp-aware workload counts, and exam-day alerts.
 - [x] **Interactive Quiz Generator** – Note-derived multiple-choice practice quizzes and flashcards.
-- [x] **Academic GPA & Grade Calculator** – Percentage course averages, linear 4.0 / 5.0 scaling, and temporary hypothetical-score simulation; no custom grading-category or credit weighting.
+- [x] **Academic GPA & Grade Calculator (initial release)** – Percentage course averages, linear 4.0 / 5.0 scaling, and temporary hypothetical-score simulation. Weighted categories, course credits, and target-score calculations were added in 2.8.0.
 - [x] **Pomodoro & Focus Timer** – Floating widget, custom countdown intervals, configurable Web Audio alarms, and ambient white/brown noise.
 - [x] **Interactive Master Calendar** – FullCalendar integration, deadline filtering, and `.ics` feed export for Apple/Google Calendar.
 - [x] **Offline-First PWA & IndexedDB Storage** – Cached application pages and supported per-user planner changes after an online load; authentication and provider services still require connectivity. Hosted installation support is separate from loopback previews, which skip DueVinci's worker.
@@ -41,10 +41,12 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - [x] **Canvas assignment change alerts** – Pro users can opt in to alerts for new assignments and changed due dates after a Canvas sync, with browser notification permission enabled on each device.
 - [x] **Term rollover and calendar conversion** – Free course-only rollover copies course setup into a new term without copying assignments or lesson progress. Students can manually turn a calendar event into a linked assignment while keeping the original event.
 - [x] **SNHU Brightspace calendar feed** – Pro users can sync events and due dates from a private Brightspace calendar feed. This does not import course records or automatically create planner assignments.
+- [x] **Weighted grades and GPA estimates** – Free category-weighted course averages, credit-weighted 4.0/5.0 GPA estimates, a target-score calculator, and 90-day grade insights. The estimates do not reproduce institution-specific letter-grade or repeat-course rules.
+- [x] **Coursework workflow and imports** – Recurring coursework, parent/subtask progress, editable reviewed checklist suggestions, reviewed syllabus and WGU/Maestro importer rows, timed note-based mock exams, and Anki text/CSV exchange. Canvas sync imports selected-course assignments directly without the browser importer review step.
 
 ---
 
-## 🎯 Current Initiatives & Near-Term Releases
+## 🎯 Current Offer & Integration Prerequisites
 
 ### Subscription packaging
 - **DueVinci Pro (current offer):** direct Canvas sync for selected courses and assignments with due dates, optional scheduled Canvas refresh, opt-in assignment-change and posted-grade alerts, SNHU Brightspace calendar sync, read-only Google Calendar and Outlook sync, opt-in study-plan calibration, Socratic Tutor, and the Daily Brief; the existing planner, grades, calendar, timers, and portable backups stay free.
@@ -54,7 +56,7 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - **Connected calendars (implemented; configuration required):** read-only Google Calendar and Microsoft Outlook/Graph OAuth connections use encrypted tokens, explicit disconnect controls, idempotent event rows, and provider-specific consent. Configure provider client IDs, secrets, and exact redirect URIs as described in the calendar integration runbook. Apple/iCloud remains supported through the existing `.ics` import/export.
 - **Scheduled Canvas refresh and grade alerts (implemented; configuration required):** opt-in scheduled refresh and posted-grade alerts extend assignment-change alerts sent after Canvas sync. Configure the scheduler, encryption key, VAPID push secrets, notification preferences, and deployment prerequisites before enabling the service.
 
-### Phase 2: Socratic AI & Intelligent Study Workflows (v1.3 – v2.0) 🚧
+### Phase 2: Socratic AI & Intelligent Study Workflows (v1.3 – v2.0 core shipped) ✅
 - [x] **Socratic AI Study Companion (`/tutor`)** ✅
   - Context-aware study partner that quizzes you on course concepts rather than just giving answers.
   - Step-by-step problem solver for STEM formulas and coding concepts.
@@ -91,9 +93,8 @@ Welcome to the **DueVinci** product and engineering roadmap! This document outli
 - [ ] **Virtual Study Rooms & Peer Accountability** 💡
   - Shared Pomodoro rooms with synchronized focus cycles and ambient soundscapes.
   - Study streak leaderboards and collaborative note decks.
-- [ ] **Simulated Mock Exam Mode** 📋
-  - Timed test simulator using question banks generated from notes and past homework.
-  - Automated AI scoring with rubrics and targeted improvement recommendations.
+- [ ] **Expanded mock exam tools** 📋
+  - The current timed exam uses questions made from saved notes. Planned extensions include broader question banks, richer authoring, and optional AI scoring with rubrics and targeted improvement recommendations.
 - [ ] **Native Mobile & Tablet Packaging** 💡
   - Standalone iOS and Android apps powered by Capacitor / Web Push notifications for due date reminders.
 
@@ -120,4 +121,4 @@ We build DueVinci in the open with student and developer feedback!
 - 🤝 **Want to contribute?** Read our [Contributing Guide](docs/CONTRIBUTING.md) to get started!
 
 ---
-*Last updated: October 2026 • Maintained by [@saappleg](https://github.com/saappleg) and the DueVinci Open Source Community.*
+*Last updated: October 17, 2026 • Maintained by [@saappleg](https://github.com/saappleg) and the DueVinci Open Source Community.*

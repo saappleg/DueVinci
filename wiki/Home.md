@@ -15,7 +15,7 @@ DueVinci is a student academic workspace for classes, deadlines, study planning,
 
 ## Free core
 
-Course and term setup, lesson and deadline tracking, Smart Study Plan, workload radar, percentage grades and What-If simulation, calendar events and `.ics` import/export, timers, and portable backups remain free.
+Course and term setup, lesson and deadline tracking, Smart Study Plan, workload radar, weighted grade categories, credit-weighted GPA estimates, target-score calculations, What-If simulation, calendar events and `.ics` import/export, timers, and portable backups remain free.
 
 - Set class and term date windows, search or archive terms, move classes in bulk, and start a new term by copying class shells without copying old coursework.
 - Sequence study blocks around deadlines, rest days, and protected dates. Workload radar highlights upcoming due work and exams.
@@ -28,7 +28,7 @@ Optional syllabus parsing uses an authenticated Supabase Edge Function and confi
 
 ## DueVinci Pro and Study Companion
 
-The current Pro catalog includes Canvas course/assignment sync (selected-course assignments import directly), SNHU Brightspace calendar sync, read-only Google Calendar and Outlook sync, the Socratic Study Companion, a Daily Brief, opt-in personalized study estimates, scheduled Canvas refresh, and opt-in Canvas assignment and posted-grade alerts. Google and Outlook sync once after connection; later syncs are user-started. Settings → Subscription shows the account's current access and billing options.
+The current Pro offer is $5/month or $45/year with a 30-day trial; verify live Stripe price and trial settings in each environment before release. It includes Canvas course/assignment sync (selected-course assignments import directly), SNHU Brightspace calendar sync, read-only Google Calendar and Outlook sync, the Socratic Study Companion, a Daily Brief, opt-in personalized study estimates, scheduled Canvas refresh, and opt-in Canvas assignment and posted-grade alerts. Google and Outlook sync once after connection; later syncs are user-started. Provider OAuth, scheduler, and Web Push configuration is required before the related integrations and alerts can operate. Settings → Subscription shows the account's current access and billing options.
 
 The Study Companion can use a selected course's description, objectives, notes, and assignment context. Choose **General study help** to ask without selected-course context. It guides learning rather than writing graded submissions. Loading, retry, pending-reply, and usage states are shown; conversation history remains in the current page and is not a saved chat archive. Daily/monthly allowances appear in the UI and can be configured by the operator.
 

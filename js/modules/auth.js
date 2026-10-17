@@ -2,7 +2,7 @@
 import { supabaseClient } from './config.js';
 import { getCurrentPageName, getBasePath } from './utils.js';
 import { initializePreferenceSync, stopPreferenceSync, syncPreferencesNow } from './preferences.js';
-import { refreshProfileAvatar } from './profileAvatar.js';
+import { clearCachedProfileAvatarUrl, invalidateProfileAvatarRequests, refreshProfileAvatar } from './profileAvatar.js';
 import { startReminderService, stopReminderService } from './reminders.js';
 import { clearSubscriptionSnapshot } from './subscription.js';
 
@@ -40,6 +40,16 @@ export async function handleAuth(session) {
     const token = session?.access_token || null;
     if (token === lastProcessedSessionToken) return;
     lastProcessedSessionToken = token;
+
+    const nextUserId = session?.user?.id || null;
+    if (currentUser?.id && currentUser.id !== nextUserId) {
+        invalidateProfileAvatarRequests();
+        clearCachedProfileAvatarUrl(currentUser);
+        const image = document.getElementById('profileAvatarImage');
+        image?.removeAttribute('src');
+        image?.classList.add('hidden');
+        document.getElementById('profileAvatarInitials')?.classList.remove('hidden');
+    }
 
     if (session) {
         currentUser = session.user;
@@ -149,6 +159,7 @@ export async function logout() {
         // per-user pending snapshot for the next sign-in.
         await syncPreferencesNow();
         clearSubscriptionSnapshot();
+        clearCachedProfileAvatarUrl(currentUser);
         if (typeof localStorage !== 'undefined') localStorage.removeItem('duevinci_offline_user');
         // A local sign-out works even when offline; the default global scope
         // can fail its network request before clearing the persisted session.

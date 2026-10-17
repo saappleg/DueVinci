@@ -32,7 +32,7 @@ SUMMARY:Fictional study review
 END:VEVENT
 ```
 
-Files are portable snapshots, not two-way provider synchronization. Pro also offers read-only Google Calendar and Outlook connections: the first sync runs after connection, and users start later syncs. These providers do not receive DueVinci changes; see the [calendar integration runbook](../docs/CALENDAR_INTEGRATIONS.md) for scopes and configuration.
+Files are portable snapshots, not two-way provider synchronization. Pro also offers read-only Google Calendar and Outlook connections after the provider OAuth applications and callback are configured: the first sync runs after connection, and users start later syncs. These providers do not receive DueVinci changes; see the [calendar integration runbook](../docs/CALENDAR_INTEGRATIONS.md) for scopes and configuration.
 
 ## Create coursework from an event
 

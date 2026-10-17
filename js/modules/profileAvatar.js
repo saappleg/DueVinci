@@ -5,6 +5,10 @@ const AVATAR_FILE = 'avatar';
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_BYTES = 2 * 1024 * 1024;
 const PROFILE_EASTER_EGG_KEY = 'duevinci_profile_easter_egg';
+const PROFILE_AVATAR_URL_KEY = 'duevinci_profile_avatar_url';
+const PROFILE_AVATAR_URL_TTL_MS = 55 * 60 * 1000;
+let profileIdentityGeneration = 0;
+let profileAvatarGeneration = 0;
 const PROFILE_EASTER_EGG_CLASS = 'pointer-events-none absolute bottom-0 right-0 z-10 h-6 w-6 object-contain drop-shadow-sm';
 const PROFILE_EASTER_EGGS = {
     maestro: { asset: new URL('../../assets/images/maestro-logo.svg', import.meta.url).href, label: 'Maestro shield' },
@@ -82,6 +86,49 @@ export function setProfileEasterEgg(egg, user = window.currentUser) {
 
 const avatarPath = (userId) => `${userId}/${AVATAR_FILE}`;
 
+function profileAvatarUrlKey(user) {
+    return `${PROFILE_AVATAR_URL_KEY}:${user?.id || 'guest'}`;
+}
+
+function isCurrentProfileUser(user) {
+    if (typeof window === 'undefined' || !Object.prototype.hasOwnProperty.call(window, 'currentUser')) return true;
+    return window.currentUser?.id === user?.id;
+}
+
+function readCachedProfileAvatarUrl(user) {
+    if (!user?.id || typeof sessionStorage === 'undefined') return '';
+    const key = profileAvatarUrlKey(user);
+    try {
+        const cached = JSON.parse(sessionStorage.getItem(key) || 'null');
+        if (typeof cached?.url === 'string' && cached.url && Number.isFinite(cached.expiresAt)
+            && cached.expiresAt > Date.now() + 60 * 1000) {
+            return cached.url;
+        }
+        sessionStorage.removeItem(key);
+    } catch { /* Storage can be disabled; request a fresh signed URL instead. */ }
+    return '';
+}
+
+function cacheProfileAvatarUrl(user, url) {
+    if (!user?.id || typeof sessionStorage === 'undefined') return;
+    try {
+        sessionStorage.setItem(profileAvatarUrlKey(user), JSON.stringify({
+            url,
+            expiresAt: Date.now() + PROFILE_AVATAR_URL_TTL_MS,
+        }));
+    } catch { /* The image still works when session storage is unavailable. */ }
+}
+
+export function clearCachedProfileAvatarUrl(user) {
+    if (!user?.id || typeof sessionStorage === 'undefined') return;
+    try { sessionStorage.removeItem(profileAvatarUrlKey(user)); } catch { /* Ignore unavailable session storage. */ }
+}
+
+export function invalidateProfileAvatarRequests() {
+    profileIdentityGeneration += 1;
+    profileAvatarGeneration += 1;
+}
+
 function fallbackNameFor(user) {
     const metadata = user?.user_metadata || {};
     const providerName = metadata.full_name || metadata.name || metadata.display_name;
@@ -130,9 +177,11 @@ export async function getProfileDisplayName(user) {
 }
 
 export async function refreshProfileIdentity(user) {
-    if (typeof document === 'undefined' || !user?.id) return;
+    if (typeof document === 'undefined' || !user?.id || !isCurrentProfileUser(user)) return;
+    const generation = ++profileIdentityGeneration;
     setProfileIdentity(user);
     const displayName = await getProfileDisplayName(user);
+    if (generation !== profileIdentityGeneration || !isCurrentProfileUser(user)) return;
     if (displayName) setProfileIdentity(user, displayName);
 }
 
@@ -153,30 +202,52 @@ export async function saveProfileDisplayName(value, user) {
 }
 
 export async function refreshProfileAvatar(user) {
-    if (typeof document === 'undefined' || !user?.id) return;
+    if (typeof document === 'undefined' || !user?.id || !isCurrentProfileUser(user)) return;
+    const generation = ++profileAvatarGeneration;
     await refreshProfileIdentity(user);
+    if (generation !== profileAvatarGeneration || !isCurrentProfileUser(user)) return false;
+    const image = document.getElementById('profileAvatarImage');
+    const initials = document.getElementById('profileAvatarInitials');
+    if (!image) return false;
+
+    const displayAvatar = (url) => {
+        image.onload = () => {
+            if (generation !== profileAvatarGeneration) return;
+            image.classList.remove('hidden');
+            initials?.classList.add('hidden');
+        };
+        image.onerror = () => {
+            if (generation !== profileAvatarGeneration) return;
+            clearCachedProfileAvatarUrl(user);
+            showAvatarFallback(user);
+            console.warn('Unable to display profile photo.');
+        };
+        if (image.src !== url) image.src = url;
+        if (image.complete && image.naturalWidth > 0) {
+            image.classList.remove('hidden');
+            initials?.classList.add('hidden');
+        }
+    };
+    const cachedUrl = readCachedProfileAvatarUrl(user);
+    if (cachedUrl) {
+        displayAvatar(cachedUrl);
+        renderProfileEasterEgg(user);
+        return true;
+    }
+
     const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(avatarPath(user.id), 60 * 60);
+    if (generation !== profileAvatarGeneration || !isCurrentProfileUser(user)) return false;
     if (error || !data?.signedUrl) {
         // A missing object is normal for accounts without a photo. Keep an
         // already-rendered image intact during transient refresh failures.
-        const image = document.getElementById('profileAvatarImage');
         if (!image?.getAttribute('src')) showAvatarFallback(user);
         if (error && !/not found|object not found/i.test(error.message || '')) console.warn('Unable to refresh profile photo:', error.message || error);
         renderProfileEasterEgg(user);
         return false;
     }
-    const image = document.getElementById('profileAvatarImage');
-    const initials = document.getElementById('profileAvatarInitials');
-    if (!image) return false;
-    image.onload = () => {
-        image.classList.remove('hidden');
-        initials?.classList.add('hidden');
-    };
-    image.onerror = () => {
-        showAvatarFallback(user);
-        console.warn('Unable to display profile photo.');
-    };
-    image.src = `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+    const signedUrl = `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+    cacheProfileAvatarUrl(user, signedUrl);
+    displayAvatar(signedUrl);
     renderProfileEasterEgg(user);
     return true;
 }
@@ -204,6 +275,7 @@ export async function uploadProfileAvatar(file, user) {
             cacheControl: '3600',
         });
         if (error) throw error;
+        clearCachedProfileAvatarUrl(user);
         await refreshProfileAvatar(user);
         profileMessage('Profile photo updated.', 'text-green-500');
     } catch (error) {
@@ -221,6 +293,7 @@ export async function removeProfileAvatar(user) {
     try {
         const { error } = await supabaseClient.storage.from(BUCKET).remove([avatarPath(user.id)]);
         if (error) throw error;
+        clearCachedProfileAvatarUrl(user);
         showAvatarFallback(user);
         profileMessage('Profile photo removed.', 'text-green-500');
     } catch (error) {
