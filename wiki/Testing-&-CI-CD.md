@@ -8,6 +8,7 @@ DueVinci uses Vitest for source and behavior regressions, syntax checks for the 
 npm test
 npm run test:watch
 npm run check:syntax
+npm run build:css
 ```
 
 `npm run test:coverage` is defined for environments with the required coverage tooling; it was not part of the October 16 release evidence. Syntax checking is not type checking or a browser execution test.
@@ -29,7 +30,7 @@ These are `tests/*.test.js` files. Source class assertions do not calculate CSS 
 
 ## CI and deployment
 
-[CI](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/ci.yml) runs on pull requests and pushes to `main`/`dev`, using Node 24, syntax checks, Vitest, and asset checks. The [Pages workflow](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/deploy.yml) repeats syntax/tests before publishing.
+[CI](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/ci.yml) runs on pull requests and pushes to `main`/`dev`, using Node 24, syntax checks, Vitest, asset checks, and a Tailwind CSS rebuild that fails if the committed generated stylesheet is stale. The [Pages workflow](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/deploy.yml) repeats syntax/tests and the CSS freshness check before publishing.
 
 After deployment, `scripts/release-smoke.mjs` checks public pages, the service worker, manifest, and local assets. With dedicated `DUEVINCI_SMOKE_EMAIL`/`DUEVINCI_SMOKE_PASSWORD` secrets, it also signs in and performs a temporary planner write followed by a cleanup step. Pages and the production monitor currently set `DUEVINCI_SMOKE_SKIP_SUPPORT=true`; support submission is intentionally skipped. Do not use personal credentials or describe a logged cleanup attempt as an independent database deletion check.
 

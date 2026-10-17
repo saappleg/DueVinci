@@ -30,7 +30,7 @@ flowchart TD
 ## Frontend
 
 - HTML and vanilla ES modules; `js/app.js` coordinates initialization and bindings.
-- Tailwind and browser vendor libraries are served locally and included in the production cache where configured.
+- Tailwind utility classes are compiled at development and CI time with the pinned Tailwind CLI into `assets/css/tailwind.css`. Routes load that static stylesheet, and the service worker precaches it; the browser does not compile Tailwind at runtime. Browser libraries remain local vendor assets and are cached where configured.
 - FullCalendar renders the current Month/Week calendar UI.
 - PDF.js extracts PDF text; configurable Gemini models process optional syllabus requests server-side.
 - Inline SVGs and existing theme CSS preserve the site's visual identity. Degree themes provide accent colors and background artwork.
