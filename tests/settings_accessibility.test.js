@@ -34,6 +34,41 @@ describe('Settings modal markup', () => {
         expect(generatedMarkup).toContain('id="supportEmail" autocomplete="email"');
     });
 
+    it.each(settingsSources)('%s submits Canvas and Brightspace connection forms through their existing handlers', (_name, source) => {
+        const forms = [
+            {
+                id: 'canvasConnectorArea',
+                handler: 'handleCanvasConnect',
+                fields: ['canvasDomainInput', 'canvasTokenInput'],
+                button: 'canvasConnectBtn',
+            },
+            {
+                id: 'brightspaceConnectArea',
+                handler: 'connectBrightspaceCalendar',
+                fields: ['brightspaceFeedUrlInput'],
+                button: 'brightspaceConnectButton',
+            },
+        ];
+
+        for (const { id, handler, fields, button } of forms) {
+            const start = source.indexOf(`<form id="${id}"`);
+            expect(start).toBeGreaterThanOrEqual(0);
+            const end = source.indexOf('</form>', start);
+            expect(end).toBeGreaterThan(start);
+            const markup = source.slice(start, end);
+
+            expect(markup).toContain(`onsubmit="event.preventDefault(); ${handler}()`);
+            for (const fieldId of fields) expect(markup).toContain(`id="${fieldId}"`);
+
+            const connectButton = markup.match(new RegExp(`<button\\b[^>]*id="${button}"[^>]*>`))?.[0];
+            expect(connectButton).toContain('type="submit"');
+            expect(connectButton).not.toContain('onclick=');
+        }
+
+        expect(source).toMatch(/id="canvasTokenInput" autocomplete="off"/);
+        expect(source).toMatch(/id="brightspaceFeedUrlInput" autocomplete="off"/);
+    });
+
     it('labels generated command search and resource link inputs without adding visible text', () => {
         const commandPaletteSource = readFileSync(new URL('../js/modules/easterEggs.js', import.meta.url), 'utf8');
         const academicsSource = readFileSync(new URL('../js/modules/academics.js', import.meta.url), 'utf8');
