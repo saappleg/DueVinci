@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="DueVinci is a focused academic planner for classes, assignments, study plans, grades, and calendars.">
     <title>DueVinci - Dashboard</title>
-    <script src="assets/vendor/tailwindcss.js"></script>
-    <script>
-        tailwind.config = { 
-            darkMode: 'class',
-            theme: { extend: { colors: { brand: { 900: '#151515', 800: '#1c1c1c', 700: '#2b2b2b', 600: '#3f3f3f' } } } }
-        }
-    </script>
     <script>
         const theme = localStorage.getItem('theme') || 'system';
         if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
@@ -27,6 +20,7 @@
     <link rel="stylesheet" href="assets/css/greek-theme.css" />
     <link rel="stylesheet" href="assets/css/renaissance-theme.css" />
     <link rel="stylesheet" href="assets/css/degree-theme.css">
+    <link rel="stylesheet" href="assets/css/tailwind.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/icon-16x16.png">

@@ -1,7 +1,7 @@
 // DueVinci Service Worker - Offline Caching
 // Bump this whenever the precached application shell changes so installed PWAs
 // receive the current planner and workload logic after activation.
-const CACHE_NAME = 'duevinci-v8.46';
+const CACHE_NAME = 'duevinci-v8.47';
 // Version runtime assets with the shell so query-versioned modules from a
 // previous release cannot survive activation and override the current code.
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
@@ -74,7 +74,7 @@ const ASSETS_TO_CACHE = [
   './js/modules/ui.js',
   './js/modules/brightspace.js',
   './js/modules/canvas.js',
-  './assets/vendor/tailwindcss.js',
+  './assets/css/tailwind.css',
   './assets/vendor/supabase-js.js',
   './assets/vendor/driver.js',
   './assets/vendor/driver.css',

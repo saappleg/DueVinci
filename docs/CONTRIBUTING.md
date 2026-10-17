@@ -41,9 +41,11 @@ Please be respectful, constructive, and considerate when interacting with other 
 5. **Verify your changes locally**:
    - Run the repository checks:
      ```bash
+     npm run build:css
      npm run check:syntax
      npm test
      ```
+   - Commit the generated `assets/css/tailwind.css` with any changes to utility classes. CI rebuilds it and fails if the tracked stylesheet is stale.
    - Open and test the dashboard and nested routes (`index.html`, `courses/index.html`, `grades/index.html`, `calendar/index.html`, `nursing/index.html`, and `tutor/index.html`). Verify keyboard navigation, narrow screens, and light/dark themes for any UI changes.
 6. **Commit & Push**:
    ```bash
@@ -56,7 +58,7 @@ Please be respectful, constructive, and considerate when interacting with other 
 
 ## Development Guidelines
 
-- **Vanilla Stack**: DueVinci uses Vanilla JavaScript and semantic HTML. Tailwind and browser libraries are served as local, pre-cached vendor assets to support reliable PWA startup; follow the existing asset and versioning patterns when changing them.
+- **Vanilla Stack**: DueVinci uses Vanilla JavaScript and semantic HTML. Tailwind CSS is built at development time with the locked Tailwind CLI version and served as a static, pre-cached stylesheet; the browser does not compile Tailwind classes at runtime. Run `npm run build:css` after changing HTML or JavaScript class names, then commit the regenerated `assets/css/tailwind.css`. Browser libraries continue to use local, pre-cached vendor assets.
 - **Privacy & Security**: Never store unhashed sensitive credentials in local storage or client-side code.
 - **Edge Functions**: Edge functions live in Supabase and should be tested with Deno.
 

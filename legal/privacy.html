@@ -4,13 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DueVinci - Privacy Policy & Data Retention</title>
-    <script src="../assets/vendor/tailwindcss.js"></script>
-    <script>
-        tailwind.config = { 
-            darkMode: 'class',
-            theme: { extend: { colors: { brand: { 900: '#151515', 800: '#1c1c1c', 700: '#2b2b2b', 600: '#3f3f3f' } } } }
-        }
-    </script>
     <script>
         const theme = localStorage.getItem('theme') || 'system';
         if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } 
@@ -20,6 +13,7 @@
     <link rel="stylesheet" href="../assets/css/greek-theme.css" />
     <link rel="stylesheet" href="../assets/css/renaissance-theme.css" />
     <link rel="stylesheet" href="../assets/css/degree-theme.css">
+    <link rel="stylesheet" href="../assets/css/tailwind.css">
     <script>document.documentElement.dataset.degreeTheme = localStorage.getItem('duevinci_workspace_degree_theme') || 'classic';</script>
 </head>
 <body class="bg-zinc-50 dark:bg-brand-900 text-zinc-800 dark:text-zinc-200 font-sans min-h-screen transition-colors duration-200 selection:bg-indigo-500/30">

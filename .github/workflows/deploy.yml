@@ -35,6 +35,12 @@ jobs:
       - name: Verify release
         run: |
           npm ci
+          npm run build:css
+          if ! git diff --quiet -- assets/css/tailwind.css; then
+            echo "Generated Tailwind CSS is stale. Run npm run build:css and commit assets/css/tailwind.css."
+            git diff -- assets/css/tailwind.css
+            exit 1
+          fi
           npm run check:syntax
           npm test
 
