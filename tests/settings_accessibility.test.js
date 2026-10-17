@@ -21,4 +21,24 @@ describe('Settings modal markup', () => {
         expect(generatedMarkup).toContain('class="support-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-16"');
         expect(generatedMarkup).toContain('class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"');
     });
+
+    it('associates generated support form labels and identifies the email autofill field', () => {
+        const generatedMarkup = settingsSources.find(([name]) => name === 'generated dashboard')[1];
+        for (const id of ['supportCategory', 'supportEmail', 'supportSubject', 'supportMessageText']) {
+            expect(generatedMarkup).toContain(`for="${id}"`);
+        }
+        expect(generatedMarkup).toContain('id="supportEmail" autocomplete="email"');
+    });
+
+    it('labels generated command search and resource link inputs without adding visible text', () => {
+        const commandPaletteSource = readFileSync(new URL('../js/modules/easterEggs.js', import.meta.url), 'utf8');
+        const academicsSource = readFileSync(new URL('../js/modules/academics.js', import.meta.url), 'utf8');
+        const coursesSource = readFileSync(new URL('../js/modules/courses.js', import.meta.url), 'utf8');
+
+        expect(commandPaletteSource).toContain('<label for="cmdInput" class="sr-only">Search pages and actions</label>');
+        expect(academicsSource).toContain('<label for="resTitle_${escapeHtml(courseId)}" class="sr-only">Resource title</label>');
+        expect(academicsSource).toContain('<label for="resUrl_${escapeHtml(courseId)}" class="sr-only">Resource URL</label>');
+        expect(coursesSource).toContain('<label for="resTitle_${courseIdAttr}" class="sr-only">Resource title</label>');
+        expect(coursesSource).toContain('<label for="resUrl_${courseIdAttr}" class="sr-only">Resource URL</label>');
+    });
 });

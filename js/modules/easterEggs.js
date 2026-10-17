@@ -23,6 +23,7 @@ export function ensureCommandPaletteExists() {
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div class="p-4 border-b border-zinc-200 dark:border-brand-700 flex items-center gap-3">
                 <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-400" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <label for="cmdInput" class="sr-only">Search pages and actions</label>
                 <input type="text" id="cmdInput" placeholder="Search pages, actions, or secret commands (/party)..." class="w-full bg-transparent text-sm focus:outline-none dark:text-white">
                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-brand-700 text-zinc-400 font-mono">ESC</span>
             </div>

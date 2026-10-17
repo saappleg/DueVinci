@@ -539,11 +539,11 @@ export function ensureSettingsModalExists() {
                             </div>
                             <div>
                                 <label for="profileEmail" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
-                                <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                                <input type="email" id="profileEmail" autocomplete="email" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <div>
                                 <label for="profilePassword" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
-                                <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                                <input type="password" id="profilePassword" autocomplete="new-password" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition shadow-sm">Save Profile Changes</button>
                             <p id="settingsMsg" class="text-sm text-center hidden mt-2"></p>
@@ -736,7 +736,7 @@ export function ensureSettingsModalExists() {
                             </div>
                             <div>
                                 <label for="canvasTokenInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
-                                <input type="password" id="canvasTokenInput" placeholder="Canvas → Account → Settings → + New Access Token" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
+                                <input type="password" id="canvasTokenInput" autocomplete="off" placeholder="Canvas → Account → Settings → + New Access Token" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
                                 <p class="text-[11px] text-zinc-400 mt-1.5">Canvas: Account → Settings → Approved Integrations → + New Access Token.</p>
                             </div>
                             <button type="button" id="canvasConnectBtn" onclick="handleCanvasConnect()" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
@@ -1104,7 +1104,7 @@ export function ensureSupportModalExists() {
                         </div>
                         <form id="supportForm" onsubmit="submitSupportMessage(event)" class="space-y-3">
                             <div>
-                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Topic / Category</label>
+                                <label for="supportCategory" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Topic / Category</label>
                                 <select id="supportCategory" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
                                     <option value="General Question">💬 General Question & Support</option>
                                     <option value="Bug Report">🐞 Bug or Glitch Report</option>
@@ -1114,15 +1114,15 @@ export function ensureSupportModalExists() {
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Your Email</label>
-                                <input type="email" id="supportEmail" required placeholder="your.email@school.edu" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
+                                <label for="supportEmail" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Your Email</label>
+                                <input type="email" id="supportEmail" autocomplete="email" required placeholder="your.email@school.edu" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Subject</label>
+                                <label for="supportSubject" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Subject</label>
                                 <input type="text" id="supportSubject" required placeholder="Brief description of what you need help with" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Message</label>
+                                <label for="supportMessageText" class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Message</label>
                                 <textarea id="supportMessageText" rows="4" required placeholder="Describe your question or issue in detail..." class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-xs focus:outline-none focus:border-indigo-500"></textarea>
                             </div>
                             <div class="flex gap-2 pt-1">
