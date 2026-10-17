@@ -47,7 +47,7 @@ DueVinci’s essential planning workflow—course setup, lesson and due-date tra
 
 **Frontend:**
 - HTML5 & Vanilla JavaScript
-- Tailwind CSS and browser libraries served as local, pre-cached vendor assets for reliable PWA startup
+- Tailwind utility classes compiled at development and CI time into a local, pre-cached stylesheet; browser libraries remain local vendor assets
 - FullCalendar for schedule visualization
 - PDF.js for client‑side PDF text extraction
 - Canvas‑Confetti for micro‑interactions and rewards
@@ -65,11 +65,13 @@ DueVinci’s essential planning workflow—course setup, lesson and due-date tra
    git clone https://github.com/saappleg/DueVinci.git
    cd DueVinci
    ```
-2. **Install Dev Tooling & Run Tests**
+2. **Install Dev Tooling, Build CSS, & Run Tests**
    ```bash
    npm install
+   npm run build:css
    npm test
    ```
+   `assets/css/tailwind.css` is committed and served directly. Rebuild it after changing Tailwind classes in HTML or JavaScript; CI checks that the generated file is current.
 3. **Supabase Configuration**
    - The repository's migrations extend DueVinci's existing app schema; they are not a complete fresh-project bootstrap, and this repository does not include the full baseline schema. A new project also needs the base planner tables, their required columns, and owner-scoped Row Level Security policies before the app can run.
    - For the repository's Dev environment, follow [Supabase Dev setup](supabase/README.md). Keep development and production projects, function secrets, and Stripe modes separate.
@@ -87,6 +89,11 @@ DueVinci’s essential planning workflow—course setup, lesson and due-date tra
 ```text
 DueVinci/
 ├── CHANGELOG.md                 # Canonical release history
+├── tailwind.config.cjs          # Tailwind source scan and theme config
+├── assets/                      # CSS themes, icons, images, and vendor libraries
+│   └── css/
+│       ├── tailwind.input.css   # Tailwind build entry point
+│       └── tailwind.css         # Generated static stylesheet served by routes
 ├── index.html                   # Main dashboard (Up Next & Goals)
 ├── courses/
 │   └── index.html               # Class management, syllabus AI & study quizzes
@@ -108,10 +115,10 @@ DueVinci/
 │   ├── RELEASE_CHECKLIST.md     # Production release checks
 │   ├── SECURITY.md              # Security policies & reporting
 │   └── COURSEWORK_IMPORTER_BETA.md # Browser importer beta and poll rollout
+├── wiki/                        # Canonical sources for the GitHub project wiki
 ├── scripts/
 │   └── release-smoke.mjs        # Post-deploy production smoke test
 ├── supabase/                    # Migrations and Edge Functions
-├── assets/                      # CSS themes, icons, and image assets (including degree-theme artwork)
 ├── js/
 │   ├── app.js                   # Application orchestrator
 │   └── modules/                 # Modular ES6 feature engines

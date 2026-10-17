@@ -24,7 +24,7 @@ describe('Calendar import and custom event utilities', () => {
     it('destroys the calendar instance before leaving the route so it can mount again', () => {
         const calendarElement = {};
         const instance = { render: vi.fn(), destroy: vi.fn() };
-        const Calendar = vi.fn(() => instance);
+        const Calendar = vi.fn(function () { return instance; });
         vi.stubGlobal('document', { getElementById: (id) => id === 'calendar' ? calendarElement : null });
         vi.stubGlobal('FullCalendar', { Calendar });
 
@@ -65,7 +65,7 @@ describe('Calendar import and custom event utilities', () => {
         const newInstance = { render: vi.fn(), destroy: vi.fn(), removeAllEvents: vi.fn(), addEventSource: vi.fn() };
         const instances = [oldInstance, newInstance];
         vi.stubGlobal('document', { getElementById: (id) => id === 'calendar' ? calendarElement : null });
-        vi.stubGlobal('FullCalendar', { Calendar: vi.fn(() => instances.shift()) });
+        vi.stubGlobal('FullCalendar', { Calendar: vi.fn(function () { return instances.shift(); }) });
 
         initCalendar();
         const staleLoad = loadCalendarCourses();

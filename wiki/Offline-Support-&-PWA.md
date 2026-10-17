@@ -24,12 +24,12 @@ flowchart TD
 
 ### Service worker (`sw.js`)
 
-- Precaches known pages, modules, local vendor assets, styles, and icons. Optional asset failures do not abort the whole install.
+- Precaches known pages, modules, local vendor assets, the generated Tailwind stylesheet, theme styles, and icons. Optional asset failures do not abort the whole install.
 - Serves known application navigation from cache with background refresh.
 - Versions both application and runtime caches so older modules do not override a new shell after activation.
 - Does not cache authenticated Supabase/API responses.
 
-The current release shell is `duevinci-v8.42` as of October 16, 2026; this cache identifier is separate from the application's 2.8 version line.
+The current release shell is `duevinci-v8.48` as of October 17, 2026; this cache identifier is separate from the application's 2.8 version line.
 
 ### PWA controller (`js/modules/pwa.js`)
 

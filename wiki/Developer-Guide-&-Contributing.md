@@ -4,7 +4,7 @@ Use the repository's [CONTRIBUTING.md](https://github.com/saappleg/DueVinci/blob
 
 ## Code organization
 
-DueVinci uses native ES modules and static HTML routes. A static HTTP server can run the app without bundling. Local vendor assets provide Tailwind, FullCalendar, PDF.js and related browser libraries.
+DueVinci uses native ES modules and static HTML routes. A static HTTP server can run the app without a JavaScript bundler. Tailwind classes are compiled ahead of time into `assets/css/tailwind.css`; FullCalendar, PDF.js and related browser libraries use local vendor assets.
 
 | Area | Main files |
 | --- | --- |
@@ -26,9 +26,12 @@ Module names above refer to `js/modules/` unless otherwise shown. Keep pure sche
 4. Run relevant checks when implementation verification is requested. For documentation-only work, inspect links, source accuracy, and the diff; do not describe old test results as a new test run.
 
 ```bash
+npm run build:css
 npm run check:syntax
 npm test
 ```
+
+After changing Tailwind classes in HTML or JavaScript, run `npm run build:css` and commit the regenerated `assets/css/tailwind.css`. CI and the Pages deployment rebuild it and fail if the committed stylesheet is stale.
 
 For example, naming/target changes have focused regressions in `tests/navigationTargets.test.js`; focus changes have `tests/sidebarFocus.test.js` and `tests/modalFocus.test.js`. Add source/behavior regressions appropriate to changed implementation. Do not weaken failing checks.
 

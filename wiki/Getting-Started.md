@@ -24,11 +24,12 @@ cd DueVinci
 npm install
 ```
 
-The application itself does not require a production bundling step. Development dependencies support repository checks.
+The application runs as static files and does not need a JavaScript bundling step. Tailwind CSS is compiled ahead of time into the committed `assets/css/tailwind.css`; rebuild it only when changing Tailwind classes.
 
 ### 3. Verify code integrity
 
 ```bash
+npm run build:css
 npm test
 npm run check:syntax
 ```
