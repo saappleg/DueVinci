@@ -50,7 +50,7 @@
             
             <header class="h-16 border-b border-zinc-200 dark:border-brand-800 flex items-center justify-between px-8 gap-4 bg-white dark:bg-brand-900 shrink-0">
                 <div class="flex items-center gap-4">
-                    <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
+                    <button type="button" onclick="toggleSidebar()" title="Toggle Sidebar" class="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-brand-800 text-zinc-600 dark:text-zinc-300 transition">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
                     </button>
                     <div class="flex items-center gap-3">
@@ -70,7 +70,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button type="button" onclick="logout()" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
+                    <button type="button" onclick="logout()" aria-label="Sign out" class="flex items-center gap-2 bg-zinc-100 dark:bg-brand-800 text-zinc-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-200 dark:hover:bg-brand-700 transition border border-zinc-200 dark:border-brand-600 sign-out-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> 
                         <span class="hidden sm:inline">Sign out</span>
                     </button>
@@ -89,14 +89,14 @@
                     <div class="bg-zinc-50 dark:bg-brand-800 p-6 rounded-2xl border border-zinc-200 dark:border-brand-700 transition-colors duration-200 space-y-2" id="courseFormContainer">
                         <form id="courseForm" class="flex-1 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                             <label for="courseEmoji" class="sr-only">Course icon</label>
-                            <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
+                            <input type="text" id="courseEmoji" placeholder="📚" maxlength="2" required class="w-12 h-11 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg text-center focus:outline-none focus:border-indigo-500 transition">
                             <label for="courseCode" class="sr-only">Course code</label>
-                            <input type="text" id="courseCode" placeholder="Add a new class (e.g. BE101)" required class="flex-1 h-10 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
-                            <div class="relative w-10 h-10 rounded-lg border border-zinc-300 dark:border-brand-600 overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-brand-900">
+                            <input type="text" id="courseCode" placeholder="Add a new class (e.g. BE101)" required class="flex-1 h-11 min-h-11 border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg px-3 text-sm focus:outline-none focus:border-indigo-500 transition">
+                            <div class="relative w-11 h-11 rounded-lg border border-zinc-300 dark:border-brand-600 overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-brand-900">
                                 <label for="courseColor" class="sr-only">Course color</label>
                                 <input type="color" id="courseColor" value="#4f46e5" class="absolute -inset-2 w-16 h-16 cursor-pointer bg-transparent">
                             </div>
-                            <button type="submit" class="bg-white dark:bg-zinc-100 text-zinc-900 h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-zinc-200 transition shrink-0 shadow-sm">
+                            <button type="submit" class="bg-white dark:bg-zinc-100 text-zinc-900 h-11 min-h-11 px-4 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-zinc-200 transition shrink-0 shadow-sm">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Add Class
                             </button>
                         </form>
@@ -107,13 +107,16 @@
                         <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
                             <h3 class="text-lg font-bold text-zinc-800 dark:text-zinc-200">Term Folders</h3>
                             <div class="flex flex-wrap items-center gap-2">
-                                <label class="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-300"><input id="showArchivedTermsToggle" type="checkbox" onchange="toggleArchivedTerms(this.checked)" class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Show archived</label>
+                                <label class="flex min-h-11 items-center gap-1.5 px-1 text-[11px] text-zinc-600 dark:text-zinc-300"><input id="showArchivedTermsToggle" type="checkbox" onchange="toggleArchivedTerms(this.checked)" class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"> Show archived</label>
                                 <label class="sr-only" for="courseSearchInput">Search classes and terms</label>
-                                <input type="search" id="courseSearchInput" oninput="filterCourses(this.value)" placeholder="Search classes or terms…" class="w-full sm:w-52 text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
-                                <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500">
-                                <label for="newTermStartDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Starts<input type="date" id="newTermStartDate" aria-label="Term start date" title="Term start date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
-                                <label for="newTermEndDate" class="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Ends<input type="date" id="newTermEndDate" aria-label="Term end date" title="Term end date" class="text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
-                                <button type="button" onclick="createNewTermFolder()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition">+ Add Term</button>
+                                <input type="search" id="courseSearchInput" oninput="filterCourses(this.value)" placeholder="Search classes or terms…" class="min-h-11 w-full sm:w-52 text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500">
+                                <div class="grid min-w-0 flex-[1_1_38rem] grid-cols-2 items-center gap-2 xl:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
+                                    <label class="sr-only" for="newTermInput">New term name</label>
+                                    <input type="text" id="newTermInput" placeholder="New term (e.g., Fall 2026)" class="col-span-2 min-h-11 w-full min-w-0 text-xs px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 focus:outline-none focus:border-indigo-500 xl:col-span-1">
+                                    <label for="newTermStartDate" class="flex min-h-11 min-w-0 items-center justify-between gap-1.5 whitespace-nowrap text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Starts<input type="date" id="newTermStartDate" aria-label="Term start date" title="Term start date" class="min-h-11 w-32 min-w-0 text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
+                                    <label for="newTermEndDate" class="flex min-h-11 min-w-0 items-center justify-between gap-1.5 whitespace-nowrap text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Ends<input type="date" id="newTermEndDate" aria-label="Term end date" title="Term end date" class="min-h-11 w-32 min-w-0 text-xs px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white focus:outline-none focus:border-indigo-500"></label>
+                                    <button type="button" onclick="createNewTermFolder()" class="col-span-2 min-h-11 justify-self-end whitespace-nowrap px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition xl:col-span-1">+ Add Term</button>
+                                </div>
                             </div>
                         </div>
                         <p class="-mt-2 mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">Optional dates archive a term after its end date and keep coursework inside the term window. Search classes or term names above; turn on “Show archived” to include past terms.</p>
@@ -264,8 +267,20 @@
                                     <option value="low">🌱 Low</option>
                                 </select>
                                 <label for="assignDate" class="sr-only">Due date</label>
-                                <input type="date" id="assignDate" required class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
+                                <input type="date" id="assignDate" required onchange="updateAssignmentRecurrenceControls()" class="border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white rounded-lg p-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono">
                             </div>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <label for="assignRecurrence" class="flex flex-col gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Repeat
+                                    <select id="assignRecurrence" onchange="updateAssignmentRecurrenceControls()" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-2.5 text-xs dark:border-brand-600 dark:bg-brand-800 dark:text-white">
+                                        <option value="none">Does not repeat</option>
+                                        <option value="weekly">Every week</option>
+                                    </select>
+                                </label>
+                                <label id="assignRepeatUntilLabel" for="assignRepeatUntil" class="hidden flex flex-col gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Repeat through
+                                    <input id="assignRepeatUntil" type="date" disabled onchange="updateAssignmentRecurrenceControls()" class="min-h-11 rounded-lg border border-zinc-300 bg-white px-2.5 text-xs font-mono dark:border-brand-600 dark:bg-brand-800 dark:text-white">
+                                </label>
+                            </div>
+                            <p class="text-[10px] text-zinc-500 dark:text-zinc-400">Weekly repeats create separate due-date items through the selected date, within this class and term window.</p>
                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5">
                                 <span>+ Add Lesson / Coursework</span>
                             </button>

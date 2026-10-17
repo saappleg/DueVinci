@@ -1,50 +1,48 @@
 # Grade Tracker & GPA Calculator 📊
 
-DueVinci's **Grade Tracker & GPA Calculator** (`js/modules/grades.js`) provides real-time visibility into academic performance, course standing, and future GPA projections.
+The Grades page (`js/modules/grades.js`) tracks percentage grades, course category weights, course credits, and temporary What-If values. It is a planning estimate, not a transcript or an institution-specific GPA calculation.
 
----
+## Course averages
 
-## 🧮 Calculation Engines
+Open **Grade settings** on a course to enter category names and weights. The weights must total 100%. Assign each coursework item to a category using its category selector; items without a saved category use the first category. Existing courses start with one **Coursework** category weighted at 100%.
 
-### 1. Weighted Course Average Formula
-For courses with weighted grading categories:
+Within each category, DueVinci takes the arithmetic mean of included, non-empty percentage grades. The course average then combines the graded category averages using their configured weights. Categories without a graded item are omitted, and the remaining weights are normalized to calculate a current grade. **Exclude** removes an item from the category average.
 
-$$\text{Course Average} = \frac{\sum_{i=1}^n \left( \frac{\text{Score}_i}{\text{MaxPoints}_i} \times \text{Weight}_i \right)}{\sum_{i=1}^n \text{Weight}_i}$$
+Grade entries are lesson-style coursework and assignments whose title or stored type identifies coursework such as a quiz, paper, exam, project, lab, reading, or other listed task. Imported LMS coursework is also available. Unit headers are not treated as grades unless they have a grade or category.
 
-If not all categories have graded assignments yet, the denominator automatically normalizes to the sum of active category weights.
+DueVinci stores only percentages, not points earned or possible. Therefore, assignments count equally inside a category; category weights are supported, but point-weighted assignment averages are not.
 
----
+## Cumulative GPA estimate
 
-### 2. Cumulative GPA Calculation
-Supports both standard **4.0 Scale** (Unweighted) and **5.0 Scale** (Honors / AP Weighted):
+The selected scale is 4.0 or 5.0 in Settings → Appearance → **GPA Scale Target**. Each course percentage is converted linearly to that scale, then weighted by its credit hours:
 
-$$\text{Cumulative GPA} = \frac{\sum (\text{Grade Points}_c \times \text{Credits}_c)}{\sum \text{Credits}_c}$$
+$$\text{Estimated GPA} = \frac{\sum_c \left(\frac{\text{Course Average}_c}{100} \times \text{Scale} \times \text{Credit Hours}_c\right)}{\sum_c \text{Credit Hours}_c}$$
 
-#### Standard 4.0 Scale Mapping
-| Letter Grade | Percentage Range | 4.0 Scale Grade Points |
-| :--- | :--- | :--- |
-| **A+ / A** | 93.0% – 100% | 4.00 |
-| **A-** | 90.0% – 92.9% | 3.70 |
-| **B+** | 87.0% – 89.9% | 3.30 |
-| **B** | 83.0% – 86.9% | 3.00 |
-| **B-** | 80.0% – 82.9% | 2.70 |
-| **C+** | 77.0% – 79.9% | 2.30 |
-| **C** | 73.0% – 76.9% | 2.00 |
-| **C-** | 70.0% – 72.9% | 1.70 |
-| **D** | 60.0% – 69.9% | 1.00 |
-| **F** | Below 60.0% | 0.00 |
+Existing courses start at 3 credit hours to preserve equal weighting until a student changes them. For example, an 88% average scales to 3.52 on a 4.0 scale before credit weighting. DueVinci does not translate percentage bands into letter-grade points, apply honors/AP weighting, or account for repeated-course rules. Check the official school calculation for academic decisions.
 
----
+Courses without included graded work do not contribute to the cumulative estimate.
 
-## 🔮 "What-If" Final Exam Simulator
+## Term insights
 
-The built-in **What-If Simulator** allows students to determine exactly what score they must achieve on remaining assignments or final exams to secure their target letter grade:
+The Grades page shows a rolling 90-day snapshot. The score comparison needs at least six graded items with due dates in that window. It sorts the current saved percentage grades by due date, compares the earlier half with the later half, and counts each item equally. DueVinci does not keep grade-change history, so this describes current scores by coursework order rather than when a score changed. It does not use What-If scores.
 
-$$\text{Required Final Score} = \frac{\text{Target Average} - (\text{Current Average} \times (1 - W_{\text{final}}))}{W_{\text{final}}}$$
+The focus summary uses the existing saved study-history setting. It appears after at least three completed focus sessions across two different days in the same 90-day window. It shows aggregate session counts and minutes, with a weekday callout only when one day has the uniquely highest count. The page does not create or save insight records, and it does not match study minutes to grades or infer that one affected the other. If study history is off or the minimum sample is not met, the page explains what data is missing.
 
-### Example:
-- Current Average: `88%`
-- Final Exam Weight: `30%` (0.30)
-- Target Course Grade: `90%` (A-)
-- **Required Final Exam Score**:
-  $$\frac{90 - (88 \times 0.70)}{0.30} = \frac{90 - 61.6}{0.30} = \mathbf{94.67\%}$$
+## Target score calculator
+
+Enter a target course percentage and select the category for one upcoming item. The calculator solves for the score needed on that next item, assuming it counts equally with the other graded items in that category. It reports when the target is already secured by a zero score on that item or when the required score exceeds 100%.
+
+The estimate uses the current category setup and current grade inputs, including temporary What-If values while the simulator is active. It does not model an item with a separate points value or a different within-category weight.
+
+## What-If simulation
+
+1. Select **Start simulator**.
+2. Enter hypothetical percentages in the displayed grade fields.
+3. Observe the recalculated course and cumulative values, or use the target score calculator.
+4. Use **Reset simulation** or **Exit simulator** to discard temporary values.
+
+Simulated values remain in page memory and do not overwrite saved grades. Exclude and category selections are separate saved assignment settings. Outside simulation, changing a grade saves it to the assignment.
+
+## Input and error behavior
+
+Grade fields include the course and coursework title in their accessible names, and grade/category/Exclude controls have enlarged targets. A load error offers **Try again** instead of presenting failed reads as an empty workspace. Grade settings are saved on the course row and item categories on assignment rows, subject to the existing account row-level security policies. The schema migration must be applied before using the new saved settings.

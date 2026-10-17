@@ -128,11 +128,33 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('stripe_subscription_id, updated_at')
+      .select('stripe_subscription_id, updated_at, account_deletion_pending')
       .eq('stripe_customer_id', customerId)
       .maybeSingle()
     if (profileError) throw profileError
-    if (!profile) return await acknowledge('profile_not_found')
+    if (!profile || profile.account_deletion_pending) {
+      const orphanSubscriptionId = event.type === 'checkout.session.completed'
+        ? stripeId(dataObj.subscription)
+        : event.type.startsWith('customer.subscription.')
+          ? stripeId(dataObj.id)
+          : event.type.startsWith('invoice.payment_')
+            ? invoiceSubscriptionId(dataObj)
+            : null
+      if (!orphanSubscriptionId) return await acknowledge(profile ? 'deletion_pending_no_subscription' : 'profile_not_found')
+      try {
+        const orphanSubscription = await stripe.subscriptions.retrieve(orphanSubscriptionId)
+        if (stripeId(orphanSubscription.customer) !== customerId) throw new Error('Orphan subscription customer mismatch')
+        if (!['canceled', 'incomplete_expired'].includes(orphanSubscription.status)) {
+          await stripe.subscriptions.cancel(orphanSubscription.id)
+        }
+        return await acknowledge('orphan_subscription_canceled')
+      } catch (error) {
+        if ((error as { code?: string }).code === 'resource_missing') {
+          return await acknowledge('orphan_subscription_missing')
+        }
+        throw error
+      }
+    }
 
     let updatePayload: Record<string, unknown> | null = null
     let expectedSubscriptionId: string | null | undefined

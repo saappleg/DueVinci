@@ -1,8 +1,15 @@
 // --- POMODORO TIMER, SIDEBAR CONTROLS & MULTI-TIMER STATE MACHINE MODULE ---
 import { playTimerAlarm, fireConfetti, recordStudyActivity, escapeHtml, escapeInlineJs } from './utils.js';
+import { recordCompletedFocusSessionIfEntitled } from './studyCalibration.js';
 
 function timerArg(value) {
     return escapeHtml(escapeInlineJs(value));
+}
+
+function startInterval(callback, delay) {
+    const interval = setInterval(callback, delay);
+    interval?.unref?.();
+    return interval;
 }
 
 // --- SIDEBAR POMODORO TIMER STATE ---
@@ -18,10 +25,49 @@ export let timerCollapsed = typeof localStorage !== 'undefined' ? (localStorage.
 export let customTimersExpanded = typeof localStorage !== 'undefined' ? (localStorage.getItem('customTimersExpanded') === 'true') : true;
 export let floatingTimerDismissed = false;
 
+const STUDY_FOCUS_CONTEXT_KEY = 'duevinci_active_study_context';
+
+function getStudyFocusContext() {
+    if (typeof localStorage === 'undefined') return null;
+    try { return JSON.parse(localStorage.getItem(STUDY_FOCUS_CONTEXT_KEY) || 'null'); } catch { return null; }
+}
+
+export function setStudyFocusContext(context = null) {
+    if (typeof localStorage === 'undefined') return;
+    if (!context?.taskId) {
+        localStorage.removeItem(STUDY_FOCUS_CONTEXT_KEY);
+        return;
+    }
+    localStorage.setItem(STUDY_FOCUS_CONTEXT_KEY, JSON.stringify({
+        taskId: String(context.taskId),
+        courseId: context.courseId == null ? null : String(context.courseId),
+        taskType: String(context.taskType || ''),
+    }));
+}
+
+function clearStudyFocusContext() {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(STUDY_FOCUS_CONTEXT_KEY);
+}
+
+function recordFinishedStudyFocusSession() {
+    const context = getStudyFocusContext();
+    const saved = context?.taskId
+        ? recordCompletedFocusSessionIfEntitled({ ...context, minutes: focusMinutes })
+        : Promise.resolve(false);
+    clearStudyFocusContext();
+    return saved;
+}
+
 // Sync active state from timestamp on script load
 if (timerRunning && timerEndTime > Date.now()) {
     timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
 } else {
+    if (timerRunning && timerEndTime > 0 && isWorking) {
+        recordFinishedStudyFocusSession();
+        isWorking = false;
+        timeLeft = breakMinutes * 60;
+        if (typeof localStorage !== 'undefined') localStorage.setItem('timerIsWorking', 'false');
+    }
     timerRunning = false;
     if (typeof localStorage !== 'undefined') localStorage.setItem('timerRunning', 'false');
 }
@@ -78,7 +124,7 @@ export function updateFloatingTimer() {
                     <div class="flex justify-between items-center bg-zinc-800/90 px-2 py-1 rounded text-xs">
                         <span class="font-bold truncate max-w-[100px]">${escapeHtml(t.name)}</span>
                         <span class="font-mono text-indigo-300 font-bold">${formatTimerTime(t.timeLeft)}</span>
-                        <button onclick="toggleMultiTimerRun('${timerArg(t.id)}')" class="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold">⏸</button>
+                        <button type="button" aria-label="Pause ${escapeHtml(t.name)} timer" aria-pressed="true" onclick="toggleMultiTimerRun('${timerArg(t.id)}')" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-[10px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"><span aria-hidden="true">⏸</span></button>
                     </div>
                 `).join('')}
             </div>
@@ -88,11 +134,11 @@ export function updateFloatingTimer() {
     floatWidget.innerHTML = `
         <div class="flex justify-between items-center mb-2 pb-2 border-b border-zinc-700">
             <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">${label}</span>
-            <button onclick="dismissFloatingTimer()" class="text-zinc-400 hover:text-white text-xs">✕</button>
+            <button type="button" onclick="dismissFloatingTimer()" class="text-zinc-400 hover:text-white text-xs">✕</button>
         </div>
         <div class="flex justify-between items-center">
             <span class="font-mono text-2xl font-bold text-indigo-300">${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}</span>
-            <button onclick="toggleTimer()" class="px-3 py-1.5 ${timerRunning ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-zinc-700 hover:bg-zinc-600'} rounded-lg text-white text-xs font-bold transition">${timerRunning ? '⏸ Pause' : '▶ Start'}</button>
+            <button type="button" onclick="toggleTimer()" class="min-h-11 min-w-11 px-3 py-1.5 ${timerRunning ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-zinc-700 hover:bg-zinc-600'} rounded-lg text-white text-xs font-bold transition">${timerRunning ? '⏸ Pause' : '▶ Start'}</button>
         </div>
         ${customHtml}
     `;
@@ -123,13 +169,13 @@ export function toggleTimer() {
         }
         if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
 
-        timerInterval = setInterval(() => {
+        timerInterval = startInterval(() => {
             if (timerEndTime > Date.now()) {
                 timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                 updateTimerDisplay();
             } else {
                 playTimerAlarm();
-                skipTimer();
+                skipTimer(true);
             }
         }, 1000);
         recordStudyActivity();
@@ -138,6 +184,7 @@ export function toggleTimer() {
 }
 
 export function resetTimer() {
+    clearStudyFocusContext();
     timerRunning = false;
     if (timerInterval) {
         clearInterval(timerInterval);
@@ -150,7 +197,11 @@ export function resetTimer() {
     updateTimerDisplay();
 }
 
-export function skipTimer() {
+export function skipTimer(completed = false) {
+    if (isWorking) {
+        if (completed) recordFinishedStudyFocusSession();
+        else clearStudyFocusContext();
+    }
     isWorking = !isWorking;
     if (typeof localStorage !== 'undefined') localStorage.setItem('timerIsWorking', isWorking);
     const labelEl = document.getElementById('timerLabel');
@@ -229,6 +280,7 @@ export function toggleCustomTimersSection() {
     customTimersExpanded = !customTimersExpanded;
     if (typeof localStorage !== 'undefined') localStorage.setItem('customTimersExpanded', customTimersExpanded);
     initMultiTimersUI();
+    if (typeof document !== 'undefined') document.getElementById('customTimersToggle')?.focus({ preventScroll: true });
 }
 
 // --- MULTI-TIMER STATE MACHINE ---
@@ -356,7 +408,12 @@ export function updateTimersDisplayDOM() {
         if (displayEl) displayEl.innerText = formatTimerTime(t.timeLeft);
 
         const btnEl = document.getElementById(`multiTimerBtn_${t.id}`);
-        if (btnEl) btnEl.innerHTML = t.running ? '⏸' : '▶';
+        if (btnEl) {
+            btnEl.setAttribute('aria-label', `${t.running ? 'Pause' : 'Start'} ${t.name} timer`);
+            btnEl.setAttribute('aria-pressed', String(t.running));
+            const glyph = btnEl.querySelector('[data-timer-glyph]');
+            if (glyph) glyph.textContent = t.running ? '⏸' : '▶';
+        }
     });
     updateFloatingTimer();
 }
@@ -365,14 +422,14 @@ export function renderTimersManager(container) {
     if (!container) return;
     let html = `
         <div class="w-full space-y-2.5">
-            <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleCustomTimersSection()">
-                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                    <span>⏱️</span> Custom Timers (${activeTimers.length})
-                </h4>
-                <span class="text-xs text-zinc-400 font-bold">${customTimersExpanded ? '▲' : '▼'}</span>
-            </div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <button type="button" id="customTimersToggle" aria-expanded="${customTimersExpanded}" aria-controls="customTimersPanel" onclick="toggleCustomTimersSection()" class="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <span class="flex items-center gap-1.5"><span aria-hidden="true">⏱️</span> Custom Timers (${activeTimers.length})</span>
+                    <span aria-hidden="true" class="text-xs text-zinc-400 font-bold">${customTimersExpanded ? '▲' : '▼'}</span>
+                </button>
+            </h4>
 
-            <div class="${customTimersExpanded ? 'block' : 'hidden'} space-y-2">
+            <div id="customTimersPanel" class="${customTimersExpanded ? 'block' : 'hidden'} space-y-2">
                 <!-- Add Custom Timer Form -->
                 <div class="space-y-1.5 bg-zinc-50 dark:bg-brand-900 p-2 rounded-xl border border-zinc-200 dark:border-brand-700">
                     <div class="flex gap-1.5">
@@ -399,9 +456,9 @@ export function renderTimersManager(container) {
                         <p id="multiTimerDisplay_${idAttr}" class="font-mono font-bold ${t.running ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-zinc-500'} text-xs">${formatTimerTime(t.timeLeft)}</p>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
-                        <button type="button" id="multiTimerBtn_${idAttr}" onclick="toggleMultiTimerRun('${idArg}')" class="w-6 h-6 rounded ${t.running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold flex items-center justify-center text-xs transition shadow-sm" title="${t.running ? 'Pause' : 'Start'}">${t.running ? '⏸' : '▶'}</button>
-                        <button type="button" onclick="resetMultiTimer('${idArg}')" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-bold px-1 text-xs transition" title="Reset">↺</button>
-                        <button type="button" onclick="deleteTimer('${idArg}')" class="text-zinc-400 hover:text-red-500 font-bold px-1 text-xs transition" title="Delete">✕</button>
+                        <button type="button" id="multiTimerBtn_${idAttr}" aria-label="${t.running ? 'Pause' : 'Start'} ${escapeHtml(t.name)} timer" aria-pressed="${t.running}" onclick="toggleMultiTimerRun('${idArg}')" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${t.running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold text-xs transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" title="${t.running ? 'Pause' : 'Start'} ${escapeHtml(t.name)} timer"><span data-timer-glyph aria-hidden="true">${t.running ? '⏸' : '▶'}</span></button>
+                        <button type="button" aria-label="Reset ${escapeHtml(t.name)} timer" onclick="resetMultiTimer('${idArg}')" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-bold text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" title="Reset ${escapeHtml(t.name)} timer"><span aria-hidden="true">↺</span></button>
+                        <button type="button" aria-label="Delete ${escapeHtml(t.name)} timer" onclick="deleteTimer('${idArg}')" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 font-bold text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" title="Delete ${escapeHtml(t.name)} timer"><span aria-hidden="true">✕</span></button>
                     </div>
                 </div>
             `;
@@ -414,7 +471,7 @@ export function renderTimersManager(container) {
 
 // Global ticker running every second for active custom timers
 if (typeof setInterval !== 'undefined') {
-    setInterval(() => {
+    startInterval(() => {
         let updated = false;
         activeTimers = activeTimers.map(t => {
             if (t.running) {
@@ -461,6 +518,7 @@ _timerScope.toggleMultiTimerRun = toggleMultiTimerRun;
 _timerScope.initMultiTimersUI = initMultiTimersUI;
 _timerScope.renderTimersManager = renderTimersManager;
 _timerScope.setTimerDuration = setTimerDuration;
+_timerScope.setStudyFocusContext = setStudyFocusContext;
 
 // Auto-initialize timer collapse, display, and multi-timers on DOM ready
 if (typeof document !== 'undefined') {
@@ -472,13 +530,13 @@ if (typeof document !== 'undefined') {
         if (timerRunning && timeLeft > 0) {
             const btn = document.getElementById('timerPlayBtn');
             if (btn) btn.innerHTML = `<svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-            timerInterval = setInterval(() => {
+            timerInterval = startInterval(() => {
                 if (timerEndTime > Date.now()) {
                     timeLeft = Math.max(0, Math.round((timerEndTime - Date.now()) / 1000));
                     updateTimerDisplay();
                 } else {
                     playTimerAlarm();
-                    skipTimer();
+                    skipTimer(true);
                 }
             }, 1000);
         }

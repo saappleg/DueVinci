@@ -1,60 +1,45 @@
 # DueVinci Documentation Wiki 📚
 
-Welcome to the official **DueVinci** Wiki! DueVinci is a modern, student-first academic workspace designed to streamline coursework tracking, grade calculation, study planning, spaced-repetition flashcards, and syllabus parsing into a single, cohesive web dashboard.
+DueVinci is a student academic workspace for classes, deadlines, study planning, grades, flashcards, and focus timers. Use the [live app](https://duevinci.tech) or follow [Getting Started](Getting-Started) for local setup.
 
----
+## Quick Navigation
 
-## 🚀 Quick Navigation
+| Section | Guides |
+| --- | --- |
+| Getting started | [Getting Started](Getting-Started), [Architecture & Tech Stack](Architecture-&-Tech-Stack) |
+| Free planning tools | [Course & Term Management](Course-&-Term-Management), [Smart Study Planner](Smart-Study-Planner), [Calendar & Schedule Sync](Calendar-&-Schedule-Sync), [Grades & GPA](Grade-Tracker-&-GPA-Calculator) |
+| Study tools | [Flashcards](SM-2-Spaced-Repetition-&-Flashcards), [Pomodoro & Timers](Pomodoro-Timer-&-Focus-Modes), [Nursing Hub](Nursing-Hub), [AI Syllabus Parser](AI-Syllabus-&-Document-Parser) |
+| Offline and data | [Offline Support & PWA](Offline-Support-&-PWA), [Data Backup & Cloud Sync](Data-Backup-&-Cloud-Sync) |
+| Development | [Developer Guide](Developer-Guide-&-Contributing), [Testing & CI/CD](Testing-&-CI-CD), [Wiki Sync Guide](Wiki-Sync-Guide), [Product Roadmap](Product-Roadmap) |
+| Help | [FAQ & Troubleshooting](FAQ-&-Troubleshooting) |
 
-| Section | Description | Key Links |
-| :--- | :--- | :--- |
-| **🏁 Getting Started** | Installation, environment setup & configuration | • [Getting Started](Getting-Started)<br>• [Architecture & Tech Stack](Architecture-&-Tech-Stack) |
-| **💡 Core Features** | In-depth guides for every module | • [AI Syllabus Parser](AI-Syllabus-&-Document-Parser)<br>• [Smart Study Planner](Smart-Study-Planner)<br>• [SM-2 Flashcards](SM-2-Spaced-Repetition-&-Flashcards)<br>• [Course Management](Course-&-Term-Management)<br>• [Grade Tracker & GPA](Grade-Tracker-&-GPA-Calculator)<br>• [Pomodoro & Timers](Pomodoro-Timer-&-Focus-Modes)<br>• [Calendar & .ICS Sync](Calendar-&-Schedule-Sync)<br>• [Nursing Hub](Nursing-Hub) |
-| **🌐 Offline & Cloud** | Data persistence, PWA & offline synchronization | • [Offline Support & PWA](Offline-Support-&-PWA)<br>• [Data Backup & Cloud Sync](Data-Backup-&-Cloud-Sync) |
-| **💻 Developer Center** | Engineering workflows, code conventions & testing | • [Developer Guide & Contributing](Developer-Guide-&-Contributing)<br>• [Testing & CI/CD](Testing-&-CI-CD)<br>• [Wiki Sync Guide](Wiki-Sync-Guide) |
-| **❓ Support & Help** | FAQ, tips, and troubleshooting common issues | • [FAQ & Troubleshooting](FAQ-&-Troubleshooting) |
+## Free core
 
----
+Course and term setup, lesson and deadline tracking, Smart Study Plan, workload radar, percentage grades and What-If simulation, calendar events and `.ics` import/export, timers, and portable backups remain free.
 
-## ✨ Free Core Highlights
+- Set class and term date windows, search or archive terms, move classes in bulk, and start a new term by copying class shells without copying old coursework.
+- Sequence study blocks around deadlines, rest days, and protected dates. Workload radar highlights upcoming due work and exams.
+- Review note-derived flashcards and quizzes, with account-scoped review progress and backup support.
+- Turn a dated calendar event into an assignment for a chosen class while preserving the original event and checking duplicates.
+- Enable the optional free Nursing Hub and degree themes in Settings → Appearance. Nursing practice must be fictional; **never enter real patient information**.
+- Install the production PWA for cached pages and supported offline planner changes. Sign-in, provider services, and cloud synchronization still need a connection.
 
-DueVinci’s course setup, due-date tracking, Smart Study Plan, 7-Day Workload & Stress Radar, grades, calendar, timers, and data export are the permanent free core. AI parsing and cloud sync are optional integrations, not requirements for planning.
+Optional syllabus parsing uses an authenticated Supabase Edge Function and configurable Google Gemini models. Manual course setup works without AI.
 
-- 🧠 **AI-Powered Syllabus Parsing**: Ingest PDF syllabi or screenshots with Google Gemini 1.5 to instantly extract weekly course breakdowns, assignments, and due dates.
-- 🎯 **Smart Study Plan & Workload Balancer**: Orders lessons, balances work before due dates, honors rest-day preferences when feasible, and never silently moves remaining deadline work late.
-- 📊 **7-Day Workload & Stress Radar**: Shows daily due-task volume and elevates exam days across the upcoming week.
-- 🃏 **SM-2 Spaced Repetition**: SuperMemo-2 flashcards algorithm with active recall quiz modes and automated flashcard generation.
-- 🩺 **Optional Nursing Hub**: Track rotations and skills, practice fictional cases and synthetic arithmetic, review anatomy and flashcards, and build a quick queue from work already due. It is hidden until enabled and is for coursework organization only.
-- 📊 **GPA & Grade Simulator**: Live weighted course average calculations supporting standard 4.0 and weighted 5.0 GPA scales with "What-If" final grade projections.
-- ⏱️ **Integrated Pomodoro Timer**: Ambient sounds, custom interval lengths, Web Audio alerts, and productivity stats.
-- 📱 **Progressive Web App**: Installable application shell with cached static assets. Network-dependent services, including sign-in and cloud sync, still require connectivity.
+## DueVinci Pro and Study Companion
 
----
+The current Pro catalog includes Canvas course/assignment sync (selected-course assignments import directly), SNHU Brightspace calendar sync, read-only Google Calendar and Outlook sync, the Socratic Study Companion, a Daily Brief, opt-in personalized study estimates, scheduled Canvas refresh, and opt-in Canvas assignment and posted-grade alerts. Google and Outlook sync once after connection; later syncs are user-started. Settings → Subscription shows the account's current access and billing options.
 
-## 🛠️ System Overview
+The Study Companion can use a selected course's description, objectives, notes, and assignment context. Choose **General study help** to ask without selected-course context. It guides learning rather than writing graded submissions. Loading, retry, pending-reply, and usage states are shown; conversation history remains in the current page and is not a saved chat archive. Daily/monthly allowances appear in the UI and can be configured by the operator.
 
-```mermaid
-graph TD
-    UI[Frontend UI: Vanilla JS + Tailwind CSS]
-    UI --> Academics[Academics & Course Engine]
-    UI --> StudyPlan[Smart Study Plan Engine]
-    UI --> Flashcards[SM-2 Spaced Repetition]
-    UI --> Timers[Pomodoro & Timers]
-    UI --> Grades[Grade & GPA Simulator]
-    UI --> Calendar[FullCalendar & ICS Engine]
+Personalized estimates and Canvas assignment/grade alerts are off until enabled in Settings → Study & Reminders. Assignment alerts follow a Canvas sync; scheduled refresh runs about hourly for opted-in accounts, and posted-grade alerts need an initial baseline and browser push permission. Brightspace imports calendar entries, not course records or automatic planner assignments; a student can explicitly create an assignment from a calendar event.
 
-    Academics <--> LocalDB[(IndexedDB / LocalStorage)]
-    LocalDB <--> SyncEngine[Sync & Offline Engine]
-    SyncEngine <--> Supabase[(Supabase Cloud Database)]
+## Settings and navigation
 
-    UI --> GeminiEdge[Supabase Edge Function: gemini-parser]
-    GeminiEdge <--> GeminiAPI[Google Gemini 1.5 Flash/Pro API]
-```
+Click the profile card at the bottom of the sidebar to open Settings. Its sections are **Profile**, **Appearance**, **Study & Reminders**, **Cloud & Backup**, **Privacy & AI**, and **Subscription**. At narrow widths, scroll the section list horizontally and the content pane vertically. Settings opens before optional preferences finish loading.
 
----
+The mobile drawer supports Tab wrapping and Escape-to-close with focus return. Settings and Support return focus to their opener when closed. Audited navigation and timer controls have enlarged touch targets and the main timer toggle has an accessible name; this is not a claim that every control has received a complete accessibility audit.
 
-## 📖 How to Use this Wiki
+## Current release documentation
 
-- Use the **[Sidebar](_Sidebar)** on the right-hand side (or toggleable on mobile) to navigate across all sections.
-- For local development and contributing instructions, head over to [Getting Started](Getting-Started) and [Developer Guide & Contributing](Developer-Guide-&-Contributing).
-- Found a bug or want to suggest an improvement? Visit our [GitHub Repository](https://github.com/saappleg/DueVinci).
+Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.42`. See the canonical [changelog](https://github.com/saappleg/DueVinci/blob/main/CHANGELOG.md), [roadmap](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md), and [release checks](Testing-&-CI-CD) for scope and verification limits.

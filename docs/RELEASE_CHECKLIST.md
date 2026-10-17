@@ -4,10 +4,22 @@
 
 - Confirm the GitHub Pages deployment workflow passed its post-deploy PWA smoke
   test.
-- To enable its authenticated checks, create a dedicated disposable production
-  account and add `DUEVINCI_SMOKE_EMAIL` and `DUEVINCI_SMOKE_PASSWORD` as
-  repository Actions secrets. The test signs in, creates and deletes one
-  temporary course, and sends a clearly labeled support test email.
+- Authenticated checks use a dedicated disposable production account configured
+  through `DUEVINCI_SMOKE_EMAIL` and `DUEVINCI_SMOKE_PASSWORD` repository Actions
+  secrets. When those secrets are absent, the script reports that authenticated
+  checks were skipped; a public-assets pass does not prove sign-in works.
+- The configured deployment and scheduled monitor sign in, create a temporary
+  course, and attempt its deletion. Cleanup currently does not assert the DELETE
+  response, so confirm the disposable account's rows if cleanup matters to the
+  release. Both workflows set `DUEVINCI_SMOKE_SKIP_SUPPORT=true`; support
+  submission is intentionally skipped. Test support delivery separately only
+  when a test submission has been approved.
+- The HTTP smoke test does not click through signed-in Settings. Check the
+  Dashboard's static dialog and a nested route's generated dialog: Profile,
+  Appearance, Study & Reminders, Cloud & Backup, Privacy & AI, and Subscription.
+  Verify light/dark modes, narrow-screen pane scrolling, Tab/Escape behavior,
+  and focus return after the Close button. Confirm Back to top neither covers
+  controls nor intercepts input while hidden.
 - Confirm the `duevinci-privacy-retention` Supabase Cron job is active. It
   deletes browser error events after 90 days and resolved/closed support tickets
   90 days after resolution.
@@ -20,6 +32,17 @@
 - Check Supabase function logs and Stripe webhook deliveries for errors after each test.
 - Validate RLS with two accounts: neither account can view the other's courses, profile, or Canvas connection.
 - Keep the free planner usable when a subscription is inactive, expired, canceled, or past due.
+- Check the opt-in personalized study plan's pause and clear-history controls.
+  Its recent-data calculation window does not automatically delete stored study
+  history, though each save retains at most the newest 180 focus sessions and
+  120 task completions. Verify opted-in Canvas assignment alerts after an explicit
+  or scheduled sync, and posted-grade alerts after the first baseline with the
+  scheduler, VAPID secrets, and receiving-device browser permission configured.
+- Check a valid empty Brightspace feed retires older events for that account
+  and provider, while malformed feeds or failed saves do not retire older rows.
+  Brightspace remains a calendar feed integration, not a course/grade importer.
+- Check course-only term rollover and calendar-event conversion with disposable
+  data: old coursework and calendar events remain, and retries avoid duplicates.
 
 
 ## Nursing Hub and theme checks

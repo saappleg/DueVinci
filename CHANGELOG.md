@@ -10,13 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added an opt-in Nursing Hub with rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, flashcards, anatomy review, and a focused quick-review queue built from existing study progress.
+- Added weighted grade categories, credit-weighted GPA estimates, target-score calculations, and 90-day term insights.
+- Added recurring coursework entries, subtasks and partial progress, editable checklists from assignment instructions, reviewed syllabus imports and WGU/Maestro browser-import rows, timed note-based mock exams, and Anki text/CSV exchange. Canvas sync directly imports assignments for selected courses; it does not use the browser importer's row-review flow.
+- Added source-checked course excerpts to Socratic Tutor replies, opt-in scheduled Canvas refresh and posted-grade alerts, and read-only Google Calendar and Outlook sync. Calendar events sync once after connection; later syncs are started by the user.
+- Added a public feature overview and updated privacy disclosures for connected calendars, Canvas grade snapshots, and optional study-plan history.
+
+## [2.8.0] - 2026-10-16
+
+### Added
+- Added the optional Nursing Hub with rotation and skills tracking, fictional care-plan practice, synthetic dosage arithmetic, flashcards, anatomy review, and a quick-review queue built from existing study progress. Never enter real patient information.
 - Added field-specific degree palettes and decorative themes, Sunday/Monday week-start preferences, and responsive dashboard scroll aids.
+- Added opt-in Pro study-plan estimates calibrated from focus history, using records from the previous 90 days. The newest 180 focus sessions and 120 task completions are retained; older entries may be dropped.
+- Added opt-in Canvas notifications for new assignments and changed due dates after a Canvas sync.
+- Added Pro sync for SNHU Brightspace calendar feeds.
+- Added free course-only term rollover and manual conversion of a calendar event into a linked assignment.
 
 ### Fixed
 - Accepted valid singular and abbreviated tablet units in dosage practice while still rejecting mismatched units.
-- Opened Settings before optional preference hydration and aligned modal scroll progress with nested Settings and Support panes.
+- Improved Settings and nested-modal focus and scrolling, mobile sidebar keyboard access, and scroll-aid visibility and placement.
+- Added descriptive assignment, grade, and timer controls, enlarged audited mobile navigation targets, and named the main timer toggle for assistive technology.
+- Added Tutor loading/retry feedback and pending-reply announcements, and prevented concurrent duplicate submissions.
+- Reported backup export/restore failures, preserved partial-restore status, and offered an explicit device-only flashcard-mastery fallback when cloud mastery is unavailable.
+- Excluded DueVinci's worker from loopback previews while preserving production PWA caching.
+- Prevented account deletion from removing server-held data when cancellation of an existing subscription fails.
 - Kept Nursing Hub practice content visible and readable in light and dark degree themes.
+- Let a valid empty Brightspace feed retire older imported events while rejecting malformed feeds before changing existing events.
+
+### Changed
+- Calendar-to-assignment conversion and term rollover use source identifiers to avoid duplicate records on retries. Rollover copies course setup only; the original term, assignments, and lesson progress remain in place.
+- Calendar events converted to assignments remain on the calendar.
 
 ## [2.7.0] - 2026-10-12
 
@@ -83,12 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed rescheduling so assignment order is deterministic by unit and lesson.
 - Fixed dashboard Quick Add so current courses load before adding a task.
 
-## [Unreleased] - 2026-08-23
+## Historical updates (2026-08-23)
 
 ### Changed
 - Documented DueVinci’s permanent free planning core: course and lesson setup, due dates, Smart Study Plan & Workload Balancer, 7-Day Workload & Stress Radar, grades, calendar, timers, and data portability.
 - Corrected planner documentation to match its deadline-first, lesson-sequencing, rest-day, and timestamp-aware workload behavior.
 - Clarified that AI syllabus parsing and Supabase cloud services are optional integrations.
+- Made the PWA shell and free planner data available offline after an initial
+  online load; offline planner changes queue for replay after reconnection.
+- Synced non-sensitive preferences across signed-in devices.
 
 ### Security
 - Sanitized Markdown and planner/course display content, and restricted user resource links to HTTP(S).
@@ -97,11 +122,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved or closed support tickets are deleted 90 days after resolution.
 - Added a post-deploy release smoke test for public pages and PWA assets, with
   optional authenticated sign-in, planner-write, and support-function checks.
-
-### Changed
-- Made the PWA shell and free planner data available offline after an initial
-  online load; offline planner changes queue for replay after reconnection.
-- Synced non-sensitive preferences across signed-in devices.
 
 ---
 

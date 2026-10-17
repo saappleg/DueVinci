@@ -1,75 +1,77 @@
 # GitHub Wiki Sync Guide 🔄
 
-GitHub hosts repository wikis in a separate, dedicated Git repository ending in `.wiki.git`. This guide explains how to sync and publish the contents of the `wiki/` directory to the live GitHub Wiki for `saappleg/DueVinci`.
+GitHub publishes this project's wiki from a separate
+[`DueVinci.wiki.git` repository](https://github.com/saappleg/DueVinci/wiki).
+The maintained source is the main repository's
+[`wiki/` directory](https://github.com/saappleg/DueVinci/tree/main/wiki).
 
----
+## Publish through the existing workflow
 
-## 🛠️ Method 1: Manual Git Push (Quickest)
+1. Edit the relevant Markdown files under `wiki/` on a documentation branch.
+2. Review the changes and merge the pull request into `main`.
+3. Open the [Sync Wiki workflow](https://github.com/saappleg/DueVinci/actions/workflows/wiki-sync.yml)
+   and check the run for the merged commit.
+4. Read the affected pages on the [published wiki](https://github.com/saappleg/DueVinci/wiki)
+   to confirm the new text, navigation, and formatting.
 
-Every GitHub repository has a dedicated wiki clone URL in the format:
-```text
-https://github.com/<owner>/<repo>.wiki.git
+The active workflow is
+[`.github/workflows/wiki-sync.yml`](https://github.com/saappleg/DueVinci/blob/main/.github/workflows/wiki-sync.yml).
+It runs when a `main` push changes `wiki/**`, and it also supports manual
+`workflow_dispatch` through GitHub Actions' **Run workflow** control.
+
+### What the workflow does
+
+- Checks out the source repository into `repo/`.
+- Uses the workflow's `contents: write` permission and `GITHUB_TOKEN` to clone
+  the separate wiki repository.
+- Copies the repository's `wiki/*` files, including `_Sidebar.md` and `_Footer.md`,
+  into that checkout.
+- Commits changes as `github-actions[bot]` when the copied files differ.
+- Pushes to the wiki's `master` branch, with `main` as the fallback.
+
+The copy keeps any extra pages already present in the wiki repository. Review
+obsolete pages explicitly when removing a guide from the canonical source.
+Direct web edits to a page also maintained in `wiki/` can be replaced by the
+next sync; make lasting changes in the source repository.
+
+### Verify a sync
+
+A successful Action confirms that its copy/commit/push commands completed, or
+that no file changes were needed. The workflow has no separate post-push
+content comparison. Check the published page content and history as well as the
+Action conclusion. Match the Action's source commit to the documentation PR.
+
+If a run fails, inspect its first failing step. Check wiki availability, workflow
+write permissions, and the wiki branch before retrying. Keep credentials out of
+logs and use the existing workflow's token handling.
+
+## Manual fallback
+
+Use a fresh temporary wiki checkout when an approved manual update is needed.
+Run the copy from the root of the actual DueVinci source checkout, review the
+staged changes, and push the wiki's checked-out branch:
+
+```sh
+git clone https://github.com/saappleg/DueVinci.wiki.git /tmp/duevinci-wiki
+cp -R wiki/* /tmp/duevinci-wiki/
+cd /tmp/duevinci-wiki
+git add .
+git diff --cached --stat
+git commit -m "docs: sync reviewed DueVinci wiki pages"
+git push origin HEAD
 ```
 
-### Steps:
-1. First, make sure you have initialized the Wiki tab on GitHub:
-   - Navigate to [https://github.com/saappleg/DueVinci](https://github.com/saappleg/DueVinci).
-   - Click on the **Wiki** tab and click **"Create the first page"** (you can click Save Page with default text). This provisions the `.wiki.git` repository on GitHub's servers.
-2. In your local terminal, clone the wiki repository into a temporary directory:
-   ```bash
-   git clone https://github.com/saappleg/DueVinci.wiki.git /tmp/duevinci-wiki
-   ```
-3. Copy all markdown files from `wiki/` into the cloned wiki directory:
-   ```bash
-   cp -R wiki/* /tmp/duevinci-wiki/
-   ```
-4. Commit and push the changes:
-   ```bash
-   cd /tmp/duevinci-wiki
-   git add .
-   git commit -m "docs: update GitHub wiki documentation"
-   git push origin master
-   ```
+The temporary destination must be available. If there is no staged difference,
+skip the commit and push. If concurrent wiki edits cause a push rejection,
+review them before integrating and retrying; preserve the existing history.
+The current wiki is already initialized. A new repository must create its first
+wiki page on GitHub before a wiki clone or publish can succeed.
 
-All pages, sidebars, and footers will immediately reflect on the live GitHub Wiki!
+## File naming
 
----
-
-## 🤖 Method 2: Automated GitHub Action (Continuous Deployment)
-
-You can set up a GitHub Action to automatically publish the `wiki/` folder whenever changes are merged into `main`.
-
-### Sample GitHub Action Workflow (`.github/workflows/sync-wiki.yml`)
-
-```yaml
-name: Sync Wiki
-
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'wiki/**'
-
-jobs:
-  sync-wiki:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source Repo
-        uses: actions/checkout@v4
-
-      - name: Sync to GitHub Wiki
-        uses: SwiftDocOrg/github-wiki-publish-action@v1
-        with:
-          wiki_folder: wiki
-          token: ${{ secrets.GITHUB_TOKEN }}
-```
-
----
-
-## 📑 File Naming Conventions on GitHub Wiki
-
-- `Home.md`: Automatically rendered as the Wiki front page.
-- `_Sidebar.md`: Automatically rendered as the persistent sidebar on all wiki pages.
-- `_Footer.md`: Automatically rendered at the bottom of all wiki pages.
-- Standard pages: Use hyphens (`-`) instead of spaces (e.g., `Getting-Started.md`, `Smart-Study-Planner.md`).
+- `Home.md` is the wiki landing page.
+- `_Sidebar.md` supplies navigation; `_Footer.md` supplies the shared footer.
+- Existing guide names use hyphens, such as `Getting-Started.md`. Link wiki pages
+  by their page name without the `.md` extension.
+- Links to files outside the wiki should use their full GitHub repository URLs
+  so they also work after publication.

@@ -36,11 +36,15 @@ export function validateBackupPayload(json) {
 
 export async function exportUserDataJSON() {
     try {
-        const { data: courses } = await supabaseClient.from('courses').select('*');
-        const { data: assignments } = await supabaseClient.from('assignments').select('*');
-        const { data: customEvents } = await supabaseClient.from('custom_events').select('*');
+        const { data: courses, error: coursesError } = await supabaseClient.from('courses').select('*');
+        if (coursesError) throw new Error('Could not load courses for the backup.');
+        const { data: assignments, error: assignmentsError } = await supabaseClient.from('assignments').select('*');
+        if (assignmentsError) throw new Error('Could not load assignments for the backup.');
+        const { data: customEvents, error: customEventsError } = await supabaseClient.from('custom_events').select('*');
+        if (customEventsError) throw new Error('Could not load calendar events for the backup.');
         const timers = (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('duevinci_timers'))) || [];
         let flashcardMastery = collectLocalFlashcardMastery();
+        let cloudMasteryUnavailable = false;
         try {
             const { data: cloudMastery, error } = await supabaseClient.from('flashcard_mastery').select('course_id, mastery');
             if (!error) {
@@ -48,8 +52,13 @@ export async function exportUserDataJSON() {
                     const courseId = String(row.course_id);
                     flashcardMastery[courseId] = mergeFlashcardMastery(flashcardMastery[courseId] || {}, row.mastery || {});
                 });
-            }
-        } catch { /* Keep the local progress in an offline backup. */ }
+            } else cloudMasteryUnavailable = true;
+        } catch { cloudMasteryUnavailable = true; }
+
+        if (cloudMasteryUnavailable && typeof window !== 'undefined'
+            && !window.confirm('Synced flashcard progress could not be loaded. Download a backup with only progress saved on this device?')) {
+            return;
+        }
 
         const prefs = collectSyncedPreferences();
 
@@ -67,7 +76,7 @@ export async function exportUserDataJSON() {
         URL.revokeObjectURL(url);
     } catch (err) {
         console.error('Error exporting backup:', err);
-        alert('Failed to export backup data.');
+        alert('A complete backup could not be created, so no file was downloaded. Check your connection and try again.');
     }
 }
 

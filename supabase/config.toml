@@ -14,3 +14,13 @@ enabled = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+# OAuth callbacks are provider redirects without a Supabase user JWT. The
+# callback validates one-time state and exchanges the code server-side.
+[functions.calendar-oauth-callback]
+verify_jwt = false
+
+# The scheduled worker uses a separate high-entropy Vault secret header rather
+# than a user JWT; it processes only opted-in, entitled Canvas connections.
+[functions.canvas-scheduled-sync]
+verify_jwt = false

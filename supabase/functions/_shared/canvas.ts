@@ -52,9 +52,9 @@ export async function requireFeature(req: Request, featureKey: string) {
 }
 
 export async function entitledConnection(req: Request, featureKey = 'canvas_sync') {
-  const { admin, user } = await requireFeature(req, featureKey)
+  const { admin, user, profile } = await requireFeature(req, featureKey)
   const { data: connection, error: connectionError } = await admin.from('canvas_connections')
-    .select('canvas_domain, canvas_token, canvas_token_encrypted').eq('user_id', user.id).maybeSingle()
+    .select('canvas_domain, canvas_token, canvas_token_encrypted, last_synced_at, auto_sync_enabled, grade_alerts_enabled, last_auto_sync_claimed_at').eq('user_id', user.id).maybeSingle()
   if (connectionError) throw connectionError
   if (!connection) throw new Error('Canvas credentials not found. Connect Canvas first.')
   let canvasToken = connection.canvas_token_encrypted
@@ -69,7 +69,14 @@ export async function entitledConnection(req: Request, featureKey = 'canvas_sync
       .eq('user_id', user.id)
     if (upgradeError) throw upgradeError
   }
-  return { admin, user, connection: { canvas_domain: connection.canvas_domain, canvas_token: canvasToken } }
+  return { admin, user, profile, connection: {
+    canvas_domain: connection.canvas_domain,
+    canvas_token: canvasToken,
+    last_synced_at: connection.last_synced_at,
+    auto_sync_enabled: connection.auto_sync_enabled === true,
+    grade_alerts_enabled: connection.grade_alerts_enabled === true,
+    last_auto_sync_claimed_at: connection.last_auto_sync_claimed_at || null,
+  } }
 }
 
 export function json(body: unknown, status = 200) {

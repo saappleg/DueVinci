@@ -1,33 +1,31 @@
 # Pomodoro Timer & Focus Modes ⏱️
 
-The **Pomodoro Timer & Focus Modes** module (`js/modules/timers.js`) brings focused productivity directly into your academic workspace without requiring third-party extensions or apps.
+The sidebar timer (`js/modules/timers.js`) provides focus/break countdowns, named custom timers, and browser-generated alarm audio.
 
----
+## Modes and controls
 
-## ⏲️ Modes & Intervals
+| Timer | Initial intervals | Controls |
+| --- | --- | --- |
+| Main Focus / Break | 25 / 5 minutes | Start or pause, reset, skip mode, edit intervals, collapse |
+| Deep Work custom preset | 50 / 10 minutes | Start/pause, reset, delete |
+| Quick Review custom preset | 15 / 3 minutes | Start/pause, reset, delete |
 
-| Mode | Default Duration | Purpose |
-| :--- | :--- | :--- |
-| **Focus / Pomodoro** | 25 minutes | Deep work session on active assignments or study plan tasks |
-| **Short Break** | 5 minutes | Quick stretch, hydration, and mental reset |
-| **Long Break** | 15 minutes | Deep recovery after completing 4 consecutive Pomodoros |
-| **Open Stopwatch** | Untimed | Track continuous study sessions, lab work, or reading |
+Saved preferences and custom timers can replace these initial values. Add a named custom countdown from **Custom Timers**. The module does not implement an untimed stopwatch or an automatic long break after four sessions.
 
----
+The main control is named **Start or pause timer** for assistive technology. Custom timer buttons include their timer's name and expose running state; the custom-timer disclosure is a keyboard-operable button. Audited sidebar controls have enlarged targets. Use the [Testing guide](Testing-&-CI-CD) for the limits of the release accessibility checks.
 
-## 🔊 Synthetic Web Audio Alerts
+## Alarm and ambient audio
 
-DueVinci generates high-fidelity chimes directly in the browser using the native **Web Audio API** (`AudioContext`). This ensures that alert notifications always trigger instantly without relying on external `.mp3` downloads or network connectivity:
+Appearance settings control muting, alarm sound, and ambient white/brown noise. Alarms are synthesized with Web Audio; no downloaded audio file is required. Browser interaction, device volume, background throttling, or browser policy can affect playback. There is no separate guaranteed start chime or timer-completion push notification.
 
-- **Session Start Chime**: Ascending harmonic tone sequence (Major triad: C5 $\rightarrow$ E5 $\rightarrow$ G5).
-- **Session Complete Chime**: Clear, pleasant notification tone with custom decay.
-- **Ambient Focus Noise**: Optional soothing background white/brown noise generator.
+## Floating timer
 
----
+When the main timer is collapsed or otherwise meets the module's floating conditions, running timers can appear in a corner widget. The widget provides countdown/start-pause controls and can be dismissed. It is a page UI, not an operating-system background timer service.
 
-## 🚀 Key Features
+Timer state is saved locally; do not assume live cross-device timer synchronization. A page reload can restore a running main timer from its stored end time, subject to browser behavior.
 
-1. **Floating Mini-Widget**: Minimize the timer into a floating badge in the bottom corner so you can review flashcards, browse calendars, or inspect syllabi while the timer runs.
-2. **Assignment Association**: Link timer sessions directly to a specific course or assignment to automatically track total time spent studying for each class.
-3. **Daily Productivity Analytics**: Track daily focus hours, completed intervals, and weekly study streaks.
-4. **Browser Notifications**: Native HTML5 desktop notifications alert you when intervals finish even if DueVinci is in a background tab.
+## Study-plan connection · Pro, opt-in
+
+A study-plan timer can attach a task context. With personalized estimates enabled and Pro access verified, completed focus sessions and finished tasks contribute to recent study history. Simply pressing Start is not a measurement of completed study time, and the free timer does not provide comprehensive per-class hour analytics.
+
+See [Smart Study Planner](Smart-Study-Planner) for enabling, pausing, and clearing calibration history. Browser due-date reminders and Canvas change alerts are separate settings, not timer-completion guarantees.

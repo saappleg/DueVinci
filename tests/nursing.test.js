@@ -7,10 +7,24 @@ import {
     createEmptyNursingWorkspace,
     getNursingStorageKey,
     isDosageAnswerCorrect,
+    renderNursingTabButton,
     sanitizeNursingWorkspace
 } from '../js/modules/nursing.js';
 
 describe('Nursing Hub learning tools', () => {
+    it('renders nursing tabs as named, stateful 44px navigation targets', () => {
+        const tab = { id: 'review', label: 'Quick review', icon: '⏱️' };
+        const active = renderNursingTabButton(tab, 'review');
+        const inactive = renderNursingTabButton(tab, 'overview');
+
+        expect(active).toContain('aria-current="page"');
+        expect(active).toContain('data-nursing-tab="review"');
+        expect(active).toContain('Quick review');
+        expect(active).toContain('min-h-11 min-w-11');
+        expect(inactive).not.toContain('aria-current="page"');
+        expect(inactive).toContain('min-h-11 min-w-11');
+    });
+
     it('calculates tablet and liquid practice amounts with desired ÷ have × quantity', () => {
         expect(calculateDosagePracticeAnswer(DOSAGE_PROBLEMS[0])).toBe(2);
         expect(calculateDosagePracticeAnswer(DOSAGE_PROBLEMS[1])).toBe(10);

@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { getLocalDateKey } from '../js/modules/utils.js';
 
 describe('AI Study Schedule & Workload Balancer', () => {
     let generateBalancedStudyPlan;
+    let getStudyPlanInfeasibilityWarning;
+    let renderStudyPlanDashboardWidget;
+    let refreshStudyPlan;
     let getUnitNumber;
     let getLessonNumber;
     let ensureStudyPlanDayModalExists;
@@ -14,6 +18,9 @@ describe('AI Study Schedule & Workload Balancer', () => {
     beforeAll(async () => {
         const mod = await import('../js/modules/studyPlan.js');
         generateBalancedStudyPlan = mod.generateBalancedStudyPlan || globalThis.generateBalancedStudyPlan;
+        getStudyPlanInfeasibilityWarning = mod.getStudyPlanInfeasibilityWarning;
+        renderStudyPlanDashboardWidget = mod.renderStudyPlanDashboardWidget;
+        refreshStudyPlan = mod.refreshStudyPlan;
         getUnitNumber = mod.getUnitNumber || globalThis.getUnitNumber;
         getLessonNumber = mod.getLessonNumber || globalThis.getLessonNumber;
         ensureStudyPlanDayModalExists = mod.ensureStudyPlanDayModalExists || globalThis.ensureStudyPlanDayModalExists;
@@ -457,6 +464,67 @@ describe('AI Study Schedule & Workload Balancer', () => {
             expect(plan[0].isRestDay).toBe(true);
             expect(plan[0].assignedTasks.map(item => item.task.id)).toContain('due');
             expect(plan[1].assignedTasks).toHaveLength(0);
+            expect(plan.unplacedDueToRestDays).toEqual([]);
+        });
+
+        it('marks future coursework unplaced when every day before its deadline is a rest day', () => {
+            const courses = [{ id: 'bio', code: 'BIO 101', name: 'Biology' }];
+            const assignments = [{ id: 'future', course_id: 'bio', title: 'Lesson 1: Cells', due_date: '2026-08-22', is_completed: false }];
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date('2026-08-20T12:00:00'), 3, ['Thu', 'Fri', 'Sat']);
+
+            expect(plan.every((day) => day.isRestDay)).toBe(true);
+            expect(plan.flatMap((day) => day.assignedTasks)).toHaveLength(0);
+            expect(plan.unplacedDueToRestDays.map(({ task }) => task.id)).toEqual(['future']);
+            expect(getStudyPlanInfeasibilityWarning(plan)).toContain('1 future coursework item could not be scheduled');
+            expect(getStudyPlanInfeasibilityWarning(plan)).toContain('all available days in the current plan, course, and deadline windows');
+        });
+
+        it('shows an infeasibility warning in the dashboard and refresh confirmation', async () => {
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 1);
+            const assignments = [{
+                id: 'future', course_id: 'bio', title: 'Lesson 1: Cells', due_date: getLocalDateKey(dueDate), is_completed: false,
+            }];
+            const courses = [{ id: 'bio', code: 'BIO 101', name: 'Biology', assignments }];
+            const elements = {};
+            const fakeClassList = () => ({ add() {}, remove() {}, contains() { return false; } });
+            const fakeContainer = { html: '', replaceChildren() {} };
+            Object.defineProperty(fakeContainer, 'innerHTML', {
+                get() { return this.html; },
+                set(html) {
+                    this.html = html;
+                    elements.studyPlanNotice = { textContent: '', className: '' };
+                },
+            });
+            elements.studyPlanWidgetContainer = fakeContainer;
+            vi.stubGlobal('document', {
+                getElementById: (id) => elements[id] || null,
+                createElement: (tagName) => ({
+                    tagName,
+                    className: '',
+                    classList: fakeClassList(),
+                    setAttribute() {},
+                }),
+                body: { appendChild(element) { elements[element.id] = element; } },
+            });
+            vi.stubGlobal('window', { currentUser: null, localCourses: courses, addEventListener() {} });
+            vi.stubGlobal('localStorage', {
+                getItem(key) { return key === 'duevinci_rest_days' ? JSON.stringify(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']) : null; },
+                setItem() {},
+            });
+
+            try {
+                await renderStudyPlanDashboardWidget();
+                expect(fakeContainer.innerHTML).toContain('future coursework item could not be scheduled');
+
+                await refreshStudyPlan();
+
+                expect(elements.studyPlanNotice.textContent).toContain('future coursework item could not be scheduled');
+                expect(elements.studyPlanUpdateModal.innerHTML).toContain('Some coursework could not be scheduled');
+                expect(elements.studyPlanUpdateModal.innerHTML).not.toContain('Your plan is up to date');
+            } finally {
+                vi.unstubAllGlobals();
+            }
         });
 
         it('prioritizes an earlier unit deadline over unit number so no work is scheduled late', () => {

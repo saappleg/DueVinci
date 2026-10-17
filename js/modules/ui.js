@@ -22,6 +22,76 @@ const DASHBOARD_WIDGETS = [
 ];
 
 const modalReturnFocus = new WeakMap();
+const sidebarReturnFocus = new WeakMap();
+const sidebarFocusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+function getVisibleSidebarFocusables(sidebar) {
+    if (!sidebar || typeof sidebar.querySelectorAll !== 'function') return [];
+    return [...sidebar.querySelectorAll(sidebarFocusableSelector)].filter((element) => (
+        !element.disabled
+        && element.getAttribute?.('aria-hidden') !== 'true'
+        && !element.closest?.('.hidden')
+        && element.offsetParent !== null
+    ));
+}
+
+export function focusFirstSidebarElement(sidebar) {
+    if (!sidebar) return null;
+    const first = getVisibleSidebarFocusables(sidebar)[0];
+    if (first) {
+        first.focus();
+        return first;
+    }
+    sidebar.tabIndex = -1;
+    sidebar.focus?.();
+    return sidebar;
+}
+
+export function trapSidebarTabKey(sidebar, event, activeElement = typeof document !== 'undefined' ? document.activeElement : null) {
+    if (!sidebar || event?.key !== 'Tab') return false;
+    const focusable = getVisibleSidebarFocusables(sidebar);
+    if (!focusable.length) {
+        event.preventDefault();
+        sidebar.focus?.();
+        return true;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const activeOutsideSidebar = !sidebar.contains(activeElement);
+    if (event.shiftKey && (activeElement === first || activeOutsideSidebar)) {
+        event.preventDefault();
+        last.focus();
+        return true;
+    }
+    if (!event.shiftKey && (activeElement === last || activeOutsideSidebar)) {
+        event.preventDefault();
+        first.focus();
+        return true;
+    }
+    return false;
+}
+
+function bindSidebarKeyboard(sidebar) {
+    if (sidebar.dataset.sidebarKeyboardBound === 'true') return;
+    sidebar.addEventListener('keydown', (event) => {
+        const isMobileOpen = typeof window !== 'undefined'
+            && window.matchMedia('(max-width: 1023px)').matches
+            && !sidebar.classList.contains('-translate-x-full')
+            && !sidebar.inert;
+        const visibleDialogOutsideSidebar = [...document.querySelectorAll('#settingsModal, #supportModal, #canvasSyncModal, [role="dialog"]')]
+            .some((dialog) => !dialog.closest('.hidden')
+                && dialog.getAttribute('aria-hidden') !== 'true'
+                && !sidebar.contains(dialog));
+        if (!isMobileOpen || visibleDialogOutsideSidebar) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            toggleSidebar(false);
+            return;
+        }
+        trapSidebarTabKey(sidebar, event);
+    });
+    sidebar.dataset.sidebarKeyboardBound = 'true';
+}
 
 function showAccessibleModal(modal, closeModal) {
     if (!modal) return;
@@ -60,16 +130,22 @@ function showAccessibleModal(modal, closeModal) {
 
 function hideAccessibleModal(modal) {
     if (!modal) return;
+    const trigger = modalReturnFocus.get(modal);
+    const fallback = modal.id === 'settingsModal'
+        ? document.querySelector('duevinci-sidebar button[aria-label="Open profile settings"]')
+        : document.querySelector('button[onclick*="openSupportModal"]');
+    const focusIsInsideModal = () => Boolean(modal.contains?.(document.activeElement));
+    const focusOutsideModal = (target) => {
+        if (!target?.isConnected || typeof target.focus !== 'function' || modal.contains?.(target)) return false;
+        target.focus();
+        return !focusIsInsideModal();
+    };
+
+    if (!focusOutsideModal(trigger)) focusOutsideModal(fallback);
+    if (focusIsInsideModal()) document.activeElement?.blur?.();
+
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
-    const trigger = modalReturnFocus.get(modal);
-    if (trigger?.isConnected && typeof trigger.focus === 'function') trigger.focus();
-    else {
-        const fallback = modal.id === 'settingsModal'
-            ? document.querySelector('duevinci-sidebar button[aria-label="Open profile settings"]')
-            : document.querySelector('button[onclick*="openSupportModal"]');
-        fallback?.focus();
-    }
     modalReturnFocus.delete(modal);
 }
 
@@ -222,9 +298,25 @@ export function toggleSidebar(forceOpen = null) {
     if (aside) {
         const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
         if (isMobile) {
-            const shouldOpen = forceOpen === null ? aside.classList.contains('-translate-x-full') : Boolean(forceOpen);
+            const isOpen = !aside.classList.contains('-translate-x-full');
+            const shouldOpen = forceOpen === null ? !isOpen : Boolean(forceOpen);
+            const trigger = document.activeElement;
+            if (shouldOpen && !isOpen) sidebarReturnFocus.set(aside, trigger);
             aside.classList.toggle('-translate-x-full', !shouldOpen);
+            aside.inert = !shouldOpen;
+            aside.setAttribute('aria-hidden', String(!shouldOpen));
             document.getElementById('sidebarBackdrop')?.classList.toggle('hidden', !shouldOpen);
+            if (shouldOpen && !isOpen) {
+                trigger?.setAttribute?.('aria-expanded', 'true');
+                trigger?.setAttribute?.('aria-controls', 'appSidebar');
+                bindSidebarKeyboard(aside);
+                focusFirstSidebarElement(aside);
+            } else if (!shouldOpen && isOpen) {
+                const returnFocus = sidebarReturnFocus.get(aside);
+                returnFocus?.setAttribute?.('aria-expanded', 'false');
+                sidebarReturnFocus.delete(aside);
+                if (returnFocus?.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
+            }
         } else {
             if (forceOpen === null) aside.classList.toggle('hidden');
             else aside.classList.toggle('hidden', !forceOpen);
@@ -366,7 +458,19 @@ function injectReminderSettings() {
         <label class="flex items-center justify-between gap-4 rounded-xl bg-zinc-50 dark:bg-brand-900 p-3 border border-zinc-200 dark:border-brand-700"><span class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Enable reminders</span><input id="remindersEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
         <div><label class="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Remind me</label><select id="reminderSchedule" class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs dark:border-brand-600 dark:bg-brand-900 dark:text-white"><option value="0">On the due date</option><option value="0,1">On the due date and 1 day before</option><option value="0,1,3">On the due date, 1 day, and 3 days before</option><option value="0,1,3,7">On the due date, 1 day, 3 days, and 1 week before</option></select></div>
         <div class="flex gap-2"><button type="button" onclick="saveReminderSettingsFromUI()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save reminders</button><button type="button" onclick="requestReminderPermission()" class="rounded-lg bg-zinc-200 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-300 dark:bg-brand-700 dark:text-white">Enable browser alerts</button></div>
-        <p id="reminderSettingsMsg" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>`;
+        <p id="reminderSettingsMsg" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        <div class="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+            <div><h3 class="text-sm font-bold text-zinc-900 dark:text-white">🧠 Personalized study plan · Pro</h3><p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">With your permission, completed focus sessions and finished study-plan tasks help estimate future study time. History stays in your DueVinci account and can be cleared here.</p></div>
+            <label class="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><span>Use my study history to adjust estimates</span><input id="studyCalibrationEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600"></label>
+            <div class="flex flex-wrap gap-2"><button type="button" onclick="saveStudyCalibrationSettingsFromUI()" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Save setting</button><button type="button" onclick="clearStudyCalibrationHistory()" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:bg-brand-700 dark:text-white dark:hover:bg-brand-600">Clear history</button></div>
+            <p id="studyCalibrationSettingsMsg" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        </div>
+        <div class="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+            <div><h3 class="text-sm font-bold text-zinc-900 dark:text-white">📣 Canvas assignment change alerts · Pro</h3><p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">Get a browser push alert after Canvas sync adds a dated assignment or changes its due date. Your existing classes and assignments stay in the free plan.</p></div>
+            <label class="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><span>Alert me about Canvas assignment changes</span><input id="lmsChangeAlertsEnabled" type="checkbox" class="h-4 w-4 accent-emerald-600"></label>
+            <button type="button" onclick="saveLmsChangeAlertSettingsFromUI()" class="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500">Save alert setting</button>
+            <p id="lmsChangeAlertsMsg" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+        </div>`;
     appearanceTab.appendChild(container);
 }
 
@@ -398,9 +502,9 @@ export function ensureSettingsModalExists() {
                         <a href="${getBasePath()}legal/terms.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Terms of Use ↗</a>
                     </div>
                 </div>
-                <div class="relative min-h-0 flex-1">
+                <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <button type="button" data-modal-close aria-label="Close Settings" onclick="closeSettingsModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    <div class="settings-scroll-pane h-full min-h-0 overflow-y-auto p-4 pt-14 sm:p-6 sm:pt-16">
+                    <div class="settings-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-14 sm:p-6 sm:pt-16">
                     <!-- Tab: Profile -->
                         <div id="content-profile" aria-hidden="false" class="block space-y-6">
                         <div>
@@ -409,7 +513,7 @@ export function ensureSettingsModalExists() {
                         </div>
                         <form id="settingsForm" class="max-w-sm space-y-4">
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Display Name</label>
+                                <label for="profileDisplayName" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Display Name</label>
                                 <input type="text" id="profileDisplayName" maxlength="80" autocomplete="name" placeholder="How DueVinci should address you" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                                 <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Shown in your profile menu. Your email remains private.</p>
                             </div>
@@ -434,11 +538,11 @@ export function ensureSettingsModalExists() {
                                 <p id="profileBadgeMsg" class="hidden mt-1 text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                                <label for="profileEmail" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
                                 <input type="email" id="profileEmail" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+                                <label for="profilePassword" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
                                 <input type="password" id="profilePassword" placeholder="Leave blank to keep current" class="w-full border border-zinc-300 dark:border-brand-600 dark:bg-brand-900 dark:text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                             </div>
                             <button type="submit" class="w-full bg-zinc-900 dark:bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-zinc-800 dark:hover:bg-indigo-700 transition shadow-sm">Save Profile Changes</button>
@@ -627,11 +731,11 @@ export function ensureSettingsModalExists() {
                             <div class="font-bold text-sm text-zinc-900 dark:text-white">🔗 Connect Your Canvas Instance</div>
                             <div id="canvasConnectorMsg" class="hidden text-xs rounded-lg px-3 py-2 border"></div>
                             <div>
-                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Canvas Instance URL</label>
+                                <label for="canvasDomainInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Canvas Instance URL</label>
                                 <input type="text" id="canvasDomainInput" placeholder="https://canvas.myschool.edu" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
+                                <label for="canvasTokenInput" class="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5">Personal Access Token</label>
                                 <input type="password" id="canvasTokenInput" placeholder="Canvas → Account → Settings → + New Access Token" class="w-full px-3 py-2 bg-white dark:bg-brand-800 border border-zinc-300 dark:border-brand-600 rounded-lg text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-500 font-mono transition">
                                 <p class="text-[11px] text-zinc-400 mt-1.5">Canvas: Account → Settings → Approved Integrations → + New Access Token.</p>
                             </div>
@@ -689,15 +793,60 @@ export function ensureSettingsModalExists() {
                             <p id="brightspaceSyncMessage" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
                         </div>
 
+                        <div id="calendarProvidersArea" class="hidden space-y-3 border-t border-zinc-200 pt-4 dark:border-brand-700">
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Google Calendar and Outlook · Pro</h3>
+                                <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">Read-only sync imports event titles and dates from your default calendar, from 30 days ago through 180 days ahead. DueVinci does not edit your provider calendar. Disconnect removes the saved token and hides imported events.</p>
+                            </div>
+                            <div class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-brand-700 dark:border-brand-700">
+                                <section class="space-y-2 p-3" aria-labelledby="googleCalendarTitle">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0"><h4 id="googleCalendarTitle" class="text-xs font-bold text-zinc-900 dark:text-white">Google Calendar</h4><p id="googleCalendarStatus" class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Checking connection…</p></div>
+                                        <button id="calendarGoogleConnectButton" type="button" onclick="connectCalendarProvider('google')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Connect</button>
+                                    </div>
+                                    <div id="googleCalendarConnectedArea" class="hidden flex flex-wrap gap-2">
+                                        <button id="googleCalendarSyncButton" type="button" onclick="syncCalendarProvider('google')" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Sync now</button>
+                                        <button id="googleCalendarDisconnectButton" type="button" onclick="disconnectCalendarProvider('google')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Disconnect</button>
+                                    </div>
+                                </section>
+                                <section class="space-y-2 p-3" aria-labelledby="outlookCalendarTitle">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0"><h4 id="outlookCalendarTitle" class="text-xs font-bold text-zinc-900 dark:text-white">Microsoft Outlook</h4><p id="outlookCalendarStatus" class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Checking connection…</p></div>
+                                        <button id="calendarOutlookConnectButton" type="button" onclick="connectCalendarProvider('outlook')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Connect</button>
+                                    </div>
+                                    <div id="outlookCalendarConnectedArea" class="hidden flex flex-wrap gap-2">
+                                        <button id="outlookCalendarSyncButton" type="button" onclick="syncCalendarProvider('outlook')" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Sync now</button>
+                                        <button id="outlookCalendarDisconnectButton" type="button" onclick="disconnectCalendarProvider('outlook')" class="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-brand-600 dark:text-zinc-200 dark:hover:bg-brand-800">Disconnect</button>
+                                    </div>
+                                </section>
+                            </div>
+                            <p id="calendarProviderSyncMessage" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+                        </div>
+
+                        <div id="canvasAutoSyncArea" class="hidden space-y-3 border-t border-zinc-200 pt-4 dark:border-brand-700">
+                            <div>
+                                <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Automatic Canvas refresh · Pro</h3>
+                                <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">DueVinci checks selected Canvas courses about once an hour. If enabled, it can send a browser push alert when Canvas posts or changes a grade. Refresh only reads your selected courses and submissions.</p>
+                            </div>
+                            <label class="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-700 dark:border-brand-700 dark:text-zinc-200">
+                                <span>Refresh my selected Canvas courses automatically</span><input id="canvasAutoSyncEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600">
+                            </label>
+                            <label class="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-700 dark:border-brand-700 dark:text-zinc-200">
+                                <span>Alert me when a Canvas grade is posted</span><input id="canvasGradeAlertsEnabled" type="checkbox" class="h-4 w-4 accent-indigo-600">
+                            </label>
+                            <button type="button" id="canvasAutoSyncSaveButton" onclick="saveCanvasAutoSyncSettings()" class="min-h-[44px] rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50">Save refresh settings</button>
+                            <p id="canvasAutoSyncStatus" role="status" aria-live="polite" class="hidden text-xs text-zinc-500 dark:text-zinc-400"></p>
+                        </div>
+
                         <!-- Canvas Sync Modal -->
-                        <div id="canvasSyncModal" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                            <div class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div id="canvasSyncModal" aria-hidden="true" onclick="if (event.target === this) closeCanvasSyncModal()" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                            <div role="dialog" aria-modal="true" aria-labelledby="canvasSyncModalTitle" class="relative w-full max-w-lg bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-600 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                                 <div class="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-brand-700">
                                     <div>
-                                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
+                                        <h3 id="canvasSyncModalTitle" class="text-sm font-bold text-zinc-900 dark:text-white">Sync Canvas coursework</h3>
                                         <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Import selected courses plus their dated assignments.</p>
                                     </div>
-                                    <button type="button" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
+                                    <button type="button" data-modal-close aria-label="Close Canvas sync" onclick="closeCanvasSyncModal()" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition text-lg">✕</button>
                                 </div>
                                 <div id="canvasSyncModalMsg" class="hidden mx-5 mt-4 p-3 rounded-xl text-xs border"></div>
                                 <div class="flex-1 overflow-y-auto p-5" id="canvasCourseList">
@@ -827,6 +976,9 @@ export function openSettingsModal() {
         });
         injectReminderSettings();
         refreshReminderSettings();
+        Promise.resolve(window.refreshStudyCalibrationSettings?.()).catch(() => {});
+        Promise.resolve(window.refreshLmsChangeAlertSettings?.()).catch(() => {});
+        Promise.resolve(window.refreshCalendarProviderSettings?.()).catch(() => {});
 
         const dfSelect = document.getElementById('dateFormatSelect');
         if (dfSelect) dfSelect.value = localStorage.getItem('duevinci_date_format') || 'YYYY-MM-DD';
@@ -942,9 +1094,9 @@ export function ensureSupportModalExists() {
                         <a href="${getBasePath()}legal/privacy.html" class="block text-zinc-500 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 font-medium">Privacy Policy ↗</a>
                     </div>
                 </div>
-                <div class="relative min-h-0 flex-1">
+                <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <button type="button" data-modal-close aria-label="Close Help and Support" onclick="closeSupportModal()" class="absolute right-3 top-3 z-20 rounded-lg px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">✕</button>
-                    <div class="support-scroll-pane h-full min-h-0 overflow-y-auto p-6 pt-16">
+                    <div class="support-scroll-pane min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-16">
                     <div id="support-content-contact" aria-hidden="false" class="block space-y-4">
                         <div>
                             <h2 id="supportModalTitle" class="text-xl font-bold dark:text-white mb-1">Get Help & Reach Out</h2>

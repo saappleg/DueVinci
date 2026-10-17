@@ -1,12 +1,20 @@
 # DueVinci Dev Supabase
 
-This directory contains the database migrations and Edge Functions used by the Dev environment.
+This directory contains the incremental database migrations and Edge Functions used by the Dev environment. The commands below explicitly target the DueVinci Dev project; keep Production projects, secrets, and billing credentials separate.
 
 ## Apply the Dev schema
 
+`supabase/migrations` extends DueVinci's existing application schema. It is not a complete bootstrap for a brand-new project, and this repository does not include the full baseline schema: the base planner tables (`courses`, `assignments`, and `custom_events`), their required columns, and owner-scoped Row Level Security policies must already exist. Provision and verify that baseline before applying these migrations.
+
+Link the CLI to the Dev project, review the pending changes, then apply them. The link step sets the project target for later CLI commands; do not link this Dev checkout to Production.
+
 ```sh
-supabase db push --project-ref kinsxkeerxguqkyzrjfm
+supabase link --project-ref kinsxkeerxguqkyzrjfm
+supabase db push --dry-run
+supabase db push
 ```
+
+See the [Supabase CLI reference](https://supabase.com/docs/reference/cli/introduction) for project linking and migration commands.
 
 ## Deploy Edge Functions
 
@@ -16,10 +24,15 @@ supabase functions deploy create-checkout-session --project-ref kinsxkeerxguqkyz
 supabase functions deploy create-portal-session --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy subscription-status --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy tutor --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy gemini-parser --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy delete-account --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-connect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-courses --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-sync --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy calendar-integrations --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy calendar-oauth-callback --no-verify-jwt --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-auto-sync-settings --project-ref kinsxkeerxguqkyzrjfm
+supabase functions deploy canvas-scheduled-sync --no-verify-jwt --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy canvas-disconnect --project-ref kinsxkeerxguqkyzrjfm
 supabase functions deploy brightspace-calendar --project-ref kinsxkeerxguqkyzrjfm
 # Stripe does not send a Supabase JWT; stripe-webhook verifies Stripe's signed
@@ -51,10 +64,13 @@ before deploying the matching functions or frontend. Tutor usage defaults to
 `TUTOR_TRIAL_DAILY_REQUEST_LIMIT`, `TUTOR_TRIAL_MONTHLY_REQUEST_LIMIT`,
 `TUTOR_DAILY_REQUEST_LIMIT`, and `TUTOR_MONTHLY_REQUEST_LIMIT` can override them.
 Only the service role can reserve or release usage; users can read their own usage
-row. Tutor prompts that fail before reaching the model do not use quota; upstream
-failures trigger a quota release. The migration schedules a daily cleanup that
-removes Tutor usage rows within 12 months of last activity; account deletion
-removes all remaining rows through the user foreign key.
+row. Tutor prompts that fail before reaching the model do not use quota. After a
+request reserves quota, an upstream failure triggers an attempted release; if that
+release fails, the function logs the failure and the reservation may remain counted.
+The migration schedules a daily cleanup that makes Tutor usage rows eligible for
+removal when `updated_at` is older than 12 months; this is an age threshold, not a
+guaranteed deletion time. Account deletion removes remaining rows through the user
+foreign key.
 The public offer shows the default Tutor quotas. If the quota secrets are changed,
 update `js/modules/subscription.js` before release so the offer and enforcement agree.
 
@@ -72,6 +88,18 @@ Stripe when the billing settings are opened, then keeps the last synced state
 visible if Stripe is temporarily unavailable. Apply the migration before
 deploying the updated `stripe-webhook` and `subscription-status` functions.
 
+The gradebook and coursework workflow migrations add fields to the existing
+course and assignment rows:
+
+- `20261017022938_weighted_gradebook_and_gpa.sql` adds course credit hours and
+  weighted grade categories, plus an optional category assignment for each
+  coursework item.
+- `20261017022939_coursework_workflow_fields.sql` adds parent/child coursework
+  relationships, editable progress from 0 to 100%, and optional instructions.
+
+Apply these migrations before publishing the matching frontend. They preserve
+the existing owner-scoped course and assignment rows.
+
 Checkout and billing-portal return URLs must match `APP_URL` at the root or its
 `index.html` path. Set `ALLOW_LOCALHOST_RETURN_URLS=true` only in a local development
 environment when testing Stripe redirects.
@@ -80,13 +108,60 @@ Subscription access is feature-based: `subscription_plan_features` maps a plan
 key to its enabled features. Add future paid features by creating a plan key and
 feature mapping, then use the shared Edge Function entitlement check.
 
+The `20261016005712_account_deletion_guard.sql` migration adds the server-owned
+`account_deletion_pending` flag. Checkout rejects accounts being deleted, and
+Stripe webhooks do not restore subscription state for those accounts.
+
+The `20261016011145_add_study_pro_features.sql` migration adds the
+`lms_change_alerts` and `study_plan_calibration` feature keys to the existing
+`canvas_sync` Pro plan. Canvas alerts are opt-in and cover new assignments and
+changed due dates after a Canvas sync. The follow-on
+`20261017022955_calendar_oauth_canvas_auto_sync.sql` migration adds opt-in
+scheduled refresh and posted-grade alerts, plus read-only Google Calendar and
+Outlook sync. Study-plan calibration is also opt-in. Its synced history contains task
+and course IDs, task types, focus minutes, and timestamps. Estimates use records
+from the previous 90 days, but that is a calculation window, not an automatic
+retention period. Each history save retains the newest 180 focus sessions and
+120 task completions; older entries may be dropped. The user can clear the saved
+history in Settings.
+
 Canvas tokens are stored in the server-only `canvas_connections` table and Canvas API calls run through Edge Functions. The `20260823123000_secure_canvas_connections.sql` migration moves any old profile token into that table and clears the browser-readable value.
 
-The `20261012232702_brightspace_calendar_sync.sql` migration adds the server-only Brightspace connection record and idempotent calendar-event source fields. The `brightspace-calendar` Edge Function accepts SNHU's private HTTPS calendar feed link, encrypts it with AES-GCM, fetches it on demand, and upserts calendar events. The browser never reads the saved link. Deploy this function with `subscription-status` after applying the migration.
+The `20261012232702_brightspace_calendar_sync.sql` migration adds the server-only Brightspace connection record and idempotent calendar-event source fields. The `brightspace-calendar` Edge Function accepts SNHU's private HTTPS calendar feed link, encrypts it with AES-GCM, fetches it on demand, and upserts calendar events. A successful empty feed deactivates older imported events from that Brightspace connection without deleting them; a malformed feed, rejected response, or fetch error does not deactivate existing events. Manual events, other providers, and other users' rows are not affected. The browser never reads the saved link. Deploy this function with `subscription-status` after applying the migration.
 
-`CANVAS_TOKEN_ENCRYPTION_KEY` is a separate 32-byte, base64-encoded Edge Function secret used to encrypt Canvas tokens and Brightspace feed links with AES-GCM before storage. Dev and Production must use different keys; never place either key in browser code or source control.
+The `20261016012446_add_calendar_and_rollover_idempotency.sql` migration adds
+unique source identifiers for manual calendar-event-to-assignment conversion
+and course-only term rollover. A conversion is user initiated and leaves the
+original calendar event in place. Rollover copies course setup into the new term,
+not assignments or lesson progress; the original term is unchanged. Apply the
+migration before deploying the matching frontend.
 
-Canvas sync imports selected courses and Canvas assignments that have due dates. LMS source IDs make repeat syncs update the same courses and assignments instead of creating duplicates.
+`CANVAS_TOKEN_ENCRYPTION_KEY` is a separate 32-byte, base64-encoded Edge Function secret used to encrypt Canvas tokens, Brightspace feed links, calendar access/refresh tokens, and short-lived OAuth PKCE verifiers with AES-GCM before storage. Dev and Production must use different keys; never place either key in browser code or source control.
+
+Canvas sync imports selected courses and Canvas assignments that have due dates. LMS source IDs make repeat syncs update the same courses and assignments instead of creating duplicates. Opt-in assignment-change notifications are evaluated and sent after a Canvas sync, and require browser notification permission on each device; they cover new assignments and changed due dates. The scheduled refresh worker runs every minute and claims one due account per invocation; each account is normally checked no more often than about hourly. Grade alerts detect a new or changed grade marked posted for the current submission; first observation establishes a baseline. Grade snapshots are minimal and service-role-only. See [Calendar integrations](../docs/CALENDAR_INTEGRATIONS.md) for scheduler secrets, OAuth scopes, callback configuration, deployment, and data-handling details.
+
+Google Calendar and Outlook sync are read-only. Each connection triggers an
+initial sync; the user starts later syncs. The Google scope is
+`calendar.events.owned.readonly`; Microsoft Graph uses delegated
+`Calendars.ReadBasic` plus `offline_access`. Sync imports event titles and start
+dates from the primary/default calendar for the previous 30 days and next 180
+days. Disconnect removes DueVinci's saved tokens and hides imported events;
+Outlook provider consent must also be revoked from Microsoft My Apps if desired.
+Set `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`,
+`MICROSOFT_CALENDAR_CLIENT_ID`, `MICROSOFT_CALENDAR_CLIENT_SECRET`, and `APP_URL`
+as server-side secrets. Register
+`https://<project-ref>.supabase.co/functions/v1/calendar-oauth-callback` with
+each OAuth client. The scheduled Canvas worker additionally requires a matching
+`CANVAS_SCHEDULER_SECRET` Edge Function secret and `duevinci_project_url` plus
+`duevinci_canvas_scheduler_secret` in Supabase Vault. Never commit secret values.
+
+The Gemini Edge Functions use `GEMINI_API_KEY`; Tutor can instead use the
+dedicated `GEMINI_TUTOR_API_KEY`, falling back to `GEMINI_API_KEY` when it is
+unset. Their primary model names can be overridden with
+`GEMINI_SYLLABUS_MODEL` and `GEMINI_TUTOR_MODEL`; the available fallback models
+are maintained in function source and may change. Keep all Gemini secrets and
+model configuration separate between Dev and Production, and do not pin
+deployment notes to a retired model name.
 
 Browser imports can also preserve source course windows and weekly pacing. The
 `20260909090000_wgu_weekly_pacing.sql` migration adds `start_date`, `end_date`,
@@ -125,5 +200,7 @@ verified in Resend; the function only confirms delivery after Resend accepts it.
 Migration `20260823142000_privacy_retention.sql` schedules a daily Supabase Cron
 job named `duevinci-privacy-retention`. It deletes `app_error_events` after 90
 days and tickets marked `resolved` or `closed` 90 days after their
-`resolved_at` timestamp. Tutor usage has a separate daily cleanup job and is
-removed after 12 months. These jobs must be present in both Dev and Production.
+`resolved_at` timestamp. Tutor usage has a separate daily cleanup job; rows with
+an `updated_at` older than 12 months are eligible for removal when that job runs.
+This threshold is not a guaranteed deletion time. These jobs must be present in
+both Dev and Production.

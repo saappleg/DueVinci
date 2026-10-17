@@ -1,9 +1,18 @@
 # Production operations
 
-This runbook takes effect when the approved Dev release is promoted to `main`.
+Use this runbook for approved releases and incident response on `main`.
 The scheduled GitHub Action runs each weekday at 14:00 UTC and checks public
 pages, PWA assets, smoke-account sign-in, and one create/delete planner write.
-It deliberately does not create recurring support tickets.
+It deliberately skips support submission in both the deployment and scheduled
+monitor workflows. The smoke script attempts to delete its temporary course,
+but does not check the DELETE response; its cleanup log is not independent proof
+that the row was removed.
+
+The smoke test uses HTTP requests rather than a browser. Verify signed-in
+Settings separately on the Dashboard and a nested route: all six sections,
+light/dark appearance, narrow-screen scrolling, keyboard navigation, and focus
+return after closing. Check Tutor loading/error states and interactive overlays
+in the browser when those features change.
 
 ## Daily signals
 
@@ -16,9 +25,11 @@ It deliberately does not create recurring support tickets.
 
 ## Billing release gate
 
-Do not change the Production Stripe vault during the `main` freeze. On release
-day, validate the masked values in the Production Supabase project against the
-live Stripe account:
+During a declared `main` freeze, keep Production Stripe vault changes within
+the approved release or incident exception. Before a billing release, validate
+the masked values in the Production Supabase project against the live Stripe
+account. The price IDs below are recorded deployment references, not a live
+vault audit; confirm their products, amounts, and active state before reuse.
 
 | Setting | Expected live value |
 | --- | --- |
@@ -39,5 +50,16 @@ Production.
 2. Check the matching Edge Function log and identify the first failing layer.
 3. Disable only the affected paid entry point if billing or entitlement data is
    unsafe; keep the free planner available.
-4. Apply and verify the fix in Dev first. Promote to Production only under the
-   bug-fix exception to the freeze.
+4. Apply and verify the fix in Dev first. Promote under the approved release;
+   during a declared freeze, use its authorized bug-fix exception.
+
+## Release verification record
+
+The October 16, 2026 application release is package **2.8.0**, with PWA shell
+**v8.42**. [PR #15](https://github.com/saappleg/DueVinci/pull/15) records the final
+timer-label check; [PR #14](https://github.com/saappleg/DueVinci/pull/14) records
+the preceding mobile-target and modal-focus checks. Its
+[production deployment](https://github.com/saappleg/DueVinci/actions/runs/38886005054)
+ran 231 tests across 33 files and passed the public/PWA, sign-in, and planner-write
+smoke checks. These checks do not establish live checkout or real LMS sync
+coverage; verify those separately when changing billing or provider integrations.

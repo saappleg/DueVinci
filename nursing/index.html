@@ -31,12 +31,22 @@
     <div id="appScreen" class="hidden flex h-screen overflow-hidden">
         <duevinci-sidebar></duevinci-sidebar>
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-brand-900">
-            <header class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-white px-5 dark:border-brand-800 dark:bg-brand-900 sm:px-8">
-                <div class="flex min-w-0 items-center gap-4">
-                    <button type="button" onclick="toggleSidebar()" class="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-brand-800" aria-label="Toggle sidebar">☰</button>
+            <header class="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-zinc-200 bg-white px-5 dark:border-brand-800 dark:bg-brand-900 sm:gap-4 sm:px-8">
+                <div class="flex min-w-0 items-center gap-2 sm:gap-4">
+                    <button type="button" onclick="toggleSidebar()" class="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-brand-800" aria-label="Toggle sidebar">☰</button>
+                    <div aria-hidden="true" class="flex h-8 w-8 shrink-0 items-center justify-center text-indigo-600 dark:text-indigo-400 sm:h-10 sm:w-10">
+                        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-full w-full drop-shadow-sm" focusable="false">
+                            <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" class="opacity-40"/>
+                            <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="2" class="opacity-30" transform="rotate(45 50 50)"/>
+                            <path d="M30 30 L70 30 C85 30 85 50 70 50 L50 80 L30 50 C15 50 15 30 30 30 Z" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                            <path d="M30 30 L50 80 L70 30" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="opacity-80"/>
+                            <line x1="50" y1="30" x2="50" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                    </div>
                     <div class="min-w-0">
-                        <h1 class="truncate text-base font-extrabold text-zinc-900 dark:text-white">Nursing Hub</h1>
-                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Your nursing school workspace</p>
+                        <h1 class="truncate text-base font-extrabold text-zinc-900 dark:text-white">DueVinci</h1>
+                        <p class="truncate text-[11px] text-zinc-500 dark:text-zinc-400">Nursing Hub</p>
+                        <p class="hidden truncate text-[10px] text-zinc-500 dark:text-zinc-400 lg:block">Your nursing school workspace</p>
                     </div>
                 </div>
                 <button type="button" onclick="logout()" class="rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-200 dark:border-brand-600 dark:bg-brand-800 dark:text-white dark:hover:bg-brand-700">Sign out</button>

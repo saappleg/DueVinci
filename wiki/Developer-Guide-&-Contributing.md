@@ -1,63 +1,52 @@
 # Developer Guide & Contributing 🛠️
 
-Thank you for your interest in contributing to DueVinci! This document provides engineering guidelines, coding standards, and architectural conventions for developers.
+Use the repository's [CONTRIBUTING.md](https://github.com/saappleg/DueVinci/blob/main/docs/CONTRIBUTING.md) and applicable `AGENTS.md` instructions for the working checkout. Preserve existing architecture, user work, styling tokens, and privacy boundaries.
 
----
+## Code organization
 
-## 🧭 Code Organization & Principles
+DueVinci uses native ES modules and static HTML routes. A static HTTP server can run the app without bundling. Local vendor assets provide Tailwind, FullCalendar, PDF.js and related browser libraries.
 
-DueVinci follows a **Vanilla Modern Web** philosophy:
-1. **ES6 Native Modules**: All logic is structured as standard ES6 modules in `js/modules/`.
-2. **Zero-Build Dependency**: The application can run directly in the browser via simple HTTP servers without requiring Webpack, Vite, or Babel for local runtime.
-3. **Immutability & Pure Functions**: Wherever possible, mathematical calculations (GPA, SM-2, study scheduling) should be pure functions with dedicated unit tests.
-4. **Accessible & Responsive**: All UI elements must maintain WCAG 2.1 AA accessibility and perform seamlessly across desktop and mobile screens.
+| Area | Main files |
+| --- | --- |
+| Bootstrap and shared UI | `js/app.js`, `ui.js`, `components.js`, `scrollAids.js` |
+| Courses and planning | `courses.js`, `academics.js`, `studyPlan.js`, `courseDates.js`, `termRollover.js` |
+| Study tools | `flashcards.js`, `grades.js`, `timers.js`, `studyCalibration.js`, `nursing.js` |
+| Integrations | `tutor.js`, `subscription.js`, `canvas.js`, `brightspace.js`, `lmsAlerts.js` |
+| Account and persistence | `auth.js`, `preferences.js`, `preferenceMerge.js`, `offlineDb.js`, `backup.js`, `pwa.js` |
+| Themes and helpers | `degreeThemes.js`, `markdown.js`, `utils.js`, theme CSS |
+| Backend | `supabase/functions/` and reviewed migrations in `supabase/migrations/` |
 
----
+Module names above refer to `js/modules/` unless otherwise shown. Keep pure scheduling/math/parser helpers testable, and keep external service calls at explicit boundaries.
 
-## 📁 Key Modules Reference
+## Development workflow
 
-| File | Primary Responsibility |
-| :--- | :--- |
-| `js/app.js` | Main entry point; binds event listeners, routes page states, boots modules |
-| `js/modules/academics.js` | Academic dashboard utilities, study streaks, GPA conversion, and 7-Day Workload & Stress Radar |
-| `js/modules/courses.js` | Course detail view controller, syllabus ingestion UI, module tabs |
-| `js/modules/flashcards.js` | SuperMemo-2 spaced repetition, review queues, flip-card modal |
-| `js/modules/studyPlan.js` | Deadline-first study-plan balancing, lesson sequencing, rest days, and daily study blocks |
-| `js/modules/grades.js` | Weighted course average, cumulative GPA calculations, what-if simulator |
-| `js/modules/timers.js` | Pomodoro timer, stopwatch, Web Audio API chime synthesis |
-| `js/modules/calendar.js` | FullCalendar lifecycle, event parsing, RFC 5545 `.ics` generator |
-| `js/modules/markdown.js` | Sanitized Markdown rendering with lightweight LaTex-style math formatting |
-| `js/modules/offlineDb.js` | Local persistence and offline-status helper |
-| `js/modules/ui.js` | Notification toasts, modal dialog manager, theme toggle |
-| `js/modules/utils.js` | Date formatting, sanitization, debounce, and helper utilities |
+1. Inspect the actual checkout, status/diff, full relevant source, documentation, tests, and theme styles before changing behavior.
+2. Name the exact files and intended scope. Preserve unrelated changes and use a topic branch.
+3. Reuse existing helpers/components. Make the smallest complete fix; do not add an unimplemented feature to make a document true.
+4. Run relevant checks when implementation verification is requested. For documentation-only work, inspect links, source accuracy, and the diff; do not describe old test results as a new test run.
 
----
-
-## 🧪 Development Workflow
-
-### 1. Create a Topic Branch
-```bash
-git checkout -b feature/awesome-feature
-```
-
-### 2. Run Syntax & Test Checks
-Always ensure tests and syntax checks pass before submitting a pull request:
 ```bash
 npm run check:syntax
 npm test
 ```
 
-### 3. Commit Guidelines
-Use clear, conventional commit messages:
-- `feat: add export to CSV feature for grade tracker`
-- `fix: handle edge case in SM-2 interval when ease factor drops below floor`
-- `docs: update API documentation in wiki`
+For example, naming/target changes have focused regressions in `tests/navigationTargets.test.js`; focus changes have `tests/sidebarFocus.test.js` and `tests/modalFocus.test.js`. Add source/behavior regressions appropriate to changed implementation. Do not weaken failing checks.
 
----
+## UI and accessibility verification
 
-## 🤝 Pull Request Checklist
+Check Dashboard, Classes, Grades, Calendar, Nursing, and Tutor routes when affected. Verify light/dark appearance, narrow layouts, computed target bounds, keyboard entry/Tab/Escape/focus return, and visible loading/error/empty states. Source classes and DOM stubs do not prove real CSS geometry or complete WCAG compliance.
 
-- [ ] Code follows existing formatting and ES6 module patterns.
-- [ ] New logic is covered by automated unit tests in `tests/`.
-- [ ] `npm test` and `npm run check:syntax` pass without errors or warnings.
-- [ ] Relevant documentation / wiki pages are updated.
+Settings has both a static dashboard copy and injected nested-route copies. Verify both where relevant. Scroll aids must stay inside the active pane and avoid controls; hidden aids must not intercept pointer input. Local loopback previews deliberately remove DueVinci's worker; use a hosted environment for installation/offline checks.
+
+## Backend and privacy boundaries
+
+Read the current function/schema and official provider documentation before changing an integration. Keep provider/privileged secrets server-side and preserve ownership checks/RLS. Review database migrations and deployments explicitly; running frontend checks is not a backend deployment or Deno type check.
+
+Nursing scenarios must be fictional. Never use real patient information, real coursework mutations, purchases, or destructive account actions as incidental audit data. Use authorized disposable accounts and report what remains unverified.
+
+## Pull request checklist
+
+- Describe exact behavior, files, and source evidence.
+- Record checks actually run, failures encountered/resolved, manual coverage, and remaining limits.
+- Update relevant docs/wiki without inventing shipped functionality.
+- Follow the [release checklist](https://github.com/saappleg/DueVinci/blob/main/docs/RELEASE_CHECKLIST.md) and [Testing & CI/CD](Testing-&-CI-CD) before an authorized release.

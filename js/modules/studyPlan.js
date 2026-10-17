@@ -5,6 +5,7 @@ import { supabaseClient } from './config.js';
 import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
 import { getCourseDateBounds, isDateWithinCourseWindow, isWeeklyPacedCourse } from './courseDates.js';
 import { getWeekStartDayIndex } from './weekPreferences.js';
+import { getStudyCalibrationContext, getPersonalizedStudyEstimate, recordStudyPlanCompletionIfEntitled, removeStudyPlanCompletion } from './studyCalibration.js';
 
 function inlineArg(value) {
     return escapeHtml(escapeInlineJs(value));
@@ -418,13 +419,20 @@ export function toggleRestDay(dayName) {
 
 const DEFAULT_DAILY_FOCUS_CAP = 120;
 
-function estimatedMinutes(task) {
+function estimatedMinutes(task, calibration = null) {
     const savedEstimate = Number(task.estimated_minutes);
-    if (Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480) return savedEstimate;
     let localType = '';
     try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[task.id] || ''; } catch { /* Use the synced assignment type below. */ }
     const type = localType || task.task_type || task.type || '';
-    return type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
+    const base = Number.isInteger(savedEstimate) && savedEstimate >= 5 && savedEstimate <= 480
+        ? savedEstimate
+        : type === 'exam' || /exam|final|midterm|test/i.test(task.title || '') ? 50 : 25;
+    const estimate = getPersonalizedStudyEstimate({ ...task, taskType: type }, base, calibration);
+    const progress = task.is_completed
+        ? 100
+        : Math.max(0, Math.min(100, Number.isFinite(Number(task.progress_percent)) ? Number(task.progress_percent) : 0));
+    if (progress >= 100) return 0;
+    return progress > 0 ? Math.max(5, Math.ceil(estimate * (100 - progress) / 100)) : estimate;
 }
 
 function taskMovePriority(task) {
@@ -437,9 +445,9 @@ function taskMovePriority(task) {
  * deadline or onto a rest day. Moving later is curriculum-safe: it cannot put
  * a later lesson before an earlier one already scheduled on the source day.
  */
-export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP, courses = []) {
+export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOCUS_CAP, courses = [], calibration = null) {
     const coursesById = new Map(courses.map((course) => [course.id, course]));
-    const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task), 0);
+    const minutesForDay = (day) => (day.assignedTasks || []).reduce((sum, entry) => sum + estimatedMinutes(entry.task, calibration), 0);
     const canMoveToDay = (entry, sourceIndex, targetIndex) => {
         const target = days[targetIndex];
         if (!target || target.isRestDay || sourceIndex === targetIndex) return false;
@@ -471,7 +479,7 @@ export function rebalanceStudyPlanAssignments(days = [], cap = DEFAULT_DAILY_FOC
                 });
             let moved = false;
             for (const candidate of candidates) {
-                const duration = estimatedMinutes(candidate.entry.task);
+                const duration = estimatedMinutes(candidate.entry.task, calibration);
                 const targetIndex = days
                     .map((target, index) => ({ target, index }))
                     // Prefer the focus cap, but still reduce a sharp imbalance
@@ -618,9 +626,10 @@ export function getCurrentStudyWeekAssignments(courses = [], assignments = [], r
  * @param {Array|null} customRestDays Optional rest days override (e.g. ['Sun', 'Sat'])
  * @returns {Array} List of daily study plan objects
  */
-export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7, customRestDays = null) {
+export function generateBalancedStudyPlan(courses = [], assignments = [], startDate = new Date(), daysAhead = 7, customRestDays = null, options = {}) {
     if (!courses || !assignments || !Array.isArray(courses) || !Array.isArray(assignments)) return [];
 
+    const calibration = options?.calibration || null;
     const restDays = customRestDays !== null ? (Array.isArray(customRestDays) ? customRestDays : []) : getRestDays();
     const noStudyDates = new Set(getNoStudyDates());
 
@@ -633,6 +642,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     const pendingAssignments = getCurrentStudyWeekAssignments(courses, assignments, baseDate);
     if (pendingAssignments.length === 0) {
         const emptyPlan = [];
+        emptyPlan.unplacedDueToRestDays = [];
         for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
             const currentDate = new Date(baseDate);
             currentDate.setDate(baseDate.getDate() + dayOffset);
@@ -661,6 +671,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
     // Initialize day buckets
     const days = [];
+    const unplacedDueToRestDays = [];
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
         const currentDate = new Date(baseDate);
         currentDate.setDate(baseDate.getDate() + dayOffset);
@@ -705,7 +716,8 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
         const isExam = taskType === 'exam';
         const isReview = taskType === 'review';
-        const durationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task);
+        const baselineDurationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task);
+        const durationMin = customMinutes !== null ? customMinutes : estimatedMinutes(task, calibration);
         const daysLeft = calculateDaysRemaining(task.due_date, currentDate);
 
         let priority = localPrios[task.id] || task.priority || 'medium';
@@ -778,6 +790,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
             priority,
             priorityBadgeText,
             durationMinutes: durationMin,
+            baselineDurationMinutes: baselineDurationMin,
             isExam,
             isReview,
             dueDate: task.due_date,
@@ -901,7 +914,10 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
 
             // Protected dates and recurring rest days stay clear even when a
             // deadline leaves no eligible study day in the current window.
-            if (activeDayIndices.length === 0) return;
+            if (activeDayIndices.length === 0) {
+                unitTaskList.forEach((task) => unplacedDueToRestDays.push({ task }));
+                return;
+            }
 
             // Distribute unit tasks evenly across active days available
             const tasksPerActiveDay = Math.max(1, Math.ceil(unitTaskList.length / activeDayIndices.length));
@@ -929,7 +945,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
     // A course-by-course allocation can otherwise stack every course's first
     // lesson on day zero. Rebalance only when there is later, non-rest time
     // before the item's own deadline.
-    rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses);
+    rebalanceStudyPlanAssignments(days, DEFAULT_DAILY_FOCUS_CAP, courses, calibration);
     applyManualStudyMoves(days);
 
     // Build rich daily blocks from assigned tasks
@@ -977,6 +993,7 @@ export function generateBalancedStudyPlan(courses = [], assignments = [], startD
         day.totalMinutes = totalMins;
     });
 
+    days.unplacedDueToRestDays = unplacedDueToRestDays;
     cachedStudyPlan = days;
     return days;
 }
@@ -1044,7 +1061,8 @@ export async function openStudyPlanDayModal(dateStr) {
         }
 
         if (courses.length > 0) {
-            const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7);
+            const calibration = await getStudyCalibrationContext();
+            const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 7, null, { calibration });
             day = plan.find(d => d.date === dateStr) || plan[0];
         }
     }
@@ -1052,9 +1070,9 @@ export async function openStudyPlanDayModal(dateStr) {
     if (!day) return;
 
     // Intensity calculation
-    let intensityLabel = 'Rest & Light Review';
+    let intensityLabel = day.isProtectedDate ? 'Protected No-Study Date' : (day.isRestDay ? 'Rest & Recovery Day' : 'Open Study Day');
     let intensityBg = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
-    let intensityIcon = '🌴';
+    let intensityIcon = day.isProtectedDate ? '🛡️' : (day.isRestDay ? '🌴' : '📚');
 
     if (day.totalMinutes > 90) {
         intensityLabel = 'Heavy Study Load';
@@ -1149,7 +1167,7 @@ export async function openStudyPlanDayModal(dateStr) {
 
                 <!-- Interactive Actions -->
                 <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                    <button type="button" onclick="startStudyPlanTimer(${durationMinutes}, '${inlineArg(block.title)}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
+                    <button type="button" onclick="startStudyPlanTimer(${durationMinutes}, '${inlineArg(block.title)}', '${inlineArg(block.taskId)}', '${inlineArg(block.courseId)}', '${inlineArg(block.taskType)}', ${Number(block.baselineDurationMinutes) || durationMinutes})" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-xs">
                         <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         Start ${durationMinutes}m Timer
                     </button>
@@ -1173,7 +1191,7 @@ export async function openStudyPlanDayModal(dateStr) {
     modal.innerHTML = `
         <div class="bg-white dark:bg-brand-800 border border-zinc-200 dark:border-brand-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200 text-zinc-800 dark:text-zinc-200">
             <!-- Modal Header -->
-            <div class="p-6 pb-4 border-b border-zinc-200 dark:border-brand-700 bg-zinc-50/80 dark:bg-brand-900 flex items-start justify-between gap-4">
+            <div class="shrink-0 p-6 pb-4 border-b border-zinc-200 dark:border-brand-700 bg-zinc-50/80 dark:bg-brand-900 flex items-start justify-between gap-4">
                 <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-xl">🗓️</span>
@@ -1197,7 +1215,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Rest Day Toggle Bar -->
-            <div class="px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
+            <div class="shrink-0 px-6 py-2.5 bg-zinc-100/70 dark:bg-brand-900/80 border-b border-zinc-200 dark:border-brand-700 flex items-center justify-between text-xs">
                 <span class="text-zinc-600 dark:text-zinc-400 font-medium">
                     ${day.isProtectedDate ? '🛡️ This is a <strong>protected no-study date</strong>; the planner will not assign coursework here.' : (day.isRestDay ? '🌴 This day is marked as a <strong>Rest Day</strong> (no study blocks assigned).' : '📚 This day is an active <strong>Study Day</strong>.')}
                 </span>
@@ -1207,7 +1225,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Summary Stats Bar -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-zinc-100/60 dark:bg-brand-900 border-b border-zinc-200 dark:border-brand-700 text-xs">
+            <div class="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-zinc-100/60 dark:bg-brand-900 border-b border-zinc-200 dark:border-brand-700 text-xs">
                 <div class="p-3 bg-white dark:bg-brand-800 rounded-xl border border-zinc-200/80 dark:border-brand-700 shadow-xs">
                     <div class="text-zinc-500 dark:text-zinc-400 font-bold text-[10px] uppercase tracking-wider">Planned Time</div>
                     <div class="text-base font-black text-indigo-600 dark:text-indigo-400 mt-0.5">${day.totalMinutes} mins</div>
@@ -1227,7 +1245,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Modal Body (Scrollable Task List) -->
-            <div class="p-6 space-y-4 overflow-y-auto max-h-[55vh] bg-white dark:bg-brand-800">
+            <div class="min-h-0 flex-1 p-6 space-y-4 overflow-y-auto bg-white dark:bg-brand-800">
                 <div class="flex justify-between items-center pb-1">
                     <h4 class="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">All Scheduled Blocks (${day.allBlocks.length})</h4>
                     <span class="text-[11px] text-zinc-400 font-medium">Sequential Unit & Lesson Order</span>
@@ -1246,7 +1264,7 @@ export async function openStudyPlanDayModal(dateStr) {
             </div>
 
             <!-- Modal Footer -->
-            <div class="p-4 px-6 bg-zinc-50 dark:bg-brand-900 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between gap-3">
+            <div class="shrink-0 p-4 px-6 bg-zinc-50 dark:bg-brand-900 border-t border-zinc-200 dark:border-brand-700 flex items-center justify-between gap-3">
                 <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Click any timer to jump straight into deep work.</span>
                 <button type="button" onclick="closeStudyPlanDayModal()" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-brand-700 dark:hover:bg-brand-600 text-white font-bold rounded-xl text-xs transition shadow-sm">
                     Close Plan
@@ -1274,6 +1292,12 @@ function getPlanSnapshot(plan = []) {
     }])));
 }
 
+export function getStudyPlanInfeasibilityWarning(plan = []) {
+    const count = plan?.unplacedDueToRestDays?.length || 0;
+    if (count === 0) return '';
+    return `${count} future coursework item${count === 1 ? '' : 's'} could not be scheduled because all available days in the current plan, course, and deadline windows are marked as rest days or protected. Review rest days, protected dates, and class or term date windows.`;
+}
+
 function getActiveManualMoveCount() {
     return Object.values(getManualStudyMoves()).filter((move) => move?.date).length;
 }
@@ -1297,7 +1321,7 @@ export function closeStudyPlanUpdateModal() {
     modal?.classList.remove('flex');
 }
 
-function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves }) {
+function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves, infeasibilityWarning }) {
     if (typeof document === 'undefined') return;
     ensureStudyPlanUpdateModalExists();
     const modal = document.getElementById('studyPlanUpdateModal');
@@ -1305,7 +1329,15 @@ function showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves 
     const movedHtml = moved.length
         ? `<ul class="mt-4 max-h-40 space-y-2 overflow-y-auto text-left">${moved.slice(0, 5).map(({ title, from, to }) => `<li class="rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:bg-brand-900 dark:text-zinc-200"><strong>${escapeHtml(title)}</strong><span class="text-zinc-500 dark:text-zinc-400"> moved from ${escapeHtml(from)} to ${escapeHtml(to)}.</span></li>`).join('')}${moved.length > 5 ? `<li class="text-xs text-zinc-500">Plus ${moved.length - 5} more adjusted session${moved.length - 5 === 1 ? '' : 's'}.</li>` : ''}</ul>`
         : '<p class="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-300">Everything is already in its best available slot. The plan still reflects your latest coursework, deadlines, and rest days.</p>';
-    modal.innerHTML = `<section class="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-2xl dark:bg-indigo-500/20">${moved.length ? '✨' : '✓'}</div><h2 class="mt-4 text-xl font-extrabold text-zinc-900 dark:text-white">${moved.length ? 'Your week was rebalanced' : 'Your plan is up to date'}</h2><p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">${totalBlocks} study session${totalBlocks === 1 ? '' : 's'} across ${activeDays} active day${activeDays === 1 ? '' : 's'}.</p>${movedHtml}${manualMoves ? `<p class="mt-4 text-xs text-indigo-600 dark:text-indigo-300">Your ${manualMoves} manual placement${manualMoves === 1 ? '' : 's'} ${manualMoves === 1 ? 'was' : 'were'} kept.</p>` : ''}<button type="button" onclick="closeStudyPlanUpdateModal()" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button></section>`;
+    const hasInfeasibility = Boolean(infeasibilityWarning);
+    const heading = hasInfeasibility
+        ? 'Some coursework could not be scheduled'
+        : (moved.length ? 'Your week was rebalanced' : 'Your plan is up to date');
+    const statusHtml = hasInfeasibility
+        ? `<p role="alert" class="mt-3 text-left text-sm leading-relaxed text-amber-800 dark:text-amber-200">${escapeHtml(infeasibilityWarning)}</p>`
+        : movedHtml;
+    const otherMovesHtml = hasInfeasibility && moved.length ? movedHtml : '';
+    modal.innerHTML = `<section class="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-2xl dark:border-brand-600 dark:bg-brand-800"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${hasInfeasibility ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200' : 'bg-indigo-100 dark:bg-indigo-500/20'} text-2xl">${hasInfeasibility ? '!' : (moved.length ? '✨' : '✓')}</div><h2 class="mt-4 text-xl font-extrabold text-zinc-900 dark:text-white">${heading}</h2><p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">${totalBlocks} study session${totalBlocks === 1 ? '' : 's'} across ${activeDays} active day${activeDays === 1 ? '' : 's'}.</p>${statusHtml}${otherMovesHtml}${manualMoves ? `<p class="mt-4 text-xs text-indigo-600 dark:text-indigo-300">Your ${manualMoves} manual placement${manualMoves === 1 ? '' : 's'} ${manualMoves === 1 ? 'was' : 'were'} kept.</p>` : ''}<button type="button" onclick="closeStudyPlanUpdateModal()" class="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">Got it</button></section>`;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -1320,15 +1352,20 @@ export async function refreshStudyPlan() {
         .map(([taskId, next]) => ({ title: next.title, from: previous.get(taskId).date, to: next.date }));
     const totalBlocks = [...current.values()].length;
     const activeDays = (plan || cachedStudyPlan).filter((day) => !day.isRestDay && day.totalMinutes > 0).length;
-    const message = moved.length
-        ? `Plan refreshed: ${moved.length} session${moved.length === 1 ? '' : 's'} rebalanced across your available study days.`
-        : `Plan refreshed: ${totalBlocks} session${totalBlocks === 1 ? '' : 's'} are already balanced around deadlines and rest days.`;
+    const infeasibilityWarning = getStudyPlanInfeasibilityWarning(plan || cachedStudyPlan);
+    const message = infeasibilityWarning
+        ? `Plan refreshed: ${infeasibilityWarning}${moved.length ? ` ${moved.length} other session${moved.length === 1 ? '' : 's'} rebalanced.` : ''}`
+        : moved.length
+            ? `Plan refreshed: ${moved.length} session${moved.length === 1 ? '' : 's'} rebalanced across your available study days.`
+            : `Plan refreshed: ${totalBlocks} session${totalBlocks === 1 ? '' : 's'} are already balanced around deadlines and rest days.`;
     const notice = document.getElementById('studyPlanNotice');
     if (notice) {
         notice.textContent = message;
-        notice.className = 'text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold';
+        notice.className = infeasibilityWarning
+            ? 'text-[11px] text-amber-800 dark:text-amber-300 font-semibold'
+            : 'text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold';
     }
-    showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves: getActiveManualMoveCount() });
+    showStudyPlanUpdateModal({ moved, totalBlocks, activeDays, manualMoves: getActiveManualMoveCount(), infeasibilityWarning });
     return plan;
 }
 
@@ -1337,7 +1374,7 @@ export async function refreshStudyPlan() {
  * @param {number} durationMinutes Duration in minutes
  * @param {string} taskTitle Title of task being studied
  */
-export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
+export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '', taskId = null, courseId = null, taskType = '', baselineDurationMinutes = null) {
     if (typeof window !== 'undefined') {
         if (typeof window.setTimerDuration === 'function') {
             window.setTimerDuration(durationMinutes, true);
@@ -1349,6 +1386,7 @@ export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
             }
             if (typeof window.resetTimer === 'function') window.resetTimer();
         }
+        window.setStudyFocusContext?.({ taskId, courseId, taskType, estimatedMinutes: baselineDurationMinutes || durationMinutes });
         if (!window.timerRunning && typeof window.toggleTimer === 'function') {
             window.toggleTimer();
         }
@@ -1362,7 +1400,24 @@ export function startStudyPlanTimer(durationMinutes = 25, taskTitle = '') {
 export async function toggleStudyPlanAssignment(assignId, currentState, courseId, dateStr) {
     if (!supabaseClient) return;
     const newState = !currentState;
-    await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
+    const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
+    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
+    if (error) {
+        console.error('Could not update study-plan coursework:', error);
+        return;
+    }
+    const block = cachedStudyPlan.flatMap((day) => day.allBlocks || []).find((entry) => String(entry.taskId) === String(assignId));
+    if (newState && block) {
+        recordStudyPlanCompletionIfEntitled({
+            taskId: assignId,
+            courseId: block.courseId,
+            taskType: block.taskType,
+            title: block.rawTitle || block.title,
+            estimatedMinutes: block.baselineDurationMinutes,
+        });
+    } else if (!newState) {
+        removeStudyPlanCompletion(assignId);
+    }
     if (newState) fireConfetti();
 
     // Refresh dashboard widget and re-open modal with refreshed data
@@ -1444,7 +1499,9 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
         return [];
     }
 
-    const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5);
+    const calibration = await getStudyCalibrationContext();
+    const plan = generateBalancedStudyPlan(courses, assignments, new Date(), 5, null, { calibration });
+    const infeasibilityWarning = getStudyPlanInfeasibilityWarning(plan);
 
     let daysHtml = '';
     plan.forEach(day => {
@@ -1523,6 +1580,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <div>
                         <h3 class="text-sm font-extrabold text-zinc-900 dark:text-white">Smart Study Plan & Workload Balancer</h3>
                         <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Balanced study blocks lead up to deadlines. Weekly-paced classes show the week you are working through now.</p>
+                        ${calibration ? '<p class="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Pro estimates adjust using your completed focus sessions and study-plan tasks.</p>' : ''}
                     </div>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -1540,7 +1598,7 @@ export async function renderStudyPlanDashboardWidget(containerId = 'studyPlanWid
                     <button type="button" onclick="refreshStudyPlan()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline px-2 py-1">↺ Refresh plan</button>
                 </div>
             </div>
-            <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400'}">${studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
+            <p id="studyPlanNotice" aria-live="polite" class="text-[11px] ${infeasibilityWarning ? 'text-amber-800 dark:text-amber-300 font-semibold' : (studyPlanMoveNotice ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-zinc-500 dark:text-zinc-400')}">${infeasibilityWarning || studyPlanMoveNotice || 'Drag on desktop, or open a day and use “Move to another day” on mobile. Lesson order stays protected.'}</p>
             <div class="flex flex-wrap items-center gap-1.5" aria-label="Protected no-study dates">${noStudyDatesHtml}</div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 ${daysHtml}

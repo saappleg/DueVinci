@@ -1,66 +1,57 @@
 # Offline Support & Progressive Web App (PWA) 📱
 
-DueVinci caches its static application shell and a per-user planner cache for
-PWA installation and offline use. After an initial online load, Courses,
-assignments, completion changes, grades, and calendar events remain available
-offline; supported planner writes queue locally and replay when the device
-reconnects. Authentication, AI parsing, Canvas, billing, support requests, and
-account deletion still require a connection.
+DueVinci caches its production application shell and per-user planner data. After an initial online sign-in and successful caching, supported courses, assignments, completion changes, grades, and calendar events can remain available offline. Supported writes queue locally and replay after reconnecting.
 
----
+Authentication, AI/Tutor, Canvas/Brightspace, billing, support, and account deletion require connectivity. Offline availability depends on what was cached and browser storage remaining available.
 
-## 🏗️ Offline Architecture
+## Offline architecture
 
 ```mermaid
 flowchart TD
     App[DueVinci App]
     SW[Service Worker: sw.js]
-    Cache[(Service Worker Static Cache)]
-    Cloud[(Supabase Remote Database)]
-
-    App -- "Assets Request" --> SW
-    SW -- "Cache-first navigation; background refresh" --> Cache
-    App -- "Planner reads/writes" --> LocalDB[(IndexedDB cache and mutation queue)]
-    LocalDB -- "Replay when online" --> Cloud
-    App -- "AI, Canvas, billing, support" --> Cloud
+    Cache[(Static application cache)]
+    LocalDB[(Per-user IndexedDB cache and mutation queue)]
+    Cloud[(Supabase services)]
+    App -- Assets --> SW
+    SW -- Cached shell and background refresh --> Cache
+    App -- Supported planner reads and writes --> LocalDB
+    LocalDB -- Replay online --> Cloud
+    App -- Online-only requests --> Cloud
 ```
 
----
+## Key modules
 
-## 🛠️ Key Offline Modules
+### Service worker (`sw.js`)
 
-### 1. Service Worker (`sw.js`)
-- Caches all essential assets: HTML pages, JavaScript modules, stylesheets, fonts, and icons.
-- Resolves known app routes from cache first and refreshes them in the background,
-  avoiding a long network timeout while offline.
-- Cache versions are bumped for application releases so installed clients receive updated planning logic.
+- Precaches known pages, modules, local vendor assets, styles, and icons. Optional asset failures do not abort the whole install.
+- Serves known application navigation from cache with background refresh.
+- Versions both application and runtime caches so older modules do not override a new shell after activation.
+- Does not cache authenticated Supabase/API responses.
 
-### 2. PWA Controller (`js/modules/pwa.js`)
-- Listens for `beforeinstallprompt` to present an unobtrusive, native-feeling install banner.
-- Displays an offline badge indicator in the top navbar when network connection drops.
-- Listens for `online` and `offline` events to reflect connection state in the UI.
+The current release shell is `duevinci-v8.42` as of October 16, 2026; this cache identifier is separate from the application's 2.8 version line.
 
-## What works offline
+### PWA controller (`js/modules/pwa.js`)
 
-Previously visited app pages and planner data can load when the network is
-unavailable. Supported free-planner changes are queued in IndexedDB and replay
-after reconnecting. Keep the app open until the "online synced" notice clears,
-and export a JSON backup before relying on a long offline session.
+The controller registers the worker relative to the manifest directory, including from nested routes, and requests worker-script revalidation. It handles the browser install prompt and installation-banner dismissal. Offline status and queued synchronization are coordinated with the planner's persistence modules.
 
----
+### Local development exception
 
-## 📲 Installing as a PWA
+On `localhost`, `127.0.0.1`, and IPv6 loopback, DueVinci skips worker registration and unregisters only workers matching its manifest-directory `sw.js`. Other applications' workers and planner storage are preserved. An already controlled page may need a reload after cleanup. Use hosted production or an appropriate test environment to check installation/offline behavior; localhost preview is intended to show current source.
 
-### iOS (iPhone & iPad)
-1. Open DueVinci in **Safari**.
-2. Tap the **Share** icon (square with arrow up).
-3. Scroll down and tap **"Add to Home Screen"**.
+## Using the planner offline
 
-### Android
-1. Open DueVinci in **Google Chrome**.
-2. Tap the **"Install App"** prompt or tap the 3 dots menu $\rightarrow$ **"Install DueVinci"**.
+1. Sign in and visit required routes while connected.
+2. Confirm the needed coursework has loaded before going offline.
+3. Make supported free-planner edits; keep pending data on the same device until synchronization completes.
+4. Reconnect and allow the queue to replay before relying on another device's copy.
 
-### macOS & Windows Desktop
-1. Open DueVinci in **Chrome**, **Edge**, or **Brave**.
-2. Click the **Install** button in the omnibox (address bar).
-3. Launch DueVinci as a standalone desktop window.
+Flashcard mastery also retains account-scoped local changes for later merge. A local cache is not an independent backup. Export a [JSON backup](Data-Backup-&-Cloud-Sync) before a long offline session; browsers can evict storage.
+
+## Installing
+
+- iOS Safari: Share → Add to Home Screen.
+- Android Chrome: use Install App or Add to Home Screen when offered.
+- Desktop Chrome/Edge: use the browser's install control when offered.
+
+Available install controls vary by browser. Verify a hosted installation and an offline reload manually; source tests and public asset checks do not replace a device check.

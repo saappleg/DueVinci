@@ -7,20 +7,24 @@ offline.
 | Area | Storage / service | Ready state |
 | --- | --- | --- |
 | Authentication and account identity | Supabase Auth and `profiles` | Account-scoped by RLS. |
-| Courses, terms, notes, resources, and completion | `courses` | Synced per account. |
+| Courses, term labels, notes, resources, and completion | `courses`; named term/date preferences also use `user_preferences` | Synced per account. |
 | Assignments, grades, due dates, type, priority, and completion | `assignments` | Synced per account. `task_type`, `type`, and `priority` are in migration `20260823135000_assignment_metadata.sql`. |
-| Calendar events | `custom_events` | Synced per account. Manual one-day/multi-day events and reviewed `.ics` imports are supported; imports expand common recurrence rules, honor `EXDATE`, and skip matching title/date duplicates. |
+| Calendar events | `custom_events` | Synced per account. Manual one-day/multi-day events and reviewed `.ics` imports are supported; imports expand common recurrence rules, honor `EXDATE`, and skip matching title/date duplicates. A student can manually convert an event to a linked assignment after choosing a class; the original event stays on the calendar. A valid empty Brightspace feed marks that provider's older imported rows inactive, while malformed or failed feeds do not retire them. |
+| Google Calendar and Outlook | Server-only `calendar_connections` and `calendar_oauth_states`; provider events in `custom_events` | Pro, read-only sync of the primary/default calendar. The first sync runs after connection; users start later syncs. Imports event title and date for the previous 30 days through the next 180 days. OAuth tokens and PKCE verifiers are encrypted server-side; disconnect hides imported events. Requires provider OAuth apps, callback registration, secrets, migration, and function deployment. |
 | Dashboard, grades, calendar, and study plan | Reads the course and assignment data above | No separate copy of academic data. |
-| Export/import backup | Supabase academic data plus device preferences and flashcard mastery | Plain JSON recovery/transfer tool, not encrypted and not a replacement for RLS-protected sync. |
+| Term rollover | `courses` plus the synced term preferences | Copies course setup only to a new term, leaves the source term unchanged, and uses the source course ID for retry-safe copies. Assignments and lesson progress are not copied. |
+| Export/import backup | Supabase courses, assignments, calendar events, synced preferences, and flashcard mastery; timers from the current device | Plain JSON recovery/transfer tool, not encrypted and not a replacement for RLS-protected sync. Restore upserts records present in the file; it does not delete cloud records missing from the backup and may partially complete if a later table fails. |
 | Flashcard mastery | `flashcard_mastery` plus account-scoped localStorage | RLS-protected cloud row; authenticated writes atomically merge per-card review timestamps. Offline edits remain local and sync on reconnect or next authenticated launch. Backups include only the current account's local mastery and cloud rows. Unscoped progress from older app versions is not automatically attributed to an account. |
 | Nursing Hub workspace | Account-scoped `duevinci_workspace_nursing_hub_<user-id>` localStorage plus the signed-in user's `user_preferences` row | Opt-in and local-first. Validated workspace data syncs while online; disabling the Hub hides it and keeps drafts. Quick-review session state is temporary and derives its queue from saved flashcard, dosage, and anatomy progress. Keep real patient information out of all Nursing fields. |
-| Tutor usage ledger | `tutor_usage_monthly` | Users can read their own aggregate counts; only service-role functions can reserve or release requests. Daily cleanup removes rows within 12 months of last activity. |
+| Study-plan calibration history | `duevinci_study_history` in localStorage and the signed-in user's `user_preferences` row | Opt-in DueVinci Pro feature. Records task/course IDs, task type, focus minutes, and timestamps. Turning it off pauses new capture but keeps saved history. Estimates use records from the previous 90 days; that window is not an automatic deletion period. Each save retains the newest 180 focus sessions and 120 completions; older entries may be dropped. The user can clear history in Settings. |
+| Canvas coursework refresh and grade alerts | `canvas_connections`, server-only `canvas_grade_snapshots`, per-device `push_subscriptions`, and the push delivery log | Pro Canvas sync directly imports dated assignments for selected courses without per-row review. The opt-in worker checks every minute and claims one account per invocation; each account is normally checked at most about hourly, plus existing manual sync. Alerts cover new assignments, changed due dates, and changed grades Canvas marks posted for the current submission. Initial grade observation is a baseline. Requires Vault scheduler secrets and Web Push setup. |
+| Tutor usage and course grounding | `tutor_usage_monthly`; selected course description, objectives, notes, and up to 20 assignment titles and due dates | Users can read their own aggregate counts; only service-role functions can reserve or release requests. Selected course material is sent with the Tutor question; returned excerpts are checked against that text and shown with the reply. The interface identifies replies without a supporting course source. Conversation history stays on the current page. The daily cleanup deletes usage rows whose last update is more than 12 months old. |
 | Support form and inbox | `support_tickets` | Submitted with the signed-in user ID; resolved/closed tickets are automatically deleted 90 days after resolution. |
 | Browser diagnostics | `app_error_events` | Captures client error reports server-side; events are automatically deleted after 90 days. |
-| Non-sensitive preferences | `user_preferences` plus local cache | Theme, timer, display, and similar preferences sync across signed-in devices. |
-| Account deletion | Settings plus `delete-account` Edge Function | Removes core academic rows and Canvas credentials before deleting Auth; flashcard mastery and Tutor usage cascade with the user. Clears browser storage on the browser performing deletion; offline copies on other devices require clearing that device's browser storage. Test only with a disposable account. |
-| AI syllabus import | Shared `gemini-parser` Edge Function | Dev deliberately uses the active function supplied from the main integration; do not replace it during Dev work. |
-| Canvas connection and sync | Server-only `canvas_connections` and Canvas Edge Functions | Dev-only paid integration. Tokens are AES-GCM encrypted at rest and never returned to the browser. |
+| User preferences | `user_preferences` plus local cache | Theme, timer, display, reminder, and similar settings sync across signed-in devices. The optional study history is described separately above because it contains task IDs, focus minutes, and timestamps. |
+| Account deletion | Settings plus `delete-account` Edge Function | Removes core academic rows and Canvas credentials before deleting Auth; flashcard mastery, Tutor usage, and synced preferences (including study history) cascade with the user. Clears browser storage on the browser performing deletion; offline copies on other devices require clearing that device's browser storage. Test only with a disposable account. |
+| AI syllabus import | `gemini-parser` Edge Function in the configured project | Localhost/127.0.0.1 use the configured Dev project. Coordinate changes to the existing Dev function before replacing it; frontend publication does not deploy Edge Functions. |
+| Canvas connection and sync | Server-only `canvas_connections` and Canvas Edge Functions | Paid integration; exercise it against the configured Dev project for development checks. Tokens are AES-GCM encrypted at rest and never returned to the browser. |
 | Subscription and billing | Stripe plus billing Edge Functions | Dev uses Stripe Test credentials and the Dev Supabase project only. |
 
 ## Local cache and synchronized preferences
@@ -29,14 +33,20 @@ The browser keeps a per-user IndexedDB/localStorage cache for offline planner
 use. Flashcard mastery uses account-scoped localStorage keys and is queued for
 cloud merge on reconnect. This is a cache—not a replacement for the RLS-protected
 cloud record. Backups are plain JSON files and are not encrypted by DueVinci.
-Non-sensitive settings such as theme, timer preferences, rest days, and display
-choices synchronize through the RLS-protected `user_preferences` table. Live
-session state, installation-banner dismissal, and tour state can remain local.
+Settings synchronize through the RLS-protected `user_preferences` table.
+If Pro study-plan calibration is enabled, that row also syncs its optional
+task/course IDs, focus minutes, task types, and timestamps. The app calculates
+estimates from the previous 90 days but does not delete history on that schedule;
+the user can clear it in Settings. Live session state, installation-banner
+dismissal, and tour state can remain local.
 
 ## PWA readiness
 
-- The worker is registered from the manifest directory, so it works from the
-  dashboard and nested routes.
+- On hosted origins, the worker is registered from the manifest directory, so
+  it works from the dashboard and nested routes. On `localhost`, `127.0.0.1`,
+  and IPv6 loopback, DueVinci skips registration and unregisters only its own
+  matching worker to avoid stale local previews. An already controlled preview
+  may need a reload after cleanup; unrelated workers and planner storage remain.
 - The core application shell and modules are pre-cached. Optional cache misses
   no longer stop installation.
 - Authenticated Supabase/API responses are never cached by the worker.
@@ -48,9 +58,11 @@ session state, installation-banner dismissal, and tour state can remain local.
   server-side operations remain online-only. Do not assume an offline write is
   fully synced until the reconnection notice clears.
 
-Before a release, manually verify installation and an offline reload in Chrome
-or on a phone after visiting the dashboard, Courses, Grades, and Calendar once
-while online.
+Before a release, manually verify installation and an offline reload on a hosted
+test environment in Chrome or on a phone, after visiting the dashboard, Courses,
+Grades, and Calendar once while online. Loopback previews do not test worker
+installation. Configure the intended test backend explicitly: the checked-in
+client chooses Dev for localhost/127.0.0.1 and Production for other hosts.
 
 ## Dev verification checklist
 
@@ -62,20 +74,31 @@ while online.
 3. Add and remove a calendar event; export and re-import a backup using a
    disposable account. Test an `.ics` file with a recurrence, an `EXDATE`, a
    multi-day event, and a duplicate to confirm the review step behaves as expected.
+   Convert a calendar event to an assignment and confirm the event remains; retry
+   the action and confirm it does not create a second assignment.
 4. Exercise AI import with the shared `gemini-parser` function, if its API key
    is configured.
 5. Use the Dev Canvas mock to connect, select courses, and sync assignments.
-6. Test PWA install and offline reload as described above. Review a flashcard
+6. For Dev Brightspace sync, confirm a valid empty feed deactivates older imported
+   provider events, while a malformed feed or failed fetch leaves them intact.
+   Confirm another user's and manual calendar events are unaffected.
+7. Roll over a named term and confirm only course setup is copied, the old term
+   remains unchanged, and repeating the action does not duplicate courses.
+8. With an entitled Pro test account, enable study-plan calibration and Canvas
+   change alerts. Confirm study history is opt-in, its estimates use the previous
+   90 days, clearing history syncs the removal, and Canvas alerts arrive only
+   after sync for new assignments or changed due dates.
+9. Test PWA install and offline reload as described above. Review a flashcard
    while offline, reconnect, and confirm the pending mastery merge completes
    before relying on the second-device copy.
-7. Mark a test support ticket resolved and confirm it remains visible before the
+10. Mark a test support ticket resolved and confirm it remains visible before the
    90-day retention window; check the Supabase Cron job for scheduled cleanup.
-8. Change a preference on one signed-in device and confirm it appears on a
+11. Change a preference on one signed-in device and confirm it appears on a
    second device.
-9. Enable the Nursing Hub on a test account, review the due/unfinished queue,
+12. Enable the Nursing Hub on a test account, review the due/unfinished queue,
    complete one item from each available tool, and confirm the existing progress
    records save locally and sync to the same account.
-10. Open Settings from the dashboard and Nursing page, switch sections, close
+13. Open Settings from the dashboard and Nursing page, switch sections, close
     with Escape, and scroll the modal in both light and dark degree themes.
     Check narrow screens for readable text and controls.
 

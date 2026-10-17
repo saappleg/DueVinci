@@ -9,8 +9,14 @@ export let isCardFlipped = false;
 export let currentQuizQuestions = [];
 export let currentQuizIndex = 0;
 export let quizScore = 0;
-export let currentStudyMode = 'flashcards'; // 'flashcards' | 'quiz'
+export let currentStudyMode = 'flashcards'; // 'flashcards' | 'quiz' | 'mock-exam'
 export let currentDeckCourseId = null;
+export let currentMockExam = null;
+let currentMockExamQuestionPool = [];
+let mockExamTimerInterval = null;
+let mockExamKeyHandler = null;
+let mockExamBeforeUnloadHandler = null;
+let mockExamNotice = '';
 
 /**
  * SuperMemo SM-2 Spaced Repetition Algorithm.
@@ -151,6 +157,411 @@ export function generateQuizFromNotes(notesText, course = {}) {
     return questions;
 }
 
+export function getNoteDerivedMockExamQuestions(notesText, course = {}) {
+    const concepts = extractConceptsFromNotes(notesText);
+    if (concepts.length < 4) return [];
+    const noteDefinitions = new Set(concepts.map((concept) => concept.definition.trim().toLocaleLowerCase()));
+    return generateQuizFromNotes(notesText, course).filter((question) => {
+        const options = Array.isArray(question.options) ? question.options : [];
+        return options.length === 4
+            && typeof question.explanation === 'string'
+            && Boolean(question.explanation.trim())
+            && Number.isInteger(question.correctIndex)
+            && question.correctIndex >= 0
+            && question.correctIndex < options.length
+            && new Set(options.map((option) => String(option).trim().toLocaleLowerCase())).size === options.length
+            && options.every((option) => noteDefinitions.has(String(option).trim().toLocaleLowerCase()));
+    });
+}
+
+function shuffleItems(items, random = Math.random) {
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index--) {
+        const sample = Number(random());
+        const unit = Number.isFinite(sample) && sample >= 0 && sample < 1 ? sample : 0.5;
+        const swapIndex = Math.floor(unit * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+}
+
+export function buildTimedMockExam(questionPool, questionCount, durationMinutes, random = Math.random) {
+    if (!Array.isArray(questionPool) || questionPool.length === 0) throw new Error('No note-derived questions are available.');
+    if (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > questionPool.length) {
+        throw new Error(`Choose between 1 and ${questionPool.length} questions.`);
+    }
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 60) {
+        throw new Error('Choose a time limit from 1 to 60 minutes.');
+    }
+
+    const selectedQuestions = shuffleItems(questionPool, random).slice(0, questionCount);
+    const questions = selectedQuestions.map((question) => {
+        const options = Array.isArray(question?.options) ? question.options.map((option) => String(option)) : [];
+        const correctIndex = question?.correctIndex;
+        if (typeof question?.question !== 'string' || !question.question.trim()
+            || typeof question.explanation !== 'string' || !question.explanation.trim()
+            || options.length < 2
+            || !Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length
+            || options.some((option) => !option.trim())
+            || new Set(options.map((option) => option.trim().toLocaleLowerCase())).size !== options.length) {
+            throw new Error('A question in this note-derived pool is incomplete or ambiguous.');
+        }
+        const correctAnswer = options[correctIndex];
+        const shuffledOptions = shuffleItems(options, random);
+        return {
+            ...question,
+            options: shuffledOptions,
+            correctIndex: shuffledOptions.indexOf(correctAnswer)
+        };
+    });
+
+    return {
+        questions: shuffleItems(questions, random),
+        durationSeconds: durationMinutes * 60
+    };
+}
+
+export function scoreTimedMockExam(questions = [], answers = []) {
+    const total = Array.isArray(questions) ? questions.length : 0;
+    const safeAnswers = Array.isArray(answers) ? answers : [];
+    let correct = 0;
+    let answered = 0;
+    if (total > 0) {
+        questions.forEach((question, index) => {
+            if (!question || !Array.isArray(question.options)) return;
+            const answer = safeAnswers[index];
+            if (Number.isInteger(answer) && answer >= 0 && answer < question.options.length) {
+                answered += 1;
+                if (answer === question.correctIndex) correct += 1;
+            }
+        });
+    }
+    return { correct, answered, total, unanswered: total - answered, percent: total ? Math.round((correct / total) * 100) : 0 };
+}
+
+export function getMockExamRemainingSeconds(endsAt, now = Date.now()) {
+    const end = Number(endsAt);
+    const current = Number(now);
+    if (!Number.isFinite(end) || !Number.isFinite(current)) return 0;
+    return Math.max(0, Math.ceil((end - current) / 1000));
+}
+
+function normalizeAnkiField(value) {
+    return String(value ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+}
+
+function parseDelimitedRecords(text, delimiter) {
+    const records = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    let afterQuote = false;
+    for (let index = 0; index < text.length; index++) {
+        const character = text[index];
+        if (quoted) {
+            if (character === '"' && text[index + 1] === '"') {
+                field += '"';
+                index++;
+            } else if (character === '"') {
+                quoted = false;
+                afterQuote = true;
+            } else {
+                field += character === '\r' && text[index + 1] === '\n' ? (index++, '\n') : character;
+            }
+        } else if (afterQuote) {
+            if (character === delimiter) {
+                row.push(field);
+                field = '';
+                afterQuote = false;
+            } else if (character === '\n' || character === '\r') {
+                if (character === '\r' && text[index + 1] === '\n') index++;
+                row.push(field);
+                if (row.some((cell) => cell.trim())) records.push(row);
+                row = [];
+                field = '';
+                afterQuote = false;
+            } else {
+                return { records: [], error: 'Unexpected characters after a quoted field.' };
+            }
+        } else if (character === '"') {
+            if (field.length > 0) return { records: [], error: 'A quote can only start an empty field.' };
+            quoted = true;
+        } else if (character === delimiter) {
+            row.push(field);
+            field = '';
+        } else if (character === '\n' || character === '\r') {
+            if (character === '\r' && text[index + 1] === '\n') index++;
+            row.push(field);
+            if (row.some((cell) => cell.trim())) records.push(row);
+            row = [];
+            field = '';
+        } else {
+            field += character;
+        }
+    }
+    if (quoted) return { records: [], error: 'A quoted field is not closed.' };
+    row.push(field);
+    if (row.some((cell) => cell.trim())) records.push(row);
+    return { records, error: null };
+}
+
+function ankiDelimiterFromHeader(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'tab' || normalized === '\\t') return '\t';
+    if (normalized === 'comma') return ',';
+    if (normalized === 'semicolon') return ';';
+    if (normalized === 'pipe') return '|';
+    if (normalized === 'space') return ' ';
+    if (normalized === 'colon') return ':';
+    if (normalized.length === 1) return normalized;
+    return null;
+}
+
+function detectAnkiDelimiter(text) {
+    let quoted = false;
+    const counts = new Map([['\t', 0], [',', 0], [';', 0], ['|', 0]]);
+    for (let index = 0; index < text.length; index++) {
+        const character = text[index];
+        if (character === '"' && text[index + 1] === '"' && quoted) {
+            index++;
+        } else if (character === '"') {
+            quoted = !quoted;
+        } else if (!quoted && (character === '\n' || character === '\r')) {
+            break;
+        } else if (!quoted && counts.has(character)) {
+            counts.set(character, counts.get(character) + 1);
+        }
+    }
+    return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[1]
+        ? [...counts.entries()].sort((left, right) => right[1] - left[1])[0][0]
+        : '\t';
+}
+
+export function parseAnkiTextImport(inputText, { maxCards = 500, maxFieldLength = 5000, maxFileLength = 2_000_000 } = {}) {
+    if (typeof inputText !== 'string' || !inputText.trim()) return { cards: [], invalidRows: 0, duplicateRows: 0, conflictingRows: 0, error: 'The selected file is empty.' };
+    if (inputText.length > maxFileLength) return { cards: [], invalidRows: 0, duplicateRows: 0, conflictingRows: 0, error: 'This text file exceeds the configured import size limit.' };
+
+    const lines = inputText.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+    const headers = new Map();
+    let firstDataLine = 0;
+    while (firstDataLine < lines.length) {
+        const line = lines[firstDataLine];
+        if (!line.trim()) {
+            firstDataLine++;
+            continue;
+        }
+        if (!line.startsWith('#')) break;
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 1) headers.set(line.slice(1, colonIndex).trim().toLowerCase(), line.slice(colonIndex + 1));
+        firstDataLine++;
+    }
+
+    const dataText = lines.slice(firstDataLine).join('\n');
+    const delimiter = ankiDelimiterFromHeader(headers.get('separator')) || detectAnkiDelimiter(dataText);
+    const parsed = parseDelimitedRecords(dataText, delimiter);
+    if (parsed.error) return { cards: [], invalidRows: 0, duplicateRows: 0, conflictingRows: 0, error: parsed.error };
+    const records = parsed.records;
+    let columns = null;
+    if (headers.has('columns')) {
+        const parsedColumns = parseDelimitedRecords(headers.get('columns'), delimiter);
+        if (parsedColumns.error) return { cards: [], invalidRows: 0, duplicateRows: 0, conflictingRows: 0, error: parsedColumns.error };
+        columns = parsedColumns.records[0] || [];
+    } else if (records.length >= 2) {
+        const candidateColumns = records[0].map((column) => column.trim().toLowerCase());
+        if (['front', 'term', 'question'].includes(candidateColumns[0])
+            && ['back', 'definition', 'answer'].includes(candidateColumns[1])) {
+            columns = records.shift();
+        }
+    }
+
+    const specialIndices = new Set();
+    for (const headerName of ['guid column', 'deck column', 'notetype column', 'tags column']) {
+        const columnNumber = Number.parseInt(headers.get(headerName), 10);
+        if (Number.isInteger(columnNumber) && columnNumber > 0) specialIndices.add(columnNumber - 1);
+    }
+    const declaredGuidColumn = Number.parseInt(headers.get('guid column'), 10);
+    const namedGuidColumn = columns?.findIndex((column) => column.trim().toLowerCase() === 'guid') ?? -1;
+    const guidColumn = Number.isInteger(declaredGuidColumn) && declaredGuidColumn > 0
+        ? declaredGuidColumn - 1
+        : namedGuidColumn;
+    const specialNames = new Set(['tag', 'tags', 'guid', 'deck', 'notetype', 'note type']);
+    const regularIndices = columns
+        ? columns.map((column, index) => ({ column: column.trim().toLowerCase(), index }))
+            .filter(({ column, index }) => !specialNames.has(column) && !specialIndices.has(index))
+            .map(({ index }) => index)
+        : records[0]?.map((_, index) => index).filter((index) => !specialIndices.has(index)) || [];
+    const findColumn = (names) => columns?.findIndex((column, index) => names.includes(column.trim().toLowerCase()) && !specialIndices.has(index)) ?? -1;
+    const frontIndex = findColumn(['front', 'term', 'question', 'prompt']);
+    const backIndex = findColumn(['back', 'definition', 'answer', 'response']);
+    const frontColumn = frontIndex >= 0 ? frontIndex : regularIndices[0];
+    const backColumn = backIndex >= 0 ? backIndex : regularIndices.find((index) => index !== frontColumn);
+    if (!Number.isInteger(frontColumn) || !Number.isInteger(backColumn)) {
+        return { cards: [], invalidRows: records.length, duplicateRows: 0, conflictingRows: 0, error: 'Choose a text file with at least two note fields.' };
+    }
+
+    const cards = [];
+    let invalidRows = 0;
+    let duplicateRows = 0;
+    let conflictingRows = 0;
+    for (const record of records) {
+        if (record[0]?.trim().startsWith('#') && record.length === 1) continue;
+        const term = String(record[frontColumn] || '').trim();
+        const definition = String(record[backColumn] || '').trim();
+        const guid = Number.isInteger(guidColumn) && guidColumn >= 0
+            ? String(record[guidColumn] || '').trim()
+            : '';
+        if (!term || !definition || term.length > maxFieldLength || definition.length > maxFieldLength || guid.length > 200) {
+            invalidRows++;
+            continue;
+        }
+        const termKey = normalizeAnkiField(term);
+        const existing = guid
+            ? cards.find((card) => card.guid === guid) || cards.find((card) => !card.guid && normalizeAnkiField(card.term) === termKey)
+            : cards.find((card) => normalizeAnkiField(card.term) === termKey);
+        if (existing) {
+            if (normalizeAnkiField(existing.term) === termKey
+                && normalizeAnkiField(existing.definition) === normalizeAnkiField(definition)) duplicateRows++;
+            else conflictingRows++;
+            continue;
+        }
+        if (cards.length >= maxCards) {
+            invalidRows++;
+            continue;
+        }
+        cards.push({ term, definition, ...(guid ? { guid } : {}) });
+    }
+
+    return { cards, invalidRows, duplicateRows, conflictingRows, error: null };
+}
+
+function serializeAnkiTextField(value) {
+    const field = String(value ?? '').replace(/\r\n?/g, '\n');
+    return /[\t\n"]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
+}
+
+export function buildAnkiTextExport(cards = [], courseCode = 'Course') {
+    if (!Array.isArray(cards) || !cards.length) throw new Error('There are no flashcards to export.');
+    const safeCourseCode = String(courseCode || 'Course').replace(/[\t\r\n]/g, ' ').replace(/\s+/g, ' ').trim().replace(/::/g, ':') || 'Course';
+    const rows = cards.map((card) => {
+        const front = String(card?.term || '').trim();
+        const back = String(card?.definition || '').trim();
+        const guid = String(card?.ankiGuid || card?.guid || '').trim();
+        if (!front || !back) throw new Error('Every card needs a front and back before export.');
+        return `${serializeAnkiTextField(guid)}\t${serializeAnkiTextField(front)}\t${serializeAnkiTextField(back)}`;
+    });
+    return `#separator:Tab\n#html:false\n#deck:DueVinci::${safeCourseCode}\n#guid column:1\n#columns:GUID\tFront\tBack\n${rows.join('\n')}\n`;
+}
+
+function stableAnkiCardId(term, guid = '') {
+    const normalized = guid ? `guid:${String(guid).trim()}` : `term:${normalizeAnkiField(term)}`;
+    let firstHash = 2166136261;
+    let secondHash = 2246822519;
+    for (let index = 0; index < normalized.length; index++) {
+        const code = normalized.charCodeAt(index);
+        firstHash = Math.imul(firstHash ^ code, 16777619);
+        secondHash = Math.imul(secondHash ^ code, 3266489917);
+    }
+    return `anki_${(firstHash >>> 0).toString(16).padStart(8, '0')}${(secondHash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+export function mergeAnkiCardsIntoDeck(existingDeck = [], existingMastery = {}, incomingCards = [], updatedAt = new Date().toISOString()) {
+    const cards = Array.isArray(existingDeck)
+        ? existingDeck.filter((card) => card && typeof card === 'object' && !Array.isArray(card)).map((card) => ({ ...card }))
+        : [];
+    const mastery = Object.create(null);
+    if (existingMastery && typeof existingMastery === 'object' && !Array.isArray(existingMastery)) {
+        Object.entries(existingMastery).forEach(([cardId, state]) => { mastery[cardId] = state; });
+    }
+    let added = 0;
+    let updated = 0;
+    let duplicates = 0;
+    let conflicts = 0;
+
+    for (const incoming of Array.isArray(incomingCards) ? incomingCards : []) {
+        const term = String(incoming?.term || '').trim();
+        const definition = String(incoming?.definition || '').trim();
+        const guid = String(incoming?.guid || incoming?.ankiGuid || '').trim();
+        if (!term || !definition || term.length > 5000 || definition.length > 5000 || guid.length > 200) {
+            conflicts++;
+            continue;
+        }
+        const termKey = normalizeAnkiField(term);
+        const masteryEntries = Object.entries(mastery)
+            .filter(([, state]) => state?.source === 'anki')
+            .map(([id, state]) => ({ ...state, id }));
+        const exactGuidCard = guid
+            ? cards.find((card) => card.source === 'anki' && card.ankiGuid === guid)
+                || masteryEntries.find((card) => card.ankiGuid === guid)
+            : null;
+        const legacyOrFrontCard = (list) => list.find((card) => normalizeAnkiField(card.term) === termKey
+            && (!guid || !card.ankiGuid));
+        const existingCard = exactGuidCard
+            || legacyOrFrontCard(cards.filter((card) => card.source === 'anki'))
+            || legacyOrFrontCard(masteryEntries)
+            || legacyOrFrontCard(cards.filter((card) => card.source !== 'anki'));
+        if (existingCard) {
+            if (normalizeAnkiField(existingCard.term) === termKey
+                && normalizeAnkiField(existingCard.definition) === normalizeAnkiField(definition)) {
+                duplicates++;
+                continue;
+            }
+            if (existingCard.source !== 'anki') {
+                conflicts++;
+                continue;
+            }
+            const previous = mastery[existingCard.id] || existingCard;
+            const updatedCard = {
+                ...previous,
+                id: existingCard.id,
+                source: 'anki',
+                term,
+                definition,
+                ...(guid ? { ankiGuid: guid } : {}),
+                contentUpdatedAt: updatedAt,
+                lastReviewedAt: updatedAt
+            };
+            mastery[existingCard.id] = updatedCard;
+            const deckCard = cards.find((card) => String(card.id) === String(existingCard.id));
+            if (deckCard) Object.assign(deckCard, updatedCard);
+            else if (!cards.some((card) => card.source !== 'anki' && normalizeAnkiField(card.term) === termKey)) cards.push(updatedCard);
+            updated++;
+            continue;
+        }
+
+        const id = stableAnkiCardId(term, guid);
+        const previous = mastery[id] || cards.find((card) => card.id === id);
+        if (previous && (previous.source !== 'anki' || normalizeAnkiField(previous.term) !== normalizeAnkiField(term))) {
+            conflicts++;
+            continue;
+        }
+        const importedCard = {
+            id,
+            source: 'anki',
+            term,
+            definition,
+            ...(guid ? { ankiGuid: guid } : {}),
+            repetitions: previous?.repetitions || 0,
+            interval: previous?.interval || 1,
+            easinessFactor: previous?.easinessFactor || 2.5,
+            nextReviewDate: previous?.nextReviewDate || null,
+            lastReviewed: previous?.lastReviewed || null,
+            lastReviewedAt: previous?.lastReviewedAt || updatedAt,
+            contentUpdatedAt: updatedAt
+        };
+        mastery[id] = importedCard;
+        cards.push(importedCard);
+        if (previous) updated++;
+        else added++;
+    }
+    return { cards, mastery, added, updated, duplicates, conflicts };
+}
+
+function importedAnkiCardsFromMastery(mastery = {}) {
+    return Object.entries(mastery)
+        .filter(([, value]) => value?.source === 'anki' && value.term && value.definition)
+        .map(([id, value]) => ({ id, ...value }));
+}
+
 /**
  * Generates multiple choice questions.
  */
@@ -276,7 +687,7 @@ export function sanitizeFlashcardMastery(mastery = {}) {
         };
         const lastReviewedAt = normalizedDate(value.lastReviewedAt, true)
             || normalizedDate(value.lastReviewed, true);
-        sanitized[cardId] = {
+        const cardState = {
             repetitions: numberOr(value.repetitions, 0, 0, 100000, true),
             interval: numberOr(value.interval, 1, 1, 36500, true),
             easinessFactor: numberOr(value.easinessFactor, 2.5, 1.3, 5),
@@ -284,6 +695,19 @@ export function sanitizeFlashcardMastery(mastery = {}) {
             lastReviewed: normalizedDate(value.lastReviewed),
             lastReviewedAt,
         };
+        if (value.source === 'anki'
+            && typeof value.term === 'string' && value.term.trim()
+            && typeof value.definition === 'string' && value.definition.trim()
+            && value.term.length <= 5000 && value.definition.length <= 5000) {
+            cardState.source = 'anki';
+            cardState.term = value.term;
+            cardState.definition = value.definition;
+            if (typeof value.ankiGuid === 'string' && value.ankiGuid.trim() && value.ankiGuid.length <= 200) {
+                cardState.ankiGuid = value.ankiGuid.trim();
+            }
+            cardState.contentUpdatedAt = normalizedDate(value.contentUpdatedAt, true);
+        }
+        sanitized[cardId] = cardState;
     });
     return sanitized;
 }
@@ -457,7 +881,13 @@ export function saveCardMastery(courseId, cardId, updatedCard) {
         easinessFactor: updatedCard.easinessFactor,
         nextReviewDate: updatedCard.nextReviewDate,
         lastReviewed: updatedCard.lastReviewed,
-        lastReviewedAt: updatedCard.lastReviewedAt || new Date().toISOString()
+        lastReviewedAt: updatedCard.lastReviewedAt || new Date().toISOString(),
+        ...(updatedCard.source === 'anki' ? {
+            source: 'anki',
+            term: updatedCard.term,
+            definition: updatedCard.definition,
+            contentUpdatedAt: updatedCard.contentUpdatedAt
+        } : {})
     };
     storeDeckMasteryLocally(courseId, all, userId);
     scheduleDeckMasteryCloudSave(courseId, all);
@@ -510,7 +940,12 @@ export async function generateStudyDeck(courseId, submittedNotes = null) {
     const courses = window.localCourses || [];
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
+    if (!confirmActiveMockExamReplacement()) return false;
 
+    clearMockExamRuntime();
+    currentMockExam = null;
+    syncMockExamNavigationGuard();
+    mockExamNotice = '';
     currentDeckCourseId = courseId;
     const savedMastery = await loadDeckMastery(courseId);
 
@@ -558,14 +993,24 @@ export async function generateStudyDeck(courseId, submittedNotes = null) {
         );
     }
 
-    currentDeckCards = deck;
+    const savedImportedCards = importedAnkiCardsFromMastery(savedMastery);
+    if (savedImportedCards.length) {
+        const baseDeck = concepts.length > 0 ? deck : [];
+        const baseTerms = new Set(baseDeck.map((card) => normalizeAnkiField(card.term)));
+        const importedCards = savedImportedCards.filter((card) => !baseTerms.has(normalizeAnkiField(card.term)));
+        currentDeckCards = [...baseDeck, ...importedCards];
+    } else {
+        currentDeckCards = deck;
+    }
     currentCardIndex = 0;
     isCardFlipped = false;
     currentQuizQuestions = generateQuizFromNotes(notes, course);
+    currentMockExamQuestionPool = getNoteDerivedMockExamQuestions(notes, course);
     currentQuizIndex = 0;
     quizScore = 0;
 
     renderStudyQuizContainer(course, notes);
+    return true;
 }
 
 export function renderStudyQuizContainer(course, notesText = '') {
@@ -576,12 +1021,13 @@ export function renderStudyQuizContainer(course, notesText = '') {
     container.innerHTML = `
         <div class="space-y-4">
             <!-- Mode Toggle Header -->
-            <div class="flex items-center justify-between p-3 bg-zinc-100 dark:bg-brand-900 rounded-xl border border-zinc-200 dark:border-brand-700">
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="switchStudyMode('flashcards')" id="modeBtn_flashcards" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${currentStudyMode === 'flashcards' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">🎴 Spaced Flashcards (${currentDeckCards.length})</button>
-                    <button type="button" onclick="switchStudyMode('quiz')" id="modeBtn_quiz" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${currentStudyMode === 'quiz' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">📝 Practice Quiz (${currentQuizQuestions.length} Qs)</button>
+            <div class="flex flex-col items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-100 p-3 dark:border-brand-700 dark:bg-brand-900 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+                    <button type="button" onclick="switchStudyMode('flashcards')" id="modeBtn_flashcards" class="min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold transition ${currentStudyMode === 'flashcards' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">🎴 Spaced Flashcards (${currentDeckCards.length})</button>
+                    <button type="button" onclick="switchStudyMode('quiz')" id="modeBtn_quiz" class="min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold transition ${currentStudyMode === 'quiz' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">📝 Practice Quiz (${currentQuizQuestions.length} Qs)</button>
+                    <button type="button" onclick="switchStudyMode('mock-exam')" id="modeBtn_mock-exam" class="min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold transition ${currentStudyMode === 'mock-exam' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700'}">Timed Mock Exam</button>
                 </div>
-                <button type="button" onclick="toggleNotesInputSection()" class="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1">
+                <button type="button" onclick="toggleNotesInputSection()" class="min-h-11 px-2 text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400">
                     ✍️ Notes & Formulas
                 </button>
             </div>
@@ -600,7 +1046,7 @@ export function renderStudyQuizContainer(course, notesText = '') {
 
             <!-- Main Content Area -->
             <div id="studyModeContent">
-                ${currentStudyMode === 'flashcards' ? getFlashcardsHtml() : getQuizHtml()}
+                ${currentStudyMode === 'flashcards' ? getFlashcardsHtml() : (currentStudyMode === 'mock-exam' ? getMockExamHtml() : getQuizHtml())}
             </div>
         </div>
     `;
@@ -618,16 +1064,21 @@ export async function applySubmittedNotes() {
     if (currentDeckCourseId) {
         const courses = window.localCourses || [];
         const course = courses.find(c => c.id === currentDeckCourseId);
-        if (course) {
-            course.scratchpad = notes;
-            await supabaseClient.from('courses').update({ scratchpad: notes }).eq('id', currentDeckCourseId);
-        }
+        if (!course) return false;
+        if (!confirmActiveMockExamReplacement()) return false;
+        clearMockExamRuntime();
+        currentMockExam = null;
+        syncMockExamNavigationGuard();
+        course.scratchpad = notes;
+        await supabaseClient.from('courses').update({ scratchpad: notes }).eq('id', currentDeckCourseId);
         await generateStudyDeck(currentDeckCourseId, notes);
         fireConfetti();
+        return true;
     }
 }
 
 export function switchStudyMode(mode) {
+    if (!['flashcards', 'quiz', 'mock-exam'].includes(mode)) return;
     currentStudyMode = mode;
     const courses = window.localCourses || [];
     const course = courses.find(c => c.id === currentDeckCourseId);
@@ -667,15 +1118,19 @@ export function getFlashcardsHtml() {
             <div class="flex justify-between items-center text-xs text-zinc-400 font-bold px-2">
                 <span class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-brand-700 text-zinc-700 dark:text-zinc-300 font-mono text-[11px]">${masteryBadge}</span>
                 <span>Card ${currentCardIndex + 1} of ${currentDeckCards.length}</span>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="speakCurrentFlashcard()" title="Read aloud" class="p-1 rounded hover:bg-zinc-200 dark:hover:bg-brand-700 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center gap-1 transition">
+                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                    <button type="button" onclick="speakCurrentFlashcard()" title="Read aloud" class="min-h-11 rounded px-2 text-indigo-600 transition hover:bg-zinc-200 dark:text-indigo-400 dark:hover:bg-brand-700">
                         🔊 <span class="hidden sm:inline">Listen</span>
                     </button>
-                    <button type="button" onclick="exportFlashcardsAsCSV()" title="Export Deck to Anki / CSV" class="p-1 rounded hover:bg-zinc-200 dark:hover:bg-brand-700 text-zinc-500 hover:text-indigo-600 dark:hover:text-white text-xs font-bold transition">
-                        📥 CSV
+                    <button type="button" onclick="exportFlashcardsAsAnkiText()" title="Export an Anki-importable text file" class="min-h-11 rounded px-2 text-xs font-bold text-indigo-600 transition hover:bg-zinc-200 dark:text-indigo-400 dark:hover:bg-brand-700">
+                        Anki text
                     </button>
+                    <button type="button" onclick="exportFlashcardsAsCSV()" title="Export a standard CSV file" class="min-h-11 rounded px-2 text-xs font-bold text-zinc-500 transition hover:bg-zinc-200 hover:text-indigo-600 dark:text-zinc-300 dark:hover:bg-brand-700 dark:hover:text-white">CSV</button>
+                    <button type="button" onclick="document.getElementById('ankiImportFile').click()" class="min-h-11 rounded px-2 text-xs font-bold text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-brand-700">Import</button>
+                    <input id="ankiImportFile" type="file" accept=".txt,.tsv,.csv,text/plain,text/tab-separated-values,text/csv" class="hidden" aria-label="Import Anki text or CSV file" onchange="importAnkiTextFile(this)">
                 </div>
             </div>
+            <p id="ankiImportStatus" class="hidden rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-left text-[11px] text-zinc-700 dark:border-brand-700 dark:bg-brand-900 dark:text-zinc-300" role="status" aria-live="polite"></p>
 
             <div onclick="flipCurrentCard()" class="cursor-pointer min-h-[180px] p-6 bg-zinc-50 dark:bg-brand-900 border-2 ${isCardFlipped ? 'border-indigo-500 bg-indigo-50/20' : 'border-zinc-200 dark:border-brand-700'} rounded-2xl flex flex-col items-center justify-center shadow-md transition-all hover:scale-[1.01]">
                 <div class="text-[11px] uppercase tracking-wider font-extrabold ${isCardFlipped ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-400'} mb-2">
@@ -714,6 +1169,293 @@ export function getFlashcardsHtml() {
             `}
         </div>
     `;
+}
+
+function formatMockExamTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function clearMockExamRuntime() {
+    if (mockExamTimerInterval !== null) {
+        clearInterval(mockExamTimerInterval);
+        mockExamTimerInterval = null;
+    }
+    if (mockExamKeyHandler && typeof document !== 'undefined') {
+        document.removeEventListener('keydown', mockExamKeyHandler);
+        mockExamKeyHandler = null;
+    }
+}
+
+export function confirmActiveMockExamReplacement(exam = currentMockExam, confirmFn = null) {
+    if (exam?.status !== 'in-progress') return true;
+    const confirm = confirmFn || (typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? (message) => window.confirm(message)
+        : null);
+    if (typeof confirm !== 'function') return false;
+    return Boolean(confirm('Generating a new study deck will cancel the active mock exam and discard its answers. Continue?'));
+}
+
+export function preventActiveMockExamNavigation(event, exam = currentMockExam) {
+    if (exam?.status !== 'in-progress' || !event) return false;
+    event.preventDefault?.();
+    event.returnValue = 'An active mock exam will be lost if you leave this page.';
+    return true;
+}
+
+function syncMockExamNavigationGuard() {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    if (currentMockExam?.status === 'in-progress' && !mockExamBeforeUnloadHandler) {
+        mockExamBeforeUnloadHandler = preventActiveMockExamNavigation;
+        window.addEventListener('beforeunload', mockExamBeforeUnloadHandler);
+    } else if (currentMockExam?.status !== 'in-progress' && mockExamBeforeUnloadHandler) {
+        window.removeEventListener('beforeunload', mockExamBeforeUnloadHandler);
+        mockExamBeforeUnloadHandler = null;
+    }
+}
+
+export function shouldHandleMockExamKeyboard(exam, studyMode, examVisible, focusWithinExam) {
+    return exam?.status === 'in-progress'
+        && studyMode === 'mock-exam'
+        && examVisible === true
+        && focusWithinExam === true;
+}
+
+function isMockExamRootVisible(root) {
+    if (!root) return false;
+    for (let element = root; element; element = element.parentElement) {
+        if (element.hidden || element.hasAttribute('hidden')
+            || element.getAttribute('aria-hidden') === 'true'
+            || element.classList?.contains('hidden')) return false;
+    }
+    return true;
+}
+
+function updateMockExamTimer() {
+    if (currentMockExam?.status !== 'in-progress') return;
+    const remaining = getMockExamRemainingSeconds(currentMockExam.endsAt);
+    const timer = document.getElementById('mockExamTimer');
+    if (timer) {
+        timer.textContent = formatMockExamTime(remaining);
+        timer.classList.toggle('text-red-600', remaining <= 60);
+        timer.classList.toggle('dark:text-red-300', remaining <= 60);
+    }
+    if (remaining <= 0) finishTimedMockExam('time-expired');
+}
+
+function handleMockExamKeydown(event) {
+    const examRoot = document.getElementById('mockExamActive');
+    const focusWithinExam = Boolean(examRoot?.contains(document.activeElement));
+    if (!shouldHandleMockExamKeyboard(currentMockExam, currentStudyMode, isMockExamRootVisible(examRoot), focusWithinExam)
+        || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goToMockExamQuestion(currentMockExam.currentIndex - 1);
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        goToMockExamQuestion(currentMockExam.currentIndex + 1);
+    } else if (/^[1-4]$/.test(event.key)) {
+        event.preventDefault();
+        selectMockExamAnswer(Number(event.key) - 1);
+    }
+}
+
+export function startTimedMockExam(questionCount, durationMinutes) {
+    if (currentMockExam?.status === 'in-progress' && !confirmActiveMockExamReplacement()) return false;
+    if (!currentMockExamQuestionPool.length) {
+        mockExamNotice = 'Add at least four distinct note definitions to build a mock exam without outside answer choices.';
+        renderFlashcardView();
+        return false;
+    }
+    const questionSelect = document.getElementById('mockExamQuestionCount');
+    const durationSelect = document.getElementById('mockExamDuration');
+    const selectedCount = questionCount ?? Number(questionSelect?.value);
+    const selectedDuration = durationMinutes ?? Number(durationSelect?.value);
+    let exam;
+    try {
+        exam = buildTimedMockExam(currentMockExamQuestionPool, selectedCount, selectedDuration);
+    } catch (error) {
+        mockExamNotice = error.message || 'Could not start this mock exam.';
+        renderFlashcardView();
+        return false;
+    }
+
+    clearMockExamRuntime();
+    const startedAt = Date.now();
+    currentMockExam = {
+        status: 'in-progress',
+        questions: exam.questions,
+        answers: Array(exam.questions.length).fill(null),
+        currentIndex: 0,
+        startedAt,
+        endsAt: startedAt + exam.durationSeconds * 1000,
+        durationSeconds: exam.durationSeconds
+    };
+    syncMockExamNavigationGuard();
+    mockExamNotice = '';
+    mockExamKeyHandler = handleMockExamKeydown;
+    document.addEventListener('keydown', mockExamKeyHandler);
+    mockExamTimerInterval = setInterval(updateMockExamTimer, 1000);
+    renderFlashcardView();
+    document.getElementById('mockExamQuestionHeading')?.focus();
+    return true;
+}
+
+export function selectMockExamAnswer(optionIndex) {
+    if (currentMockExam?.status !== 'in-progress') return;
+    if (getMockExamRemainingSeconds(currentMockExam.endsAt) <= 0) {
+        finishTimedMockExam('time-expired');
+        return;
+    }
+    const question = currentMockExam.questions[currentMockExam.currentIndex];
+    if (!question || !Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= question.options.length) return;
+    currentMockExam.answers[currentMockExam.currentIndex] = optionIndex;
+    renderFlashcardView();
+    document.querySelector(`#mockExamActive [data-mock-exam-answer="${optionIndex}"]`)?.focus();
+}
+
+export function goToMockExamQuestion(index) {
+    if (currentMockExam?.status !== 'in-progress') return;
+    if (getMockExamRemainingSeconds(currentMockExam.endsAt) <= 0) {
+        finishTimedMockExam('time-expired');
+        return;
+    }
+    if (!Number.isInteger(index) || index < 0 || index >= currentMockExam.questions.length) return;
+    currentMockExam.currentIndex = index;
+    renderFlashcardView();
+    document.getElementById('mockExamQuestionHeading')?.focus();
+}
+
+export function finishTimedMockExam(reason = 'submitted') {
+    if (currentMockExam?.status !== 'in-progress') return;
+    const actualReason = getMockExamRemainingSeconds(currentMockExam.endsAt) <= 0 ? 'time-expired' : reason;
+    currentMockExam = {
+        ...currentMockExam,
+        status: 'finished',
+        finishedAt: Date.now(),
+        finishReason: actualReason,
+        score: scoreTimedMockExam(currentMockExam.questions, currentMockExam.answers)
+    };
+    syncMockExamNavigationGuard();
+    clearMockExamRuntime();
+    if (currentStudyMode === 'mock-exam') renderFlashcardView();
+}
+
+export function cancelTimedMockExam() {
+    if (currentMockExam?.status !== 'in-progress') return;
+    if (typeof window !== 'undefined' && !window.confirm('Cancel this mock exam? Your answers will be discarded.')) return;
+    clearMockExamRuntime();
+    currentMockExam = null;
+    syncMockExamNavigationGuard();
+    mockExamNotice = 'Mock exam canceled. Your answers were discarded.';
+    if (currentStudyMode === 'mock-exam') renderFlashcardView();
+}
+
+export function resetTimedMockExam() {
+    if (currentMockExam?.status === 'in-progress') {
+        if (typeof window !== 'undefined' && !window.confirm('Cancel and reset this mock exam? Your answers will be discarded.')) return;
+    }
+    clearMockExamRuntime();
+    currentMockExam = null;
+    syncMockExamNavigationGuard();
+    mockExamNotice = '';
+    if (currentStudyMode === 'mock-exam') renderFlashcardView();
+}
+
+export function getMockExamHtml() {
+    const pool = currentMockExamQuestionPool;
+    if (!currentMockExam && pool.length === 0) {
+        return `<div class="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-brand-700 dark:bg-brand-900">
+            <h3 class="font-bold text-zinc-900 dark:text-white">Timed mock exam</h3>
+            <p class="text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">A mock exam needs four distinct definitions that can be taken directly from your notes. Add notes such as <code>Term: definition</code>, then generate again.</p>
+        </div>`;
+    }
+
+    if (!currentMockExam) {
+        const defaultQuestionCount = Math.min(10, pool.length);
+        return `<section class="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-brand-700 dark:bg-brand-900" aria-labelledby="mockExamSetupTitle">
+            <div>
+                <h3 id="mockExamSetupTitle" class="text-sm font-bold text-zinc-900 dark:text-white">Timed mock exam</h3>
+                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">Uses only question answers and distractors found in your notes. Choose a length and time limit.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="flex flex-col gap-1 text-xs font-semibold">Questions
+                    <select id="mockExamQuestionCount" class="min-h-11 rounded border border-zinc-300 bg-white px-3 text-sm dark:border-brand-600 dark:bg-brand-800">
+                        ${pool.map((_, index) => `<option value="${index + 1}" ${index + 1 === defaultQuestionCount ? 'selected' : ''}>${index + 1}</option>`).join('')}
+                    </select>
+                </label>
+                <label class="flex flex-col gap-1 text-xs font-semibold">Time limit
+                    <select id="mockExamDuration" class="min-h-11 rounded border border-zinc-300 bg-white px-3 text-sm dark:border-brand-600 dark:bg-brand-800">
+                        ${[5, 10, 15, 20, 30, 45, 60].map((minutes) => `<option value="${minutes}" ${minutes === 10 ? 'selected' : ''}>${minutes} minutes</option>`).join('')}
+                    </select>
+                </label>
+            </div>
+            ${mockExamNotice ? `<p class="text-xs text-zinc-600 dark:text-zinc-300" role="status">${escapeHtml(mockExamNotice)}</p>` : ''}
+            <button type="button" onclick="startTimedMockExam()" class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-500 sm:w-auto">Start mock exam</button>
+        </section>`;
+    }
+
+    const exam = currentMockExam;
+    if (exam.status === 'in-progress') {
+        const question = exam.questions[exam.currentIndex];
+        const selectedAnswer = exam.answers[exam.currentIndex];
+        const remaining = getMockExamRemainingSeconds(exam.endsAt);
+        const answeredCount = exam.answers.filter(Number.isInteger).length;
+        return `<section id="mockExamActive" class="space-y-4" aria-labelledby="mockExamQuestionHeading">
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-brand-700 dark:bg-brand-900">
+                <div><p class="text-xs font-bold text-zinc-900 dark:text-white">Timed mock exam</p><p class="mt-0.5 text-[11px] text-zinc-600 dark:text-zinc-300">${answeredCount} of ${exam.questions.length} answered</p></div>
+                <div class="text-right"><span class="block text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Time left</span><span id="mockExamTimer" role="timer" aria-label="Time remaining" class="font-mono text-lg font-bold tabular-nums ${remaining <= 60 ? 'text-red-600 dark:text-red-300' : 'text-indigo-700 dark:text-indigo-300'}">${formatMockExamTime(remaining)}</span></div>
+            </div>
+            <div class="grid grid-cols-5 gap-2 sm:grid-cols-10" aria-label="Question navigation">
+                ${exam.questions.map((_, index) => `<button type="button" onclick="goToMockExamQuestion(${index})" aria-label="Question ${index + 1}${Number.isInteger(exam.answers[index]) ? ', answered' : ', unanswered'}" aria-current="${index === exam.currentIndex ? 'step' : 'false'}" class="min-h-11 rounded border px-2 text-xs font-bold ${index === exam.currentIndex ? 'border-indigo-600 bg-indigo-600 text-white' : (Number.isInteger(exam.answers[index]) ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200' : 'border-zinc-300 bg-white text-zinc-700 dark:border-brand-600 dark:bg-brand-800 dark:text-zinc-200')}">${index + 1}</button>`).join('')}
+            </div>
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-brand-700 dark:bg-brand-800">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">${escapeHtml(question.topic || 'Note topic')}</p>
+                <h3 id="mockExamQuestionHeading" tabindex="-1" class="mt-1 text-sm font-bold leading-relaxed text-zinc-900 dark:text-white">${renderMarkdownToHtml(question.question)}</h3>
+            </div>
+            <div class="space-y-2" role="group" aria-label="Answer choices">
+                ${question.options.map((option, index) => `<button type="button" data-mock-exam-answer="${index}" onclick="selectMockExamAnswer(${index})" aria-pressed="${selectedAnswer === index}" class="flex min-h-11 w-full items-start gap-3 rounded-lg border p-3 text-left text-xs transition ${selectedAnswer === index ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-950/30' : 'border-zinc-200 bg-white hover:border-indigo-400 dark:border-brand-700 dark:bg-brand-800'}">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-bold text-zinc-700 dark:bg-brand-700 dark:text-zinc-200">${String.fromCharCode(65 + index)}</span><span class="leading-relaxed text-zinc-800 dark:text-zinc-200">${renderMarkdownToHtml(option)}</span>
+                </button>`).join('')}
+            </div>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Keyboard: use ← and → to move between questions, or 1–4 to choose an answer.</p>
+            <div class="flex flex-col-reverse gap-2 border-t border-zinc-200 pt-3 dark:border-brand-700 sm:flex-row sm:justify-between">
+                <button type="button" onclick="cancelTimedMockExam()" class="min-h-11 rounded border border-zinc-300 px-4 text-xs font-bold hover:bg-zinc-100 dark:border-brand-600 dark:hover:bg-brand-700">Cancel exam</button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="goToMockExamQuestion(${exam.currentIndex - 1})" ${exam.currentIndex === 0 ? 'disabled' : ''} class="min-h-11 flex-1 rounded border border-zinc-300 px-4 text-xs font-bold disabled:opacity-40 dark:border-brand-600 sm:flex-none">Previous</button>
+                    ${exam.currentIndex < exam.questions.length - 1 ? `<button type="button" onclick="goToMockExamQuestion(${exam.currentIndex + 1})" class="min-h-11 flex-1 rounded bg-indigo-600 px-4 text-xs font-bold text-white hover:bg-indigo-500 sm:flex-none">Next</button>` : '<span class="flex min-h-11 items-center px-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Last question</span>'}
+                    <button type="button" onclick="finishTimedMockExam()" class="min-h-11 flex-1 rounded bg-emerald-700 px-4 text-xs font-bold text-white hover:bg-emerald-600 sm:flex-none">Finish exam</button>
+                </div>
+            </div>
+        </section>`;
+    }
+
+    const score = exam.score || scoreTimedMockExam(exam.questions, exam.answers);
+    return `<section class="space-y-4" aria-labelledby="mockExamResultTitle">
+        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-brand-700 dark:bg-brand-900">
+            <h3 id="mockExamResultTitle" class="text-base font-bold text-zinc-900 dark:text-white">Mock exam ${exam.finishReason === 'time-expired' ? 'time expired' : 'complete'}</h3>
+            <p class="mt-1 text-sm font-semibold text-indigo-700 dark:text-indigo-300">Score: ${score.correct} / ${score.total} (${score.percent}%)</p>
+            <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">${score.answered} answered · ${score.unanswered} unanswered${score.unanswered ? ' (counted incorrect)' : ''}</p>
+        </div>
+        <button type="button" onclick="resetTimedMockExam()" class="min-h-11 rounded-lg bg-indigo-600 px-4 text-xs font-bold text-white hover:bg-indigo-500">Set up another exam</button>
+        <div class="space-y-3" aria-label="Answer review">
+            ${exam.questions.map((question, index) => {
+                const selected = exam.answers[index];
+                const correct = selected === question.correctIndex;
+                const selectedText = Number.isInteger(selected) ? question.options[selected] : 'No answer';
+                return `<article class="space-y-2 rounded-lg border border-zinc-200 bg-white p-3 dark:border-brand-700 dark:bg-brand-800">
+                    <h4 class="text-xs font-bold text-zinc-900 dark:text-white">${index + 1}. ${escapeHtml(question.topic || 'Note topic')}</h4>
+                    <div class="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200">${renderMarkdownToHtml(question.question)}</div>
+                    <p class="text-xs ${correct ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-200'}"><strong>${correct ? 'Correct' : 'Review'}:</strong> Your answer: ${renderMarkdownToHtml(selectedText)}</p>
+                    <p class="text-xs text-zinc-700 dark:text-zinc-300"><strong>Note answer:</strong> ${renderMarkdownToHtml(question.options[question.correctIndex])}</p>
+                    <div class="border-t border-zinc-200 pt-2 text-xs leading-relaxed text-zinc-600 dark:border-brand-700 dark:text-zinc-300">${renderMarkdownToHtml(question.explanation || '')}</div>
+                </article>`;
+            }).join('')}
+        </div>
+    </section>`;
 }
 
 export function getQuizHtml() {
@@ -849,7 +1591,7 @@ export function exportFlashcardsAsCSV(courseId = currentDeckCourseId) {
 
     const courses = window.localCourses || [];
     const course = courses.find(c => c.id === courseId);
-    const courseCode = course ? course.code.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Deck';
+    const courseCode = course ? String(course.code || 'Course').replace(/[^a-zA-Z0-9_-]/g, '_') : 'Deck';
 
     let csvContent = "Front,Back\n";
     currentDeckCards.forEach(c => {
@@ -861,9 +1603,109 @@ export function exportFlashcardsAsCSV(courseId = currentDeckCourseId) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${courseCode}_Flashcards_Anki.csv`;
+    link.download = `${courseCode}_Flashcards.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
+}
+
+export function exportFlashcardsAsAnkiText(courseId = currentDeckCourseId) {
+    if (!currentDeckCards.length) {
+        alert('No flashcards to export. Add notes or import a deck first.');
+        return;
+    }
+    const courses = window.localCourses || [];
+    const course = courses.find((item) => item.id === courseId);
+    try {
+        const text = buildAnkiTextExport(currentDeckCards, course?.code || 'Course');
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${String(course?.code || 'Deck').replace(/[^a-zA-Z0-9_-]/g, '_')}_Anki.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        alert(`Could not export the Anki text file: ${error.message || 'Check the deck and try again.'}`);
+    }
+}
+
+function setAnkiImportStatus(message, tone = 'neutral') {
+    const status = document.getElementById('ankiImportStatus');
+    if (!status) return;
+    const colors = {
+        success: 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200',
+        warning: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200',
+        error: 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200',
+        neutral: 'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-brand-700 dark:bg-brand-900 dark:text-zinc-300'
+    };
+    status.textContent = message;
+    status.className = `rounded border px-3 py-2 text-left text-[11px] ${colors[tone] || colors.neutral}`;
+}
+
+export async function importAnkiTextFile(fileInput) {
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+    try {
+        const courseId = currentDeckCourseId;
+        if (/\.apkg$/i.test(file.name)) {
+            throw new Error('DueVinci imports Anki text files only. An .apkg is a packaged SQLite deck, and this browser app does not read or create package files.');
+        }
+        if (!/\.(?:txt|tsv|csv)$/i.test(file.name)) {
+            throw new Error('Choose an Anki text (.txt/.tsv) or CSV file.');
+        }
+        if (file.size > 2 * 1024 * 1024) throw new Error('This text file exceeds the 2 MB import limit.');
+        if (!courseId) throw new Error('Open a course and generate its deck before importing cards.');
+
+        const text = await file.text();
+        const parsed = parseAnkiTextImport(text);
+        if (parsed.error) throw new Error(parsed.error);
+        if (!parsed.cards.length) {
+            throw new Error(`No usable cards were found. ${parsed.invalidRows} invalid row${parsed.invalidRows === 1 ? '' : 's'} skipped.`);
+        }
+
+        const localUserId = currentLocalUserId();
+        const cloudUserId = await authenticatedUserId();
+        if (localUserId && cloudUserId && localUserId !== cloudUserId) {
+            throw new Error('The signed-in account changed. Refresh the page before importing this deck.');
+        }
+        const userId = localUserId || cloudUserId;
+        let mastery = await loadDeckMastery(courseId);
+        if (currentDeckCourseId !== courseId) {
+            throw new Error('The active course changed while this file was loading. Select the course again and retry the import.');
+        }
+        const now = new Date().toISOString();
+        const merged = mergeAnkiCardsIntoDeck(currentDeckCards, mastery, parsed.cards, now);
+        currentDeckCards = merged.cards;
+        mastery = merged.mastery;
+        const { added, updated } = merged;
+        const skippedDuplicates = parsed.duplicateRows + merged.duplicates;
+        const conflicts = parsed.conflictingRows + merged.conflicts;
+
+        if (added || updated) {
+            if (userId) {
+                storeDeckMasteryLocally(courseId, mastery, userId);
+                if ((typeof navigator !== 'undefined' && navigator.onLine === false) || !cloudUserId) {
+                    if (localUserId) scheduleDeckMasteryCloudSave(courseId, mastery);
+                } else {
+                    try {
+                        await saveDeckMasteryToCloud(userId, courseId, mastery);
+                    } catch (error) {
+                        console.warn('Imported flashcards will sync when the connection is available:', error?.message || error);
+                        scheduleDeckMasteryCloudSave(courseId, mastery);
+                    }
+                }
+            }
+            if (currentCardIndex >= currentDeckCards.length) currentCardIndex = Math.max(0, currentDeckCards.length - 1);
+            renderFlashcardView();
+        }
+
+        const persistenceNote = userId ? '' : ' Cards are available for this session but could not be saved without a signed-in account.';
+        setAnkiImportStatus(`Imported ${added}; updated ${updated}; skipped ${skippedDuplicates} duplicates and ${conflicts} conflicting fronts; skipped ${parsed.invalidRows} invalid rows.${persistenceNote}`, userId ? (parsed.invalidRows || conflicts ? 'warning' : 'success') : 'warning');
+    } catch (error) {
+        setAnkiImportStatus(error.message || 'Could not import this file.', 'error');
+    } finally {
+        if (fileInput) fileInput.value = '';
+    }
 }
 
 // Bind to window & globalThis
@@ -873,6 +1715,13 @@ _scope.rateFlashcardSM2 = rateFlashcardSM2;
 _scope.extractConceptsFromNotes = extractConceptsFromNotes;
 _scope.generateQuizFromNotes = generateQuizFromNotes;
 _scope.generateQuizQuestions = generateQuizQuestions;
+_scope.getNoteDerivedMockExamQuestions = getNoteDerivedMockExamQuestions;
+_scope.startTimedMockExam = startTimedMockExam;
+_scope.selectMockExamAnswer = selectMockExamAnswer;
+_scope.goToMockExamQuestion = goToMockExamQuestion;
+_scope.finishTimedMockExam = finishTimedMockExam;
+_scope.cancelTimedMockExam = cancelTimedMockExam;
+_scope.resetTimedMockExam = resetTimedMockExam;
 _scope.generateStudyDeck = generateStudyDeck;
 _scope.renderStudyQuizContainer = renderStudyQuizContainer;
 _scope.toggleNotesInputSection = toggleNotesInputSection;
@@ -887,4 +1736,6 @@ _scope.nextFlashcard = nextFlashcard;
 _scope.prevFlashcard = prevFlashcard;
 _scope.speakCurrentFlashcard = speakCurrentFlashcard;
 _scope.exportFlashcardsAsCSV = exportFlashcardsAsCSV;
+_scope.exportFlashcardsAsAnkiText = exportFlashcardsAsAnkiText;
+_scope.importAnkiTextFile = importAnkiTextFile;
 _scope.syncPendingFlashcardMastery = syncPendingFlashcardMastery;

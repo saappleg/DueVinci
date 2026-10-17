@@ -7,6 +7,7 @@
 import { IS_DEVELOPMENT, supabaseClient } from './config.js';
 import { escapeHtml, getBasePath } from './utils.js';
 import { getSubscriptionSnapshot, hasSubscriptionFeature } from './subscription.js';
+import { subscribeToPushNotifications } from './reminders.js';
 
 let _canvasSelectedIds = new Set();
 let _canvasCourses = [];
@@ -118,6 +119,104 @@ async function requireCanvasAccess() {
         throw new Error('Canvas LMS Sync requires an active plan or an unexpired free trial.');
     }
     return { user, profile };
+}
+
+async function callCanvasAutoSyncSettings(action, extra = {}) {
+    const { data, error } = await supabaseClient.functions.invoke('canvas-auto-sync-settings', { body: { action, ...extra } });
+    if (error) throw new Error(await functionErrorMessage(error, 'Canvas refresh settings could not be loaded.'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+}
+
+function setCanvasAutoSyncMessage(message, tone = 'muted') {
+    const element = document.getElementById('canvasAutoSyncStatus');
+    if (!element) return;
+    const colors = {
+        muted: 'text-xs text-zinc-500 dark:text-zinc-400',
+        success: 'text-xs text-emerald-700 dark:text-emerald-300',
+        error: 'text-xs text-red-600 dark:text-red-400',
+    };
+    element.textContent = message;
+    element.className = colors[tone] || colors.muted;
+    element.classList.remove('hidden');
+}
+
+export async function initCanvasAutoSyncSettings() {
+    const area = document.getElementById('canvasAutoSyncArea');
+    const autoInput = document.getElementById('canvasAutoSyncEnabled');
+    const gradeInput = document.getElementById('canvasGradeAlertsEnabled');
+    if (!area || !autoInput || !gradeInput) return;
+    try {
+        const status = await callCanvasAutoSyncSettings('status');
+        area.classList.toggle('hidden', !status.featureEnabled && !status.connected);
+        autoInput.checked = status.autoSyncEnabled === true;
+        gradeInput.checked = status.gradeAlertsEnabled === true;
+        const withinCourseLimit = status.importedCourseCount <= (status.maxCourseCount || 100);
+        const canTurnOn = status.featureEnabled && status.connected && status.importedCourseCount > 0 && withinCourseLimit;
+        autoInput.disabled = !status.connected || (!canTurnOn && !status.autoSyncEnabled);
+        gradeInput.disabled = !status.connected || !status.autoSyncEnabled || (!status.featureEnabled && !status.gradeAlertsEnabled);
+        if (status.lastError) {
+            setCanvasAutoSyncMessage(status.lastError, 'error');
+        } else if (status.mockConnection) {
+            setCanvasAutoSyncMessage('Automatic refresh is not available for the development demo connection.');
+        } else if (!status.connected) {
+            setCanvasAutoSyncMessage('Connect Canvas to set up automatic refresh.');
+        } else if (!status.featureEnabled) {
+            setCanvasAutoSyncMessage('An active Pro plan is required to turn on refresh. Existing settings can be turned off here.');
+        } else if (!status.importedCourseCount) {
+            setCanvasAutoSyncMessage('Choose at least one Canvas course in Sync Canvas coursework before enabling refresh.');
+        } else if (!withinCourseLimit) {
+            setCanvasAutoSyncMessage(`Automatic refresh supports up to ${status.maxCourseCount || 100} selected courses. Reduce the selection and try again.`, 'error');
+        } else if (status.lastAutoSyncAt) {
+            setCanvasAutoSyncMessage(`Last refresh check ${new Date(status.lastAutoSyncAt).toLocaleString()}. New checks run about once an hour.`);
+        } else {
+            setCanvasAutoSyncMessage('Automatic refresh is off. Enable it to check Canvas about once an hour.');
+        }
+        if (autoInput.dataset.bound !== 'true') {
+            autoInput.addEventListener('change', () => {
+                gradeInput.disabled = !autoInput.checked || gradeInput.dataset.locked === 'true';
+            });
+            autoInput.dataset.bound = 'true';
+        }
+        gradeInput.dataset.locked = String(!status.connected || (!status.featureEnabled && !status.gradeAlertsEnabled));
+    } catch (error) {
+        area.classList.remove('hidden');
+        autoInput.disabled = true;
+        gradeInput.disabled = true;
+        setCanvasAutoSyncMessage(error.message || 'Could not load Canvas refresh settings.', 'error');
+    }
+}
+
+export async function saveCanvasAutoSyncSettings() {
+    const autoInput = document.getElementById('canvasAutoSyncEnabled');
+    const gradeInput = document.getElementById('canvasGradeAlertsEnabled');
+    const button = document.getElementById('canvasAutoSyncSaveButton');
+    if (!autoInput || !gradeInput) return;
+    const autoSyncEnabled = autoInput.checked;
+    const gradeAlertsEnabled = autoSyncEnabled && gradeInput.checked;
+    if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+    try {
+        if (autoSyncEnabled) {
+            const snapshot = await getSubscriptionSnapshot({ forceRefresh: true });
+            if (!hasSubscriptionFeature(snapshot, 'canvas_auto_sync')) {
+                throw new Error('An active DueVinci Pro plan is required for automatic Canvas refresh.');
+            }
+        }
+        if (gradeAlertsEnabled) {
+            const push = await subscribeToPushNotifications(typeof window !== 'undefined' ? window.currentUser : null);
+            if (!push.granted) throw new Error(push.message || 'Enable browser alerts before turning on Canvas grade notifications.');
+        }
+        await callCanvasAutoSyncSettings('settings', { autoSyncEnabled, gradeAlertsEnabled });
+        await initCanvasAutoSyncSettings();
+        setCanvasAutoSyncMessage(autoSyncEnabled
+            ? 'Canvas automatic refresh is on. New checks run about once an hour; grade alerts use browser push on this device.'
+            : 'Canvas automatic refresh and grade alerts are off.', 'success');
+    } catch (error) {
+        await initCanvasAutoSyncSettings();
+        setCanvasAutoSyncMessage(error.message || 'Canvas refresh settings could not be saved.', 'error');
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Save refresh settings'; }
+    }
 }
 
 function getCanvasCourseColor(canvasCourseId) {
@@ -243,9 +342,11 @@ export async function initCanvasSettingsTab({ reconcile = true } = {}) {
         badge.textContent = 'Error';
         if (msg) msg.textContent = err.message || 'Unable to load subscription details.';
         if (typeof window !== 'undefined') window.initBrightspaceSettings?.(null);
+        await initCanvasAutoSyncSettings();
         return null;
     }
     if (typeof window !== 'undefined') window.initBrightspaceSettings?.(profileSnapshot);
+    await initCanvasAutoSyncSettings();
     return profileSnapshot;
 }
 
@@ -688,4 +789,6 @@ if (typeof window !== 'undefined') {
     window.handleCanvasSyncConfirm = handleCanvasSyncConfirm;
     window.toggleCanvasSelectAll  = toggleCanvasSelectAll;
     window.toggleCanvasCourse     = toggleCanvasCourse;
+    window.initCanvasAutoSyncSettings = initCanvasAutoSyncSettings;
+    window.saveCanvasAutoSyncSettings = saveCanvasAutoSyncSettings;
 }

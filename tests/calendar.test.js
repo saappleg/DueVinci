@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     buildCustomEventPayload,
     buildCustomEventRows,
+    buildCalendarAssignmentPayload,
+    findMatchingCalendarAssignment,
     expandICSRecurrence,
     parseICSCalendar,
     parseICSDate
@@ -91,5 +93,22 @@ describe('Calendar import and custom event utilities', () => {
         expect(() => buildCustomEventPayload({ userId: 'user-1', title: '', eventDate: '2026-09-22' })).toThrow('Event title is required.');
         expect(() => buildCustomEventPayload({ userId: 'user-1', title: 'Invalid', eventDate: '2026-02-31' })).toThrow('valid event date');
         expect(() => buildCustomEventRows({ userId: 'user-1', title: 'Too long', startDate: '2026-01-01', endDate: '2027-01-02' })).toThrow('at most 366 days');
+    });
+
+    it('creates a clean assignment from a calendar event and detects duplicates by class, title, and date', () => {
+        expect(buildCalendarAssignmentPayload({
+            userId: 'user-1', courseId: 'course-1', title: '  Midterm review  ', dueDate: '2026-10-12T00:00:00Z', calendarEventId: 'event-1'
+        })).toEqual({
+            user_id: 'user-1', course_id: 'course-1', title: 'Midterm review', due_date: '2026-10-12',
+            task_type: 'assignment', type: 'assignment', priority: 'medium', is_completed: false, source_calendar_event_id: 'event-1'
+        });
+        const assignments = [
+            { id: 'a1', course_id: 'course-1', title: 'Midterm Review', due_date: '2026-10-12T04:00:00Z' },
+            { id: 'a2', course_id: 'course-2', title: 'Midterm review', due_date: '2026-10-12' }
+        ];
+        expect(findMatchingCalendarAssignment(assignments, { courseId: 'course-1', title: 'midterm review', dueDate: '2026-10-12' })).toBe(assignments[0]);
+        expect(findMatchingCalendarAssignment(assignments, { courseId: 'course-1', title: 'Midterm review', dueDate: '2026-10-13' })).toBeNull();
+        expect(() => buildCalendarAssignmentPayload({ userId: 'u1', courseId: 'c1', title: 'Invalid', dueDate: '2026-02-31', calendarEventId: 'event-2' })).toThrow('valid date');
+        expect(() => buildCalendarAssignmentPayload({ userId: 'u1', courseId: 'c1', title: 'Valid', dueDate: '2026-02-28' })).toThrow('cannot be linked');
     });
 });
