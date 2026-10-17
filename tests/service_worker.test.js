@@ -39,6 +39,13 @@ async function finishLifecycle(handler) {
 }
 
 describe('Service worker release updates', () => {
+    it('installs the current application shell cache version', async () => {
+        const worker = createWorker();
+        await finishLifecycle(worker.handlers.get('install'));
+
+        expect(worker.caches.open).toHaveBeenCalledWith('duevinci-v8.53');
+    });
+
     it('loads the application shell without reusing stale HTTP cache entries', async () => {
         const worker = createWorker();
         await finishLifecycle(worker.handlers.get('install'));
