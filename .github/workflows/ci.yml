@@ -24,6 +24,15 @@ jobs:
       - name: Install Dependencies
         run: npm ci || npm install
 
+      - name: Build and verify committed Tailwind CSS
+        run: |
+          npm run build:css
+          if ! git diff --quiet -- assets/css/tailwind.css; then
+            echo "Generated Tailwind CSS is stale. Run npm run build:css and commit assets/css/tailwind.css."
+            git diff -- assets/css/tailwind.css
+            exit 1
+          fi
+
       - name: Validate JavaScript Syntax
         run: |
           echo "Checking JavaScript syntax..."
