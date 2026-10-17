@@ -7,7 +7,7 @@ import { calculateStudyStreak, calculateDaysRemaining, getWorkloadIntensity, cal
 import { createTimerState, stepTimerState, formatTimerTime, activeTimers, addNewTimer, deleteTimer, resetMultiTimer, toggleMultiTimerRun, initMultiTimersUI, renderTimersManager, toggleTimer, resetTimer, skipTimer, toggleTimerSettings, saveTimerSettings, setTimerDuration, toggleTimerCollapse, toggleCustomTimersSection, dismissFloatingTimer, updateTimerDisplay, updateFloatingTimer, applyTimerCollapse } from './modules/timers.js';
 import { localCourses, loadDashboardStats, loadCoursesPage, initCourseForm, renderTermFolders, renderAlphabeticals, openCourseModal, closeCourseModal, openTermModal, closeTermModal, loadAssignments, toggleAssignment, updateAssignmentDate, updateAssignmentPriority, updateAssignmentType, updateAssignmentTitle, editAssignmentTitlePrompt, deleteAssignment, submitAddAssignment, addSubItem, changeAssignmentPage, updateScratchpadPreview, downloadCourseNotesAsMarkdown, filterDashboardUpNext, openQuickAddModal, closeQuickAddModal, submitQuickAddTask } from './modules/courses.js';
 import { isSimulatingGrades, simulatedGradesMap, loadGradesPage, toggleGradeSimulator, resetGradeSimulation, simulateAssignmentGrade, updateAssignmentGrade, toggleExcludeGpa } from './modules/grades.js';
-import { calendarInstance, generateICSString, initCalendar, loadCalendarCourses, setCalendarWeekStart, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
+import { calendarInstance, generateICSString, initCalendar, initCalendarForm, disposeCalendar, loadCalendarCourses, setCalendarWeekStart, exportToICS, openEventModal, closeEventModal, deleteCustomEvent } from './modules/calendar.js';
 import { generateQuizQuestions, generateQuizFromNotes, generateStudyDeck, renderFlashcardView, flipCurrentCard, nextFlashcard, prevFlashcard, calculateSM2Repetition, rateFlashcardSM2, getSavedDeckMastery, saveCardMastery, speakCurrentFlashcard, exportFlashcardsAsCSV } from './modules/flashcards.js';
 import { formatMathFormula, renderMarkdownToHtml } from './modules/markdown.js';
 import { getUnitNumber, getLessonNumber, getRestDays, setRestDays, toggleRestDay, generateBalancedStudyPlan, renderStudyPlanDashboardWidget, ensureStudyPlanDayModalExists, openStudyPlanDayModal, closeStudyPlanDayModal, startStudyPlanTimer, toggleStudyPlanAssignment } from './modules/studyPlan.js';
@@ -23,7 +23,8 @@ import { prioritizeTodayTasks, renderTodayWorkspace, renderAdaptiveDailyBrief, c
 import { applySubscriptionCatalog } from './modules/subscription.js';
 import './modules/brightspace.js';
 import { isTutorAccessActive, loadTutorPage, submitTutorMessage } from './modules/tutor.js';
-import { loadNursingPage } from './modules/nursing.js';
+import { loadNursingPage, disposeNursingPage } from './modules/nursing.js';
+import { initializeClientNavigation } from './modules/navigation.js';
 import { initScrollAids } from './modules/scrollAids.js';
 import { summarizeWeeklyPlan, renderWeeklyReview, openWeeklyPlan } from './modules/weeklyReview.js';
 import { toggleCommandPalette, filterCommandPalette, executeCmd, triggerMaestroRain, triggerNightOwlFlight, triggerKonamiEasterEgg } from './modules/easterEggs.js';
@@ -409,6 +410,49 @@ _rootScope.submitSupportMessage = submitSupportMessage;
 _rootScope.sendDirectMailto = sendDirectMailto;
 _rootScope.confirmAccountDeletion = confirmAccountDeletion;
 
+let importerBetaLaunchChecked = false;
+
+function checkDashboardImporterAnnouncement() {
+    const currentPage = getCurrentPageName();
+    if (importerBetaLaunchChecked || !['index', 'index.html', ''].includes(currentPage)) return;
+    importerBetaLaunchChecked = true;
+    checkImporterBetaOnLaunch();
+}
+
+function initializeNavigatedRoute(route) {
+    if (route === 'index') {
+        loadDashboardStats();
+        renderTodayWorkspace();
+        renderWeeklyReview();
+        renderAcademicsDashboardWidget('dashboardGrid');
+        renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+        hydrateImporterPoll();
+        setTimeout(() => showFirstRunOnboarding(currentUser), 500);
+        checkDashboardImporterAnnouncement();
+    } else if (route === 'courses') {
+        initCourseForm();
+        loadCoursesPage();
+    } else if (route === 'grades') {
+        loadGradesPage();
+    } else if (route === 'calendar') {
+        initCalendarForm();
+        initCalendar();
+        loadCalendarCourses();
+    } else if (route === 'tutor') {
+        loadTutorPage();
+    } else if (route === 'nursing') {
+        loadNursingPage();
+    }
+}
+
+_rootScope.navigateApp = initializeClientNavigation({
+    onRouteLeave: (route) => {
+        if (route === 'calendar') disposeCalendar();
+        if (route === 'nursing') disposeNursingPage();
+    },
+    onRouteEnter: initializeNavigatedRoute,
+});
+
 // Bootstrap application on page load
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -438,7 +482,7 @@ if (typeof document !== 'undefined') {
 
         setTimeout(() => {
             checkWhatsNewOnLaunch();
-            checkImporterBetaOnLaunch();
+            checkDashboardImporterAnnouncement();
             updateTourButtonVisibility();
         }, 400);
     });

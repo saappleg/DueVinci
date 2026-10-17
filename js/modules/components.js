@@ -12,8 +12,11 @@ import {
 } from './timers.js';
 import { isWorkspaceFeatureVisible, openSettingsModal, openSupportModal } from './ui.js';
 import { renderProfileEasterEgg } from './profileAvatar.js';
+import { resolveAppRouteHref } from './navigation.js';
 
 const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
+const NAV_ACTIVE_STYLE = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
+const NAV_INACTIVE_STYLE = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
 
 class DueVinciSidebar extends BaseElement {
     connectedCallback() {
@@ -51,9 +54,23 @@ class DueVinciSidebar extends BaseElement {
         }, 50);
     }
 
+    syncActiveRoute() {
+        const currentRoute = getCurrentPageName().replace(/\.html$/, '');
+        this.querySelectorAll('a[data-app-nav]').forEach((link) => {
+            const isActive = link.dataset.sidebarRoute === currentRoute;
+            const isVisible = link.dataset.sidebarVisible !== 'false';
+            link.className = `${isActive ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}${isVisible ? '' : ' hidden'}`;
+            if (isActive) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
+        });
+    }
+
     render() {
         if (typeof document === 'undefined') return;
         const basePath = getBasePath();
+        const routeHref = (path) => typeof window === 'undefined'
+            ? `${basePath}${path}`
+            : resolveAppRouteHref(path, basePath, window.location.href);
         const currentPage = getCurrentPageName();
         const isDashboard = currentPage === 'index' || currentPage === 'index.html' || currentPage === '';
         const isCourses = currentPage === 'courses' || currentPage === 'courses.html';
@@ -66,9 +83,6 @@ class DueVinciSidebar extends BaseElement {
         const showCalendar = isWorkspaceFeatureVisible('calendar');
         const showTutor = isWorkspaceFeatureVisible('tutor');
         const showNursing = isWorkspaceFeatureVisible('nursing_hub');
-
-        const navActiveStyle = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 bg-zinc-200 dark:bg-brand-700 text-zinc-900 dark:text-white rounded-lg font-medium text-sm transition";
-        const navInactiveStyle = "flex min-h-[44px] items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-brand-700 rounded-lg text-sm transition";
 
         this.innerHTML = `
         <div id="sidebarBackdrop" onclick="toggleSidebar(false)" class="hidden fixed inset-0 z-30 bg-zinc-900/50 backdrop-blur-[1px] lg:hidden"></div>
@@ -115,22 +129,22 @@ class DueVinciSidebar extends BaseElement {
 
             <div class="p-4 flex-1">
                 <nav class="space-y-1">
-                    <a href="${basePath}index.html" class="${isDashboard ? navActiveStyle : navInactiveStyle}">
+                    <a href="${routeHref('index.html')}" data-app-nav data-sidebar-route="index" data-sidebar-visible="true" ${isDashboard ? 'aria-current="page" ' : ''}class="${isDashboard ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard
                     </a>
-                    <a href="${basePath}courses/index.html" class="${isCourses ? navActiveStyle : navInactiveStyle}">
+                    <a href="${routeHref('courses/index.html')}" data-app-nav data-sidebar-route="courses" data-sidebar-visible="true" ${isCourses ? 'aria-current="page" ' : ''}class="${isCourses ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Classes
                     </a>
-                    <a href="${basePath}grades/index.html" class="${isGrades ? navActiveStyle : navInactiveStyle}${showGrades ? '' : ' hidden'}">
+                    <a href="${routeHref('grades/index.html')}" data-app-nav data-sidebar-route="grades" data-sidebar-visible="${showGrades}" ${isGrades ? 'aria-current="page" ' : ''}class="${isGrades ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}${showGrades ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Grades
                     </a>
-                    <a href="${basePath}calendar/index.html" class="${isCalendar ? navActiveStyle : navInactiveStyle}${showCalendar ? '' : ' hidden'}">
+                    <a href="${routeHref('calendar/index.html')}" data-app-nav data-sidebar-route="calendar" data-sidebar-visible="${showCalendar}" ${isCalendar ? 'aria-current="page" ' : ''}class="${isCalendar ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}${showCalendar ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Calendar
                     </a>
-                    <a href="${basePath}tutor/index.html" class="${isTutor ? navActiveStyle : navInactiveStyle}${showTutor ? '' : ' hidden'}">
+                    <a href="${routeHref('tutor/index.html')}" data-app-nav data-sidebar-route="tutor" data-sidebar-visible="${showTutor}" ${isTutor ? 'aria-current="page" ' : ''}class="${isTutor ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}${showTutor ? '' : ' hidden'}">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-1.2-.24-2.34-.68-3.38"/><path d="M8.5 10.5a3.5 3.5 0 1 1 5.5 2.87c-.96.69-1.5 1.21-1.5 2.63"/><path d="M12 18.5h.01"/></svg> Study Companion
                     </a>
-                    <a href="${basePath}nursing/index.html" class="${isNursing ? navActiveStyle : navInactiveStyle}${showNursing ? '' : ' hidden'}">
+                    <a href="${routeHref('nursing/index.html')}" data-app-nav data-sidebar-route="nursing" data-sidebar-visible="${showNursing}" ${isNursing ? 'aria-current="page" ' : ''}class="${isNursing ? NAV_ACTIVE_STYLE : NAV_INACTIVE_STYLE}${showNursing ? '' : ' hidden'}">
                         <span aria-hidden="true">🩺</span> Nursing Hub
                     </a>
                 </nav>

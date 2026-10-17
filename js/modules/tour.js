@@ -1,5 +1,5 @@
 // --- WALKTHROUGH & WHAT'S NEW CHANGELOG MODAL MODULE ---
-import { getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
+import { getBasePath, getCurrentPageName, getTourCookie, setTourCookie } from './utils.js';
 import { supabaseClient } from './config.js';
 
 const ONBOARDING_KEY = 'duevinci_onboarding_v1';
@@ -60,7 +60,7 @@ function hideTourModal(modal) {
 function onboardingKey(user) { return `${ONBOARDING_KEY}:${user?.id || 'guest'}`; }
 
 export function showFirstRunOnboarding(user) {
-    if (typeof document === 'undefined' || !user?.id || localStorage.getItem(onboardingKey(user))) return;
+    if (typeof document === 'undefined' || getCurrentPageName() !== 'index' || !user?.id || localStorage.getItem(onboardingKey(user))) return;
     if (document.getElementById('firstRunOnboarding')) return;
     const modal = document.createElement('div');
     modal.id = 'firstRunOnboarding';
@@ -90,10 +90,15 @@ export function showFirstRunOnboarding(user) {
     modal.addEventListener('click', (event) => {
         if (event.target === modal) finish();
     });
-    document.getElementById('onboardingAddClass')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
-    document.getElementById('onboardingImportSyllabus')?.addEventListener('click', () => { finish(); window.location.href = 'courses/index.html'; });
+    const navigateTo = (route) => {
+        const path = `${getBasePath()}${route}`;
+        if (typeof window.navigateApp === 'function') return window.navigateApp(path);
+        window.location.href = path;
+    };
+    document.getElementById('onboardingAddClass')?.addEventListener('click', () => { finish(); navigateTo('courses/index.html'); });
+    document.getElementById('onboardingImportSyllabus')?.addEventListener('click', () => { finish(); navigateTo('courses/index.html'); });
     document.getElementById('onboardingWorkspace')?.addEventListener('click', () => { finish(); window.openSettingsModal?.(); window.switchSettingsTab?.('appearance'); });
-    document.getElementById('onboardingTutor')?.addEventListener('click', () => { finish(); window.location.href = 'tutor/index.html'; });
+    document.getElementById('onboardingTutor')?.addEventListener('click', () => { finish(); navigateTo('tutor/index.html'); });
     document.getElementById('onboardingTour')?.addEventListener('click', () => { finish(); startWalkthrough(false); });
     document.getElementById('onboardingDismiss')?.addEventListener('click', finish);
 }

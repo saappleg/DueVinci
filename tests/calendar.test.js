@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+const calendarMocks = vi.hoisted(() => ({ from: vi.fn() }));
+vi.mock('../js/modules/config.js', () => ({ supabaseClient: { from: calendarMocks.from } }));
 import {
     buildCustomEventPayload,
     buildCustomEventRows,
@@ -6,10 +8,79 @@ import {
     findMatchingCalendarAssignment,
     expandICSRecurrence,
     parseICSCalendar,
-    parseICSDate
+    parseICSDate,
+    calendarInstance,
+    initCalendar,
+    initCalendarForm,
+    disposeCalendar
 } from '../js/modules/calendar.js';
 
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+});
+
 describe('Calendar import and custom event utilities', () => {
+    it('destroys the calendar instance before leaving the route so it can mount again', () => {
+        const calendarElement = {};
+        const instance = { render: vi.fn(), destroy: vi.fn() };
+        const Calendar = vi.fn(() => instance);
+        vi.stubGlobal('document', { getElementById: (id) => id === 'calendar' ? calendarElement : null });
+        vi.stubGlobal('FullCalendar', { Calendar });
+
+        initCalendar();
+        expect(calendarInstance).toBe(instance);
+        expect(instance.render).toHaveBeenCalledOnce();
+
+        disposeCalendar();
+        expect(instance.destroy).toHaveBeenCalledOnce();
+        expect(calendarInstance).toBeNull();
+    });
+
+    it('binds the custom-event form once when Calendar is entered after page load', () => {
+        const form = { dataset: {}, addEventListener: vi.fn() };
+        vi.stubGlobal('document', { getElementById: (id) => id === 'customEventForm' ? form : null });
+
+        initCalendarForm();
+        initCalendarForm();
+
+        expect(form.addEventListener).toHaveBeenCalledOnce();
+        expect(form.addEventListener).toHaveBeenCalledWith('submit', expect.any(Function));
+        expect(form.dataset.bound).toBe('true');
+    });
+
+    it('ignores calendar results that finish after the route was disposed and remounted', async () => {
+        let resolveStaleCourses;
+        const staleCourses = new Promise((resolve) => { resolveStaleCourses = resolve; });
+        let courseQueries = 0;
+        calendarMocks.from.mockImplementation((table) => ({
+            select: () => {
+                if (table === 'courses' && courseQueries++ === 0) return staleCourses;
+                return Promise.resolve({ data: null, error: null });
+            }
+        }));
+
+        const calendarElement = {};
+        const oldInstance = { render: vi.fn(), destroy: vi.fn(), removeAllEvents: vi.fn(), addEventSource: vi.fn() };
+        const newInstance = { render: vi.fn(), destroy: vi.fn(), removeAllEvents: vi.fn(), addEventSource: vi.fn() };
+        const instances = [oldInstance, newInstance];
+        vi.stubGlobal('document', { getElementById: (id) => id === 'calendar' ? calendarElement : null });
+        vi.stubGlobal('FullCalendar', { Calendar: vi.fn(() => instances.shift()) });
+
+        initCalendar();
+        const staleLoad = loadCalendarCourses();
+        disposeCalendar();
+        initCalendar();
+        await loadCalendarCourses();
+        resolveStaleCourses({ data: [{ id: 'old-course' }], error: null });
+        await staleLoad;
+
+        expect(oldInstance.destroy).toHaveBeenCalledOnce();
+        expect(newInstance.removeAllEvents).toHaveBeenCalledOnce();
+        expect(newInstance.addEventSource).toHaveBeenCalledOnce();
+        disposeCalendar();
+    });
+
     it('rejects impossible calendar dates instead of allowing JavaScript normalization', () => {
         expect(parseICSDate('20260231')).toBeNull();
         expect(parseICSDate('20260921T120000Z')).toBe('2026-09-21');

@@ -93,6 +93,14 @@ describe('Study Companion loading and announcements', () => {
         expect(elements.tutorReplyStatus.textContent).toBe('');
         expect(elements.tutorSend.disabled).toBe(false);
         expect(elements.tutorInput.focus).toHaveBeenCalled();
+
+        mocks.invoke.mockResolvedValue({ data: { usage: { usedThisMonth: 1, monthlyLimit: 10, usedToday: 1, dailyLimit: 4 } }, error: null });
+        elements.tutorMessages = element();
+        await loadTutorPage();
+        expect(elements.tutorMessages.children.map((message) => message.innerHTML)).toEqual([
+            'Explain a fictional study topic',
+            'What do you already know?',
+        ]);
     });
 
     it('labels the composer and exposes conversation additions as a polite log', () => {
