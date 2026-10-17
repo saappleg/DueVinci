@@ -1,6 +1,6 @@
 # Product Roadmap 🗺️
 
-The canonical roadmap is [ROADMAP.md in the repository](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md). This wiki summary records shipped scope and separates it from future work. Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.49`.
+The canonical roadmap is [ROADMAP.md in the repository](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md). This wiki summary records shipped scope and separates it from future work. Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.50`.
 
 ## Free core commitment
 

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Added explicit labels to generated timer, support, command-palette, and resource-link inputs, plus autocomplete hints for sign-in, profile, and support email and autofill suppression for Canvas tokens.
+- Associated the visible Profile photo label with its upload control in both dashboard settings implementations.
 
 ## [2.8.0] - 2026-10-16
 

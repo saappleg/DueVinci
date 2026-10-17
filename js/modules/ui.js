@@ -518,7 +518,7 @@ export function ensureSettingsModalExists() {
                                 <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Shown in your profile menu. Your email remains private.</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>
+                                <label for="profileAvatarInput" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">Profile photo</label>
                                 <div class="flex items-center gap-3">
                                     <label class="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition">Upload photo
                                         <input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
