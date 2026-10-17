@@ -10,6 +10,7 @@ import {
     getCourseCreditHours,
     getGradeCategories,
     isGradebookAssignment,
+    loadGradesPage,
     renderGradeControlInputs,
     updateAssignmentGrade
 } from '../js/modules/grades.js';
@@ -86,6 +87,45 @@ describe('grade entry controls', () => {
 });
 
 describe('gradebook visibility', () => {
+    it('explains when hiding completed classes removes every course from Grades', async () => {
+        const gradesContainer = { innerHTML: '', querySelectorAll: () => [] };
+        const cumulativeGpa = { textContent: '' };
+        let courses = [];
+        let hideCompleted = true;
+        vi.stubGlobal('document', {
+            getElementById(id) {
+                if (id === 'gradesContainer') return gradesContainer;
+                if (id === 'cumulativeGpaVal') return cumulativeGpa;
+                return null;
+            }
+        });
+        vi.stubGlobal('localStorage', {
+            getItem(key) {
+                return key === 'duevinci_hide_completed_courses' && hideCompleted ? 'true' : null;
+            }
+        });
+        mocks.from.mockImplementation((table) => ({
+            select: vi.fn().mockResolvedValue({
+                data: table === 'courses' ? courses : [],
+                error: null
+            })
+        }));
+
+        await loadGradesPage();
+        expect(gradesContainer.innerHTML).toContain('Add a course to start tracking grades.');
+
+        courses = [{ id: 'completed-course', is_completed: true }];
+        await loadGradesPage();
+        expect(gradesContainer.innerHTML).toContain('All courses are hidden because they’re marked complete.');
+        expect(gradesContainer.innerHTML).toContain('Turn off “Hide completed classes” in Settings');
+        expect(gradesContainer.innerHTML).not.toContain('Add a course to start tracking grades.');
+
+        courses = [];
+        hideCompleted = false;
+        await loadGradesPage();
+        expect(gradesContainer.innerHTML).toContain('Add a course to start tracking grades.');
+    });
+
     it('uses explicit gradeability and preserves only legacy items with saved gradebook data', () => {
         expect(isGradebookAssignment({ is_gradeable: true, title: 'Lesson 1' })).toBe(true);
         expect(isGradebookAssignment({
