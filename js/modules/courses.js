@@ -1855,7 +1855,9 @@ export function renderStaticCoursePanels(course) {
                 }).join('')}
             </div>
             <div class="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
+                <label for="resTitle_${courseIdAttr}" class="sr-only">Resource title</label>
                 <input type="text" id="resTitle_${courseIdAttr}" placeholder="Resource Title" class="w-1/3 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
+                <label for="resUrl_${courseIdAttr}" class="sr-only">Resource URL</label>
                 <input type="url" id="resUrl_${courseIdAttr}" placeholder="https://..." class="flex-1 text-xs px-3 py-2 rounded border dark:bg-brand-900 dark:border-brand-600 focus:outline-none focus:border-indigo-500">
                 <button onclick="addResourceLink('${courseArg}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-xs font-bold transition">+ Add Link</button>
             </div>

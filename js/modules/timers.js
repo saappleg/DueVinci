@@ -433,7 +433,9 @@ export function renderTimersManager(container) {
                 <!-- Add Custom Timer Form -->
                 <div class="space-y-1.5 bg-zinc-50 dark:bg-brand-900 p-2 rounded-xl border border-zinc-200 dark:border-brand-700">
                     <div class="flex gap-1.5">
+                        <label for="newTimerNameInput" class="sr-only">Timer name</label>
                         <input type="text" id="newTimerNameInput" placeholder="Timer name (e.g. Coding)" class="flex-1 text-xs px-2 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white focus:outline-none focus:border-indigo-500">
+                        <label for="newTimerMinInput" class="sr-only">Focus duration in minutes</label>
                         <input type="number" id="newTimerMinInput" placeholder="Min" value="25" min="1" max="180" class="w-14 text-xs px-1.5 py-1.5 rounded border border-zinc-300 dark:border-brand-600 dark:bg-brand-800 dark:text-white focus:outline-none focus:border-indigo-500 text-center">
                     </div>
                     <button type="button" onclick="addNewTimer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">+ Add Custom Timer</button>
