@@ -42,4 +42,4 @@ The mobile drawer supports Tab wrapping and Escape-to-close with focus return. S
 
 ## Current release documentation
 
-Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.50`. See the canonical [changelog](https://github.com/saappleg/DueVinci/blob/main/CHANGELOG.md), [roadmap](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md), and [release checks](Testing-&-CI-CD) for scope and verification limits.
+Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.51`. See the canonical [changelog](https://github.com/saappleg/DueVinci/blob/main/CHANGELOG.md), [roadmap](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md), and [release checks](Testing-&-CI-CD) for scope and verification limits.
