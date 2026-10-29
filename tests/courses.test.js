@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { supabaseClient } from '../js/modules/config.js';
 import { generateBalancedStudyPlan } from '../js/modules/studyPlan.js';
+import { getLocalDateKey } from '../js/modules/utils.js';
+vi.mock('../js/modules/studyCalibration.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        recordStudyPlanCompletionIfEntitled: vi.fn(),
+        removeStudyPlanCompletion: vi.fn(),
+    };
+});
 import {
     extractAssignmentChecklistSteps,
     normalizeAssignmentChecklistProposalLines,
@@ -15,9 +24,13 @@ import {
     getAssignmentProgress,
     getCoursePacingProfile,
     getCoursePacingUpdates,
+    getDashboardCourseworkTypeLabel,
+    getDashboardUpNextAssignments,
     renderAssignmentCompletionControl,
     renderAssignmentGradeabilityControl,
     loadAssignments,
+    toggleAssignment,
+    updateAssignmentProgress,
     toggleAssignmentGradeable
 } from '../js/modules/courses.js';
 
@@ -149,6 +162,115 @@ describe('Coursework progress', () => {
         );
 
         expect(plan[0].allBlocks.find((block) => block.taskId === 'task-1').durationMinutes).toBe(15);
+    });
+});
+
+describe('Dashboard Up Next coursework', () => {
+    it('includes categorized discussions and other dated coursework while excluding structural headings and inactive rows', () => {
+        const courses = [
+            { id: 'active-course', pacing_type: 'self-paced' },
+            { id: 'completed-course', is_completed: true },
+        ];
+        const assignments = [
+            { id: 'discussion', course_id: 'active-course', title: 'Discussion Board: Week 5', task_type: 'assignment', due_date: '2026-10-29', is_completed: false },
+            { id: 'numbered-discussion', course_id: 'active-course', title: 'Week 5: Discussion Post', task_type: 'assignment', due_date: '2026-10-30', is_completed: false },
+            { id: 'review', course_id: 'active-course', title: 'Review Chapter 5', task_type: 'review', due_date: '2026-10-31', is_completed: false },
+            { id: 'unit-heading', course_id: 'active-course', title: 'Unit 5: Course overview', due_date: '2026-10-29', is_completed: false },
+            { id: 'week-heading', course_id: 'active-course', title: 'Week 5', due_date: '2026-10-29', is_completed: false },
+            { id: 'completed', course_id: 'active-course', title: 'Discussion: finished', task_type: 'assignment', due_date: '2026-10-29', is_completed: true },
+            { id: 'undated', course_id: 'active-course', title: 'Discussion: no date', task_type: 'assignment', due_date: null, is_completed: false },
+            { id: 'completed-course-item', course_id: 'completed-course', title: 'Discussion: archived class', task_type: 'assignment', due_date: '2026-10-29', is_completed: false },
+        ];
+
+        const upcoming = getDashboardUpNextAssignments(courses, assignments, new Date(2026, 9, 28, 12));
+
+        expect(upcoming.map((assignment) => assignment.id)).toEqual(['discussion', 'numbered-discussion', 'review']);
+        expect(getDashboardUpNextAssignments(courses, assignments, new Date(2026, 9, 28, 12), 'high')).toEqual([]);
+        expect(getDashboardCourseworkTypeLabel({ task_type: 'assignment' })).toBe('Assignment');
+        expect(getDashboardCourseworkTypeLabel({ task_type: 'discussion' })).toBe('Discussion');
+        expect(getDashboardCourseworkTypeLabel({})).toBe('Coursework');
+    });
+
+    it('keeps the existing priority filter for every coursework category', () => {
+        const courses = [{ id: 'course-1', pacing_type: 'self-paced' }];
+        const assignments = [
+            { id: 'urgent-discussion', course_id: 'course-1', title: 'Discussion response', task_type: 'assignment', priority: 'high', due_date: '2026-10-29' },
+            { id: 'normal-reading', course_id: 'course-1', title: 'Chapter 5 reading', task_type: 'reading', priority: 'medium', due_date: '2026-10-29' },
+        ];
+
+        expect(getDashboardUpNextAssignments(courses, assignments, new Date(2026, 9, 28, 12), 'high').map((assignment) => assignment.id))
+            .toEqual(['urgent-discussion']);
+    });
+});
+
+describe('Assignment study activity', () => {
+    function mockAssignmentUpdate(result) {
+        const query = {
+            update: () => query,
+            eq: () => query,
+            select: () => query,
+            maybeSingle: () => Promise.resolve(result),
+        };
+        vi.spyOn(supabaseClient, 'from').mockReturnValue(query);
+    }
+
+    function useActivityStorage() {
+        const values = new Map([['duevinci_activity_dates', JSON.stringify([])]]);
+        vi.stubGlobal('localStorage', {
+            getItem: (key) => values.get(key) ?? null,
+            setItem: (key, value) => values.set(key, String(value)),
+        });
+        vi.stubGlobal('window', { location: { pathname: '/legal/privacy' } });
+        return values;
+    }
+
+    it('records a study day after the assignment completion is saved', async () => {
+        const values = useActivityStorage();
+        mockAssignmentUpdate({ data: { id: 'assignment-1' }, error: null });
+
+        await toggleAssignment('assignment-1', false);
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([getLocalDateKey()]);
+    });
+
+    it('does not record a study day when the update matches no row', async () => {
+        const values = useActivityStorage();
+        mockAssignmentUpdate({ data: null, error: null });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await toggleAssignment('assignment-hidden-by-rls', false);
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([]);
+    });
+
+    it('does not record a study day when the assignment update fails', async () => {
+        const values = useActivityStorage();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockAssignmentUpdate({ data: null, error: new Error('offline') });
+
+        await toggleAssignment('assignment-1', false);
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([]);
+    });
+
+    it('records activity for 100 percent progress only after an updated row is returned', async () => {
+        const values = useActivityStorage();
+        mockAssignmentUpdate({ data: { id: 'assignment-1' }, error: null });
+
+        await updateAssignmentProgress('assignment-1', '100');
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([getLocalDateKey()]);
+    });
+
+    it('does not record activity when a 100 percent progress update matches no row', async () => {
+        const values = useActivityStorage();
+        vi.stubGlobal('alert', vi.fn());
+        mockAssignmentUpdate({ data: null, error: null });
+
+        await updateAssignmentProgress('assignment-hidden-by-rls', '100');
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([]);
+        expect(globalThis.alert).toHaveBeenCalledWith(expect.stringContaining('No matching coursework item was updated.'));
     });
 });
 

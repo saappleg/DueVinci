@@ -6,6 +6,7 @@ describe('Academic Utilities', () => {
     let getWorkloadIntensity;
     let calculateDaysRemaining;
     let getSevenDayWorkload;
+    let getAssignmentCompletionCounts;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/academics.js');
@@ -14,6 +15,7 @@ describe('Academic Utilities', () => {
         getWorkloadIntensity = mod.getWorkloadIntensity || globalThis.getWorkloadIntensity;
         calculateDaysRemaining = mod.calculateDaysRemaining || globalThis.calculateDaysRemaining;
         getSevenDayWorkload = mod.getSevenDayWorkload || globalThis.getSevenDayWorkload;
+        getAssignmentCompletionCounts = mod.getAssignmentCompletionCounts;
     });
 
     describe('calculateStudyStreak', () => {
@@ -59,34 +61,50 @@ describe('Academic Utilities', () => {
     });
 
     describe('getWorkloadIntensity', () => {
-        it('prioritizes Exam status regardless of task count', () => {
-            const res = getWorkloadIntensity(1, true);
-            expect(res.statusLabel).toBe('🔥 Exam');
+        it('shows exam status and the actual due-item count together', () => {
+            const res = getWorkloadIntensity(2, true);
+            expect(res.statusLabel).toBe('🔥 Exam · 2 due items');
             expect(res.intensityClass).toContain('animate-pulse');
         });
 
         it('returns heavy workload for 4 or more tasks', () => {
             const res = getWorkloadIntensity(5, false);
-            expect(res.statusLabel).toBe('5 Tasks');
+            expect(res.statusLabel).toBe('5 due items');
             expect(res.intensityClass).toContain('text-rose-700');
         });
 
         it('returns moderate workload for 2-3 tasks', () => {
             const res = getWorkloadIntensity(3, false);
-            expect(res.statusLabel).toBe('3 Tasks');
+            expect(res.statusLabel).toBe('3 due items');
             expect(res.intensityClass).toContain('text-amber-700');
         });
 
         it('returns light workload for 1 task', () => {
             const res = getWorkloadIntensity(1, false);
-            expect(res.statusLabel).toBe('1 Task');
+            expect(res.statusLabel).toBe('1 due item');
             expect(res.intensityClass).toContain('text-indigo-700');
         });
 
-        it('returns Chill for 0 tasks', () => {
+        it('reports no due items for 0 tasks', () => {
             const res = getWorkloadIntensity(0, false);
-            expect(res.statusLabel).toBe('Chill');
+            expect(res.statusLabel).toBe('No due items');
             expect(res.intensityClass).toContain('text-emerald-700');
+        });
+    });
+
+    describe('getAssignmentCompletionCounts', () => {
+        it('counts completed assignments across all coursework categories', () => {
+            const summary = getAssignmentCompletionCounts([
+                { title: 'Lesson 1', is_completed: true },
+                { title: 'Discussion: Week 2', is_completed: true },
+                { title: 'Quiz 3', is_completed: false },
+            ]);
+
+            expect(summary).toEqual({ completed: 2, total: 3 });
+        });
+
+        it('returns zero counts for a non-array input', () => {
+            expect(getAssignmentCompletionCounts(null)).toEqual({ completed: 0, total: 0 });
         });
     });
 
@@ -100,7 +118,7 @@ describe('Academic Utilities', () => {
 
             expect(workload[1].dayTasks).toBe(2);
             expect(workload[1].hasExam).toBe(true);
-            expect(workload[1].intensity.statusLabel).toBe('🔥 Exam');
+            expect(workload[1].intensity.statusLabel).toBe('🔥 Exam · 2 due items');
         });
     });
 

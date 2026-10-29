@@ -26,6 +26,6 @@ Timer state is saved locally; do not assume live cross-device timer synchronizat
 
 ## Study-plan connection · Pro, opt-in
 
-A study-plan timer can attach a task context. With personalized estimates enabled and Pro access verified, completed focus sessions and finished tasks contribute to recent study history. Simply pressing Start is not a measurement of completed study time, and the free timer does not provide comprehensive per-class hour analytics.
+A study-plan timer can attach a task context. With personalized estimates enabled and Pro access verified, completed focus sessions, optional self-reported minutes from Daily Brief completion, and finished tasks contribute to recent study history. If no linked focus session was completed for that task on this device on the current date, completing it in Daily Brief offers an optional approximate-time entry. Self-reported minutes remain separate from focus-session counts and minutes. Successful completion records study activity for the streak even when no timer or estimate is used. Simply pressing Start is not a measurement of completed study time, and the free timer does not provide comprehensive per-class hour analytics.
 
 See [Smart Study Planner](Smart-Study-Planner) for enabling, pausing, and clearing calibration history. Browser due-date reminders and Canvas change alerts are separate settings, not timer-completion guarantees.

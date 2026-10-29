@@ -43,7 +43,7 @@ describe('Service worker release updates', () => {
         const worker = createWorker();
         await finishLifecycle(worker.handlers.get('install'));
 
-        expect(worker.caches.open).toHaveBeenCalledWith('duevinci-v8.53');
+        expect(worker.caches.open).toHaveBeenCalledWith('duevinci-v8.54');
     });
 
     it('loads the application shell without reusing stale HTTP cache entries', async () => {

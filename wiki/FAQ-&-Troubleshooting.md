@@ -32,7 +32,7 @@ Choose **General study help** to avoid selected-course context. Selecting a cour
 
 ### Which study features need opt-in?
 
-Settings → Study & Reminders contains Pro personalized estimates and Canvas assignment/grade alerts. Personalization uses completed, linked study sessions and task completions; each save retains at most the newest 180 focus sessions and 120 task completions, while older entries may be dropped. Turning personalization off pauses it; **Clear history** removes saved history through preference sync. Assignment alerts follow a Canvas sync. Posted-grade alerts need an initial baseline, scheduled refresh, configured scheduler/Web Push secrets, and browser push permission on each receiving device.
+Settings → Study & Reminders contains Pro personalized estimates and Canvas assignment/grade alerts. Completing coursework successfully records a study day for the streak without requiring a timer. In Daily Brief, if no linked focus session was completed for an item on this device that day, you can enter an optional approximate time. Those minutes enter personalized study history only when the Pro setting is enabled, and remain separate from focus-session totals. Each history save retains at most the newest 180 focus sessions, 120 task completions, and 120 self-reports, while older entries may be dropped. Turning personalization off pauses new history capture; **Clear history** removes saved history through preference sync. Assignment alerts follow a Canvas sync. Posted-grade alerts need an initial baseline, scheduled refresh, configured scheduler/Web Push secrets, and browser push permission on each receiving device.
 
 ## Troubleshooting
 

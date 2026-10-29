@@ -18,7 +18,8 @@ DueVinci is a student academic workspace for classes, deadlines, study planning,
 Course and term setup, lesson and deadline tracking, Smart Study Plan, workload radar, weighted grade categories, credit-weighted GPA estimates, target-score calculations, What-If simulation, calendar events and `.ics` import/export, timers, and portable backups remain free.
 
 - Set class and term date windows, search or archive terms, move classes in bulk, and start a new term by copying class shells without copying old coursework.
-- Sequence study blocks around deadlines, rest days, and protected dates. Workload radar highlights upcoming due work and exams.
+- Sequence study blocks around deadlines, rest days, and protected dates. The Dashboard shows actual due dates, including dates on rest days, while the Smart Study Plan schedules work around those preferences.
+- Mark coursework complete from the Dashboard, Courses, Calendar, or study plan to update the study streak without a timer. Dashboard completion totals include all coursework categories, and Up Next lists dated work such as discussions and assignments.
 - Review note-derived flashcards and quizzes, with account-scoped review progress and backup support.
 - Turn a dated calendar event into an assignment for a chosen class while preserving the original event and checking duplicates.
 - Enable the optional free Nursing Hub and degree themes in Settings → Appearance. Nursing practice must be fictional; **never enter real patient information**.
@@ -42,4 +43,4 @@ The mobile drawer supports Tab wrapping and Escape-to-close with focus return. S
 
 ## Current release documentation
 
-Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.51`. See the canonical [changelog](https://github.com/saappleg/DueVinci/blob/main/CHANGELOG.md), [roadmap](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md), and [release checks](Testing-&-CI-CD) for scope and verification limits.
+Updated October 28, 2026 for the 2.8 application line and PWA shell `duevinci-v8.54`. See the canonical [changelog](https://github.com/saappleg/DueVinci/blob/main/CHANGELOG.md), [roadmap](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md), and [release checks](Testing-&-CI-CD) for scope and verification limits.

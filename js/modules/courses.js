@@ -2,7 +2,7 @@
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
 import { applyDashboardWidgetLayout, isWorkspaceFeatureVisible } from './ui.js';
-import { smartParseDate, parseInputDate, fireConfetti, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
+import { smartParseDate, parseInputDate, fireConfetti, recordStudyActivity, getCurrentPageName, escapeHtml, escapeInlineJs, getSafeExternalUrl, getLocalDateKey } from './utils.js';
 import { getUnitNumber, getLessonNumber, getCurrentStudyWeekAssignments } from './studyPlan.js';
 import { deleteDeckMastery } from './flashcards.js';
 import { getArchivedTermNames, getCourseDateBounds, getTermDateRange, saveTermDateRange, isDateWithinCourseWindow, clampDateToCourseWindow } from './courseDates.js';
@@ -356,6 +356,42 @@ function isCourseProgressItem(item) {
     if (title.startsWith('↳')) return true;
     const isUnitHeader = /^(?:unit|week|wk|module|mod|chapter)\s*#?\d+\b/i.test(title);
     return !isUnitHeader || /lesson|exam|final|midterm|test|review|assignment|lab|project|reading|quiz|essay/i.test(title);
+}
+
+function isDashboardUpNextItem(item) {
+    const title = String(item?.title || '').trim();
+    if (!title) return false;
+
+    const isStructuralHeading = /^(?:unit|week|wk|module|mod|chapter)\s*#?\d+\b/i.test(title);
+    if (!isStructuralHeading || isCourseProgressItem(item)) return true;
+
+    // Numbered headings are also used as assignment titles. Preserve them when
+    // the row carries an explicit coursework category, including discussions
+    // that do not contain one of the older lesson-oriented title keywords.
+    return Boolean(String(item?.task_type || item?.type || '').trim());
+}
+
+const DASHBOARD_COURSEWORK_TYPE_LABELS = Object.freeze({
+    lesson: 'Lesson',
+    review: 'Review',
+    exam: 'Exam',
+    assignment: 'Assignment',
+    reading: 'Reading',
+    lab: 'Lab',
+});
+
+export function getDashboardCourseworkTypeLabel(assignment = {}) {
+    const type = String(assignment?.task_type || assignment?.type || '').trim().toLowerCase();
+    if (!type) return 'Coursework';
+    return DASHBOARD_COURSEWORK_TYPE_LABELS[type]
+        || type.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function getDashboardUpNextAssignments(courses = [], assignments = [], referenceDate = new Date(), priorityFilter = 'all') {
+    const upcoming = getCurrentStudyWeekAssignments(courses, assignments, referenceDate)
+        .filter(isDashboardUpNextItem);
+    if (priorityFilter === 'all') return upcoming;
+    return upcoming.filter((assignment) => (assignment.priority || 'medium') === priorityFilter);
 }
 
 function isCurriculumChild(item, course) {
@@ -766,21 +802,17 @@ export async function loadDashboardStats() {
         upNextListEl.innerHTML = '';
         const currentFilter = window.activePriorityFilter || 'all';
 
-        const currentStudyWeekAssignments = getCurrentStudyWeekAssignments(courses, assignments, new Date());
-        let upcoming = currentStudyWeekAssignments.filter(a => a.title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(a.title));
-        
-        if (currentFilter !== 'all') {
-            upcoming = upcoming.filter(a => (a.priority || 'medium') === currentFilter);
-        }
+        const upcoming = getDashboardUpNextAssignments(courses, assignments, new Date(), currentFilter);
 
         if (upcoming.length === 0) {
-            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400 py-3 text-center">No matching upcoming lessons. You\'re all caught up! 🎉</p>';
+            upNextListEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400 py-3 text-center">No matching upcoming coursework. You\'re all caught up! 🎉</p>';
         } else {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
                 const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${isWeeklyCourse(course) ? 'Wk' : 'Unit'} ${assign.unit_number}</span>` : '';
+                const categoryLabel = getDashboardCourseworkTypeLabel(assign);
                 const priority = assign.priority || 'medium';
                 let priorityBadge = '';
                 if (priority === 'high') {
@@ -795,7 +827,7 @@ export async function loadDashboardStats() {
                             ${renderAssignmentCompletionControl(assign)}
                             <div class="truncate">
                                 <p class="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">${escapeHtml(course.emoji)} ${unitBadge}${escapeHtml(assign.title)}</p>
-                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(course.code)} • Target: ${escapeHtml(formattedDate)}</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(course.code)} • ${escapeHtml(categoryLabel)} • Target: ${escapeHtml(formattedDate)}</p>
                             </div>
                         </div>
                         <div class="shrink-0 ml-2">
@@ -2344,14 +2376,19 @@ export async function toggleCourseComplete(courseId, currentState) {
 export async function toggleAssignment(assignId, currentState, courseId) {
     const newState = !currentState;
     const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
-    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
-    if (error) {
-        console.error('Could not update coursework completion:', error);
+    const { data: updated, error } = await supabaseClient.from('assignments')
+        .update(updates)
+        .eq('id', assignId)
+        .select('id')
+        .maybeSingle();
+    if (error || !updated) {
+        console.error('Could not update coursework completion:', error || new Error('No matching coursework item was updated.'));
         return;
     }
     const cachedAssignment = courseProgressAssignments.find((assignment) => assignment.id === assignId);
     if (cachedAssignment) Object.assign(cachedAssignment, updates);
     if (newState) {
+        recordStudyActivity();
         let localType = '';
         try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[assignId] || ''; } catch { /* Use the synced assignment type below. */ }
         recordStudyPlanCompletionIfEntitled({
@@ -2381,9 +2418,13 @@ export async function updateAssignmentProgress(assignId, rawProgress, courseId) 
     }
 
     const updates = { progress_percent: progress, is_completed: progress === 100 };
-    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
-    if (error) {
-        alert(`Could not save progress: ${error.message || 'Please try again.'}`);
+    const { data: updated, error } = await supabaseClient.from('assignments')
+        .update(updates)
+        .eq('id', assignId)
+        .select('id')
+        .maybeSingle();
+    if (error || !updated) {
+        alert(`Could not save progress: ${error?.message || (!updated ? 'No matching coursework item was updated.' : 'Please try again.')}`);
         if (courseId) loadAssignments(courseId, currentAssignmentPage);
         return;
     }
@@ -2391,6 +2432,7 @@ export async function updateAssignmentProgress(assignId, rawProgress, courseId) 
     const cachedAssignment = courseProgressAssignments.find((assignment) => String(assignment.id) === String(assignId));
     if (cachedAssignment) Object.assign(cachedAssignment, updates);
     if (progress === 100 && cachedAssignment) {
+        recordStudyActivity();
         recordStudyPlanCompletionIfEntitled({
             taskId: assignId,
             courseId: cachedAssignment.course_id || courseId,
@@ -2399,6 +2441,8 @@ export async function updateAssignmentProgress(assignId, rawProgress, courseId) 
             estimatedMinutes: cachedAssignment.estimated_minutes,
         });
         fireConfetti();
+    } else if (progress === 100) {
+        recordStudyActivity();
     } else if (progress < 100) {
         removeStudyPlanCompletion(assignId);
     }

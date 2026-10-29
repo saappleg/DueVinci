@@ -34,8 +34,8 @@
 - Keep the free planner usable when a subscription is inactive, expired, canceled, or past due.
 - Check the opt-in personalized study plan's pause and clear-history controls.
   Its recent-data calculation window does not automatically delete stored study
-  history, though each save retains at most the newest 180 focus sessions and
-  120 task completions. Verify opted-in Canvas assignment alerts after an explicit
+  history, though each save retains at most the newest 180 focus sessions, 120
+  task completions, and 120 self-reports. Verify opted-in Canvas assignment alerts after an explicit
   or scheduled sync, and posted-grade alerts after the first baseline with the
   scheduler, VAPID secrets, and receiving-device browser permission configured.
 - Check a valid empty Brightspace feed retires older events for that account
@@ -48,6 +48,14 @@
   the row without deleting its saved score or category. Complete a course, enable
   **Hide completed classes**, and confirm the course disappears from Grades,
   cumulative GPA, and term insights; turn the setting off and confirm it returns.
+- With disposable current-week coursework, confirm Up Next includes a dated
+  Discussion and shows its type, Dashboard and Weekly Review completion totals
+  agree, and the radar shows actual deadlines on rest days while the plan keeps
+  scheduled work off those days. Complete a Daily Brief item without a timer:
+  verify successful completion advances the streak, a same-device linked focus
+  session suppresses the time prompt for that task/date, and self-reported
+  minutes are saved only with Pro personalization enabled without increasing
+  focus-session totals.
 
 
 ## Nursing Hub and theme checks

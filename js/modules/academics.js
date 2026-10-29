@@ -55,30 +55,39 @@ export function getWorkloadIntensity(dayTasks = 0, hasExam = false) {
     if (hasExam) {
         return {
             intensityClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-700 animate-pulse',
-            statusLabel: '🔥 Exam'
+            statusLabel: `🔥 Exam · ${dayTasks} due item${dayTasks === 1 ? '' : 's'}`
         };
     }
     if (dayTasks >= 4) {
         return {
             intensityClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-800',
-            statusLabel: `${dayTasks} Tasks`
+            statusLabel: `${dayTasks} due items`
         };
     }
     if (dayTasks >= 2) {
         return {
             intensityClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-800',
-            statusLabel: `${dayTasks} Tasks`
+            statusLabel: `${dayTasks} due items`
         };
     }
     if (dayTasks === 1) {
         return {
             intensityClass: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
-            statusLabel: '1 Task'
+            statusLabel: '1 due item'
         };
     }
     return {
         intensityClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
-        statusLabel: 'Chill'
+        statusLabel: 'No due items'
+    };
+}
+
+/** Counts the same complete assignment population used by the Weekly Review. */
+export function getAssignmentCompletionCounts(assignments = []) {
+    const rows = Array.isArray(assignments) ? assignments : [];
+    return {
+        completed: rows.filter(assignment => assignment?.is_completed).length,
+        total: rows.length,
     };
 }
 
@@ -171,14 +180,11 @@ export async function renderAcademicsDashboardWidget(containerId) {
         return false;
     };
 
-    if (assignmentsData.length > 0) {
-        const validItems = assignmentsData.filter(a => {
-            const title = String(a.title || '');
-            return title.includes('↳') || /lesson|exam|final|midterm|test|review/i.test(title);
-        });
-        totalCount = validItems.length;
-        completedCount = validItems.filter(a => a.is_completed).length;
+    const assignmentCounts = getAssignmentCompletionCounts(assignmentsData);
+    totalCount = assignmentCounts.total;
+    completedCount = assignmentCounts.completed;
 
+    if (assignmentsData.length > 0) {
         const uncompletedExams = assignmentsData
             .filter(a => !a.is_completed && isExamTask(a) && a.due_date)
             .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
@@ -247,10 +253,11 @@ export async function renderAcademicsDashboardWidget(containerId) {
             <div class="mt-4 pt-4 border-t border-zinc-200 dark:border-brand-700">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                        <span>📊</span> 7-Day Workload & Stress Radar
+                        <span>📊</span> 7-Day Assignment Due Dates
                     </span>
-                    <span class="text-[11px] text-zinc-400">Green = Light • Amber = Moderate • Red = Exam/Heavy</span>
+                    <span class="text-[11px] text-zinc-400">Green = 0 • Indigo = 1 • Amber = 2–3 • Red = 4+ or exam</span>
                 </div>
+                <p class="mb-2 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">This shows actual incomplete items due on each date, including configured rest days. Rest days affect scheduled work in Smart Study Plan; they do not move deadlines.</p>
                 <div class="flex gap-2 overflow-x-auto pb-1">
                     ${days.join('')}
                 </div>

@@ -1,7 +1,7 @@
 // --- FULLCALENDAR & ICS EXPORT MODULE ---
 import { supabaseClient } from './config.js';
 import { currentUser } from './auth.js';
-import { fireConfetti, getLocalDateKey, escapeHtml } from './utils.js';
+import { fireConfetti, getLocalDateKey, recordStudyActivity, escapeHtml } from './utils.js';
 import { generateBalancedStudyPlan } from './studyPlan.js';
 import { getWeekStartDayIndex } from './weekPreferences.js';
 import { isDateWithinCourseWindow } from './courseDates.js';
@@ -805,12 +805,18 @@ export function initCalendar() {
             } else if (info.event.extendedProps.isAssignment) {
                 const assignId = info.event.extendedProps.assignmentId;
                 const newState = !info.event.extendedProps.isCompleted;
-                const { error } = await supabaseClient.from('assignments').update({ is_completed: newState }).eq('id', assignId);
-                if (error) {
-                    console.error('Could not update calendar coursework:', error);
+                const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
+                const { data: updated, error } = await supabaseClient.from('assignments')
+                    .update(updates)
+                    .eq('id', assignId)
+                    .select('id')
+                    .maybeSingle();
+                if (error || !updated) {
+                    console.error('Could not update calendar coursework:', error || new Error('No matching coursework item was updated.'));
                     return;
                 }
                 if (newState) {
+                    recordStudyActivity();
                     let localType = '';
                     try { localType = JSON.parse(localStorage.getItem('duevinci_assignment_types') || '{}')[assignId] || ''; } catch { /* Use the synced assignment type below. */ }
                     recordStudyPlanCompletionIfEntitled({

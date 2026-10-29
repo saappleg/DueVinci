@@ -1,8 +1,83 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { summarizeDailyBrief } from '../js/modules/today.js';
+import { supabaseClient } from '../js/modules/config.js';
+import { completeTodayTask, startTodayFocus, summarizeDailyBrief } from '../js/modules/today.js';
+import { consumeCompletedTaskTimerMarker, hasCompletedTaskTimerSession, recordCompletedTaskTimerMarker } from '../js/modules/timers.js';
+import { getLocalDateKey } from '../js/modules/utils.js';
 import { getWeekStartDayIndex, setWeekStartDay, normalizeWeekStartDay } from '../js/modules/weekPreferences.js';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+});
+
+describe('Daily Brief study activity', () => {
+    it('uses a completed task-linked timer marker once for the local day', () => {
+        localStorage.clear();
+        const date = getLocalDateKey();
+
+        expect(recordCompletedTaskTimerMarker('a1', date)).toBe(true);
+        expect(hasCompletedTaskTimerSession('a1', date)).toBe(true);
+        expect(consumeCompletedTaskTimerMarker('a1', date)).toBe(true);
+        expect(hasCompletedTaskTimerSession('a1', date)).toBe(false);
+        expect(consumeCompletedTaskTimerMarker('a1', date)).toBe(false);
+    });
+
+    it('starts a task-linked focus timer from Daily Brief', () => {
+        const setStudyFocusContext = vi.fn();
+        vi.stubGlobal('window', {
+            setTimerDuration: vi.fn(),
+            setStudyFocusContext,
+            timerRunning: false,
+            toggleTimer: vi.fn(),
+        });
+
+        startTodayFocus(25, 'a1', 'c1', 'lesson', 'Lesson 1', 35);
+
+        expect(setStudyFocusContext).toHaveBeenCalledWith({
+            taskId: 'a1',
+            courseId: 'c1',
+            taskType: 'lesson',
+            estimatedMinutes: 35,
+        });
+    });
+
+    it('does not record study activity or consume the timer marker when the assignment update fails', async () => {
+        localStorage.clear();
+        const date = getLocalDateKey();
+        recordCompletedTaskTimerMarker('a1', date);
+        vi.stubGlobal('document', { getElementById: () => null });
+        const query = {
+            update: vi.fn(function () { return this; }),
+            eq: vi.fn(function () { return this; }),
+            select: vi.fn(function () { return this; }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+        vi.spyOn(supabaseClient, 'from').mockReturnValue(query);
+
+        expect(await completeTodayTask('a1')).toBe(false);
+        expect(localStorage.getItem('duevinci_activity_dates')).toBeNull();
+        expect(hasCompletedTaskTimerSession('a1', date)).toBe(true);
+    });
+
+    it('records activity, sets completion progress, and consumes the marker after a successful completion', async () => {
+        localStorage.clear();
+        localStorage.setItem('duevinci_study_calibration_enabled', 'false');
+        const date = getLocalDateKey();
+        recordCompletedTaskTimerMarker('a1', date);
+        const query = {
+            update: vi.fn(function () { return this; }),
+            eq: vi.fn(function () { return this; }),
+            select: vi.fn(function () { return this; }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'a1' }, error: null }),
+        };
+        vi.spyOn(supabaseClient, 'from').mockReturnValue(query);
+
+        expect(await completeTodayTask('a1', 'c1', 'lesson', 'Lesson 1', 35)).toBe(true);
+        expect(query.update).toHaveBeenCalledWith({ is_completed: true, progress_percent: 100 });
+        expect(JSON.parse(localStorage.getItem('duevinci_activity_dates'))).toContain(date);
+        expect(hasCompletedTaskTimerSession('a1', date)).toBe(false);
+    });
+});
 
 describe('Daily Brief assignment summary', () => {
     it('counts only open work in the current study week and excludes finished or inactive-course work', () => {

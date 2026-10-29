@@ -40,6 +40,8 @@ Choose **Every week** when adding coursework to create weekly instances through 
 
 Syllabus PDF and image imports open a review dialog for each extracted unit and lesson row. Edit titles and dates or clear a row's Include checkbox before importing. Canceling the review leaves course metadata and coursework unchanged; selected due dates continue to follow the class and term date bounds.
 
+Dashboard **Up Next** shows titled, dated incomplete coursework in the current study week across categories such as lessons, assignments, quizzes, and discussions. Each row displays its coursework type; structural unit/week headings and undated items are not listed.
+
 Instructions, progress, parent links, and gradebook inclusion are synced with assignment records, kept by the offline cache, and included in full data backups. Apply `supabase/migrations/20261017022939_coursework_workflow_fields.sql` and `supabase/migrations/20261017064026_assignment_gradeability.sql` before deploying the matching UI so the saved assignment fields exist.
 
 Grades accepts percentage values and an Exclude choice. Course category weights and credit hours are configurable in the Grades page; [Grades & GPA](Grade-Tracker-&-GPA-Calculator) explains how the estimates work and their limits. The saved settings require `supabase/migrations/20261017022938_weighted_gradebook_and_gpa.sql`.

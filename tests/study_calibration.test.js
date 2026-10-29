@@ -12,6 +12,8 @@ import {
     getPersonalizedStudyEstimate,
     recordCompletedFocusSession,
     recordCompletedFocusSessionIfEntitled,
+    recordSelfReportedStudyMinutes,
+    recordSelfReportedStudyMinutesIfEntitled,
     recordStudyPlanCompletion,
 } from '../js/modules/studyCalibration.js';
 
@@ -54,6 +56,29 @@ describe('Study plan calibration', () => {
         expect(history.completions).toHaveLength(1);
         expect(history.completions[0].estimatedMinutes).toBe(35);
         expect(recordCompletedFocusSession({ taskId: 'invalid', minutes: 999 })).toBe(false);
+    });
+
+    it('uses self-reported time for estimates without counting it as a focus session', async () => {
+        const now = Date.parse('2026-10-15T12:00:00Z');
+        vi.mocked(getSubscriptionSnapshot).mockResolvedValue({ features: { study_plan_calibration: true } });
+        recordStudyPlanCompletion({ taskId: 'a1', taskType: 'lesson', estimatedMinutes: 20, completedAt: '2026-10-10T13:00:00Z' });
+        expect(await recordSelfReportedStudyMinutesIfEntitled({ taskId: 'a1', minutes: 40, reportedAt: '2026-10-10T13:05:00Z' })).toBe(true);
+
+        const result = calculateStudyCalibration(undefined, now);
+        expect(result.trackedTaskCount).toBe(1);
+        expect(result.focusSessionCount).toBe(0);
+        expect(result.totalFocusMinutes).toBe(0);
+        expect(result.averageFocusedMinutes).toBe(0);
+        expect(result.averageSelfReportedMinutes).toBe(40);
+        expect(result.ratios.lesson).toBeGreaterThan(1);
+        expect(JSON.parse(localStorage.getItem(STUDY_CALIBRATION_HISTORY_KEY)).selfReports).toHaveLength(1);
+    });
+
+    it('keeps self-reported minutes out of history when Pro entitlement is unavailable', async () => {
+        vi.mocked(getSubscriptionSnapshot).mockResolvedValue({ features: { study_plan_calibration: false } });
+        expect(await recordSelfReportedStudyMinutesIfEntitled({ taskId: 'a1', minutes: 25 })).toBe(false);
+        expect(recordSelfReportedStudyMinutes({ taskId: 'a1', minutes: 481 })).toBe(false);
+        expect(localStorage.getItem(STUDY_CALIBRATION_HISTORY_KEY)).toBeNull();
     });
 
     it('does not save history when the student has not opted in', () => {

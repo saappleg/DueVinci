@@ -2,7 +2,7 @@
 import { calculateDaysRemaining } from './academics.js';
 import { isWorkspaceFeatureVisible } from './ui.js';
 import { supabaseClient } from './config.js';
-import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey } from './utils.js';
+import { escapeHtml, escapeInlineJs, fireConfetti, getLocalDateKey, recordStudyActivity } from './utils.js';
 import { getCourseDateBounds, isDateWithinCourseWindow, isWeeklyPacedCourse } from './courseDates.js';
 import { getWeekStartDayIndex } from './weekPreferences.js';
 import { getStudyCalibrationContext, getPersonalizedStudyEstimate, recordStudyPlanCompletionIfEntitled, removeStudyPlanCompletion } from './studyCalibration.js';
@@ -1401,28 +1401,42 @@ export async function toggleStudyPlanAssignment(assignId, currentState, courseId
     if (!supabaseClient) return;
     const newState = !currentState;
     const updates = { is_completed: newState, progress_percent: newState ? 100 : 0 };
-    const { error } = await supabaseClient.from('assignments').update(updates).eq('id', assignId);
-    if (error) {
+    const { data: updated, error } = await supabaseClient.from('assignments')
+        .update(updates)
+        .eq('id', assignId)
+        .select('id')
+        .maybeSingle();
+    if (error || !updated) {
         console.error('Could not update study-plan coursework:', error);
         return;
     }
     const block = cachedStudyPlan.flatMap((day) => day.allBlocks || []).find((entry) => String(entry.taskId) === String(assignId));
     if (newState && block) {
-        recordStudyPlanCompletionIfEntitled({
+        recordStudyActivity();
+        await recordStudyPlanCompletionIfEntitled({
             taskId: assignId,
-            courseId: block.courseId,
+            courseId: block.courseId || courseId,
             taskType: block.taskType,
             title: block.rawTitle || block.title,
             estimatedMinutes: block.baselineDurationMinutes,
         });
     } else if (!newState) {
         removeStudyPlanCompletion(assignId);
+    } else {
+        recordStudyActivity();
+        await recordStudyPlanCompletionIfEntitled({ taskId: assignId, courseId });
     }
     if (newState) fireConfetti();
 
     // Refresh dashboard widget and re-open modal with refreshed data
     if (typeof window !== 'undefined' && typeof window.renderStudyPlanDashboardWidget === 'function') {
         await window.renderStudyPlanDashboardWidget('studyPlanWidgetContainer');
+    }
+    if (newState && typeof window !== 'undefined') {
+        await window.renderAcademicsDashboardWidget?.('dashboardGrid');
+        await window.renderTodayWorkspace?.();
+        await window.renderWeeklyReview?.();
+        await window.loadDashboardStats?.();
     }
     if (dateStr) {
         await openStudyPlanDayModal(dateStr);

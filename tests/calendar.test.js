@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const calendarMocks = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('../js/modules/config.js', () => ({ supabaseClient: { from: calendarMocks.from } }));
+vi.mock('../js/modules/studyCalibration.js', () => ({
+    getStudyCalibrationContext: vi.fn().mockResolvedValue(null),
+    getPersonalizedStudyEstimate: vi.fn(),
+    recordStudyPlanCompletionIfEntitled: vi.fn(),
+    removeStudyPlanCompletion: vi.fn(),
+}));
+import { getLocalDateKey } from '../js/modules/utils.js';
 import {
     buildCustomEventPayload,
     buildCustomEventRows,
@@ -16,8 +23,79 @@ import {
 } from '../js/modules/calendar.js';
 
 afterEach(() => {
+    disposeCalendar();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+});
+
+describe('Calendar assignment completion activity', () => {
+    function useActivityStorage() {
+        const values = new Map([['duevinci_activity_dates', JSON.stringify([])]]);
+        vi.stubGlobal('localStorage', {
+            getItem: (key) => values.get(key) ?? null,
+            setItem: (key, value) => values.set(key, String(value)),
+        });
+        return values;
+    }
+
+    function setupAssignmentClick(updateResult) {
+        let options;
+        const updateQuery = {
+            update: vi.fn(function () { return this; }),
+            eq: vi.fn(function () { return this; }),
+            select: vi.fn(function () { return this; }),
+            maybeSingle: vi.fn().mockResolvedValue(updateResult),
+        };
+        calendarMocks.from.mockImplementation((table) => {
+            if (table === 'assignments') {
+                return {
+                    update: (...args) => {
+                        updateQuery.update(...args);
+                        return updateQuery;
+                    },
+                    select: () => Promise.resolve({ data: null, error: null }),
+                };
+            }
+            return { select: () => Promise.resolve({ data: null, error: null }) };
+        });
+        const instance = { render: vi.fn(), destroy: vi.fn(), removeAllEvents: vi.fn(), addEventSource: vi.fn() };
+        vi.stubGlobal('document', { getElementById: (id) => id === 'calendar' ? {} : null });
+        vi.stubGlobal('FullCalendar', {
+            Calendar: vi.fn(function (_element, config) {
+                options = config;
+                return instance;
+            }),
+        });
+        initCalendar();
+        return {
+            updateQuery,
+            click: (assignmentId, isCompleted = false) => options.eventClick({
+                event: { extendedProps: { isAssignment: true, assignmentId, isCompleted } },
+            }),
+        };
+    }
+
+    it('records activity only after the calendar completion update returns a row', async () => {
+        const values = useActivityStorage();
+        const { updateQuery, click } = setupAssignmentClick({ data: { id: 'assignment-1' }, error: null });
+
+        await click('assignment-1');
+
+        expect(updateQuery.update).toHaveBeenCalledWith({ is_completed: true, progress_percent: 100 });
+        expect(updateQuery.select).toHaveBeenCalledWith('id');
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toContain(getLocalDateKey());
+    });
+
+    it('does not record activity when the calendar update returns no row', async () => {
+        const values = useActivityStorage();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { updateQuery, click } = setupAssignmentClick({ data: null, error: null });
+
+        await click('assignment-hidden-by-rls');
+
+        expect(JSON.parse(values.get('duevinci_activity_dates'))).toEqual([]);
+        expect(updateQuery.maybeSingle).toHaveBeenCalledOnce();
+    });
 });
 
 describe('Calendar import and custom event utilities', () => {

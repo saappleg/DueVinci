@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a saved per-coursework **Include in Grades** choice so students can keep lessons and imported coursework out of the grade tracker until they want to track them. Existing rows with saved grades or category assignments stay included.
 - Applied the **Hide completed classes** preference to the Grades page, including its GPA summary and term insights.
+- Added optional time estimates when completing a Daily Brief item without a completed linked focus session that day. Successful coursework completion also records study activity for the streak; entered minutes are saved only when Pro personalized study history is enabled.
 
 ### Changed
 - Replaced the browser-side Tailwind compiler with a generated, pre-cached static stylesheet. CI and the Pages deployment now rebuild the CSS and reject stale committed output.
 - Updated Tailwind CSS to 3.4.19 and Vitest to 4.1.12, with reviewed transitive dependency resolutions and constructable calendar test mocks.
-- Wrapped Canvas and Brightspace credential inputs in submit-handled forms and advanced the PWA shell cache to `duevinci-v8.51`.
+- Wrapped Canvas and Brightspace credential inputs in submit-handled forms and advanced the PWA shell cache to `duevinci-v8.54`.
+- Aligned Dashboard completion totals with Weekly Review across all assignment categories. Clarified that the dashboard radar shows actual due dates, while Smart Study Plan shows scheduled study days, and expanded Up Next to include dated coursework categories with their type.
 
 ### Fixed
 - Added explicit labels to generated timer, support, command-palette, and resource-link inputs, plus autocomplete hints for sign-in, profile, and support email and autofill suppression for Canvas tokens.

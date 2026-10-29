@@ -1,6 +1,6 @@
 # Product Roadmap 🗺️
 
-The canonical roadmap is [ROADMAP.md in the repository](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md). This wiki summary records shipped scope and separates it from future work. Updated October 17, 2026 for the 2.8 application line and PWA shell `duevinci-v8.51`.
+The canonical roadmap is [ROADMAP.md in the repository](https://github.com/saappleg/DueVinci/blob/main/ROADMAP.md). This wiki summary records shipped scope and separates it from future work. Updated October 28, 2026 for the 2.8 application line and PWA shell `duevinci-v8.54`.
 
 ## Free core commitment
 
@@ -18,6 +18,7 @@ Course and term setup, lessons and deadlines, Smart Study Plan, workload radar, 
 - Free weighted grade categories, credit-weighted GPA estimates, target-score calculator, and 90-day grade insights. Estimates use linear percentage scaling and do not reproduce every institution's letter-grade or repeat-course rules.
 - Free recurring coursework, parent/subtask progress, editable checklist suggestions, reviewed syllabus/import rows, timed note-based mock exams, and Anki text/CSV exchange. Canvas sync imports assignments directly for selected courses.
 - Pro opt-in study-plan calibration and Canvas assignment/due-date alerts after sync. Browser push permission and backend configuration are required.
+- Dashboard completion totals match Weekly Review across coursework categories; Up Next includes dated discussions and other work. Successful completion updates the study streak without a timer, and Daily Brief can collect an optional study-time estimate.
 - Pro read-only Google and Outlook calendar sync. The first sync runs after connection; later syncs are user-started.
 - Pro opt-in scheduled Canvas refresh and posted-grade alerts. Scheduler secrets, Web Push configuration, and browser permission are required for delivery.
 - Settings/Support scrolling and focus repairs, audited mobile navigation/timer touch targets, Tutor status feedback, scroll-aid collision/visibility fixes, and local-preview worker exclusion.

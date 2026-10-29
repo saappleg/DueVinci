@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { supabaseClient } from '../js/modules/config.js';
 import { getLocalDateKey } from '../js/modules/utils.js';
 
 describe('AI Study Schedule & Workload Balancer', () => {
@@ -14,6 +15,7 @@ describe('AI Study Schedule & Workload Balancer', () => {
     let startStudyPlanTimer;
     let getStudyPlanMoveError;
     let getStudyPlanMoveTargets;
+    let toggleStudyPlanAssignment;
 
     beforeAll(async () => {
         const mod = await import('../js/modules/studyPlan.js');
@@ -28,6 +30,50 @@ describe('AI Study Schedule & Workload Balancer', () => {
         startStudyPlanTimer = mod.startStudyPlanTimer || globalThis.startStudyPlanTimer;
         getStudyPlanMoveError = mod.getStudyPlanMoveError || globalThis.getStudyPlanMoveError;
         getStudyPlanMoveTargets = mod.getStudyPlanMoveTargets || globalThis.getStudyPlanMoveTargets;
+        toggleStudyPlanAssignment = mod.toggleStudyPlanAssignment;
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    describe('completion activity', () => {
+        it('records study activity only after the coursework update succeeds', async () => {
+            localStorage.clear();
+            localStorage.setItem('duevinci_study_calibration_enabled', 'false');
+            const failedQuery = {
+                update: vi.fn(function () { return this; }),
+                eq: vi.fn(function () { return this; }),
+                select: vi.fn(function () { return this; }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            };
+            vi.spyOn(supabaseClient, 'from').mockReturnValue(failedQuery);
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await toggleStudyPlanAssignment('task-failed', false, 'course-1');
+
+            expect(failedQuery.update).toHaveBeenCalledWith({ is_completed: true, progress_percent: 100 });
+            expect(localStorage.getItem('duevinci_activity_dates')).toBeNull();
+        });
+
+        it('records activity and 100 percent progress after a successful coursework update', async () => {
+            localStorage.clear();
+            localStorage.setItem('duevinci_study_calibration_enabled', 'false');
+            const successfulQuery = {
+                update: vi.fn(function () { return this; }),
+                eq: vi.fn(function () { return this; }),
+                select: vi.fn(function () { return this; }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'task-success' }, error: null }),
+            };
+            vi.spyOn(supabaseClient, 'from').mockReturnValue(successfulQuery);
+            vi.stubGlobal('window', {});
+
+            await toggleStudyPlanAssignment('task-success', false, 'course-1');
+
+            expect(successfulQuery.update).toHaveBeenCalledWith({ is_completed: true, progress_percent: 100 });
+            expect(JSON.parse(localStorage.getItem('duevinci_activity_dates'))).toContain(getLocalDateKey());
+        });
     });
 
     describe('getUnitNumber and getLessonNumber Helpers', () => {

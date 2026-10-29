@@ -29,7 +29,7 @@ flowchart TD
 - Versions both application and runtime caches so older modules do not override a new shell after activation.
 - Does not cache authenticated Supabase/API responses.
 
-The current release shell is `duevinci-v8.51` as of October 17, 2026; this cache identifier is separate from the application's 2.8 version line.
+The current release shell is `duevinci-v8.54` as of October 28, 2026; this cache identifier is separate from the application's 2.8 version line.
 
 ### PWA controller (`js/modules/pwa.js`)
 

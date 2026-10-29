@@ -6,6 +6,7 @@ export const STUDY_CALIBRATION_HISTORY_KEY = 'duevinci_study_history';
 const HISTORY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_FOCUS_SESSIONS = 180;
 const MAX_COMPLETED_TASKS = 120;
+const MAX_SELF_REPORTS = 120;
 
 function safeParse(value, fallback) {
     try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
@@ -16,12 +17,17 @@ export function isStudyCalibrationEnabled() {
 }
 
 export function getStudyCalibrationHistory() {
-    if (typeof localStorage === 'undefined') return { version: 1, sessions: [], completions: [] };
+    if (typeof localStorage === 'undefined') return { version: 1, sessions: [], completions: [], selfReports: [] };
     const stored = safeParse(localStorage.getItem(STUDY_CALIBRATION_HISTORY_KEY), null);
     if (!stored || stored.version !== 1 || !Array.isArray(stored.sessions) || !Array.isArray(stored.completions)) {
-        return { version: 1, sessions: [], completions: [] };
+        return { version: 1, sessions: [], completions: [], selfReports: [] };
     }
-    return { version: 1, sessions: stored.sessions, completions: stored.completions };
+    return {
+        version: 1,
+        sessions: stored.sessions,
+        completions: stored.completions,
+        selfReports: Array.isArray(stored.selfReports) ? stored.selfReports : [],
+    };
 }
 
 function saveHistory(history) {
@@ -31,6 +37,7 @@ function saveHistory(history) {
             version: 1,
             sessions: history.sessions.slice(-MAX_FOCUS_SESSIONS),
             completions: history.completions.slice(-MAX_COMPLETED_TASKS),
+            selfReports: (history.selfReports || []).slice(-MAX_SELF_REPORTS),
         }));
         return true;
     } catch (error) {
@@ -84,6 +91,26 @@ export async function recordCompletedFocusSessionIfEntitled(session = {}) {
     return recordCompletedFocusSession(session);
 }
 
+export function recordSelfReportedStudyMinutes({ taskId, minutes, reportedAt = new Date().toISOString() } = {}) {
+    if (!isStudyCalibrationEnabled() || taskId == null) return false;
+    const cleanMinutes = Math.round(Number(minutes));
+    if (!Number.isFinite(cleanMinutes) || cleanMinutes < 1 || cleanMinutes > 480) return false;
+    const history = getStudyCalibrationHistory();
+    const cleanTaskId = String(taskId);
+    history.selfReports = history.selfReports.filter((report) => report && String(report.taskId) !== cleanTaskId);
+    history.selfReports.push({
+        taskId: cleanTaskId,
+        minutes: cleanMinutes,
+        reportedAt: String(reportedAt),
+    });
+    return saveHistory(history);
+}
+
+export async function recordSelfReportedStudyMinutesIfEntitled(report = {}) {
+    if (!await canRecordStudyHistory()) return false;
+    return recordSelfReportedStudyMinutes(report);
+}
+
 export function recordStudyPlanCompletion({ taskId, courseId = null, taskType = '', title = '', estimatedMinutes = null, completedAt = new Date().toISOString() } = {}) {
     if (!isStudyCalibrationEnabled() || taskId == null) return false;
     const task = { taskType, title, estimatedMinutes };
@@ -135,9 +162,24 @@ export function calculateStudyCalibration(history = getStudyCalibrationHistory()
         sessionsByTask.set(taskId, (sessionsByTask.get(taskId) || 0) + Math.max(0, Number(session.minutes) || 0));
     });
 
+    const selfReportsByTask = new Map();
+    (history.selfReports || []).forEach((report) => {
+        if (!report || typeof report !== 'object') return;
+        const time = Date.parse(report.reportedAt || '');
+        const taskId = report.taskId == null ? '' : String(report.taskId);
+        const minutes = Number(report.minutes);
+        if (taskId && Number.isFinite(time) && time >= cutoff && time <= now
+            && Number.isFinite(minutes) && minutes >= 1 && minutes <= 480) {
+            selfReportsByTask.set(taskId, minutes);
+        }
+    });
+
     const trackedCompletions = (history.completions || []).flatMap((completion) => {
         const completedAt = Date.parse(completion.completedAt || '');
-        const actualMinutes = sessionsByTask.get(String(completion.taskId)) || 0;
+        const taskId = String(completion.taskId);
+        const focusMinutes = sessionsByTask.get(taskId) || 0;
+        const selfReportedMinutes = focusMinutes ? 0 : (selfReportsByTask.get(taskId) || 0);
+        const actualMinutes = focusMinutes || selfReportedMinutes;
         const estimatedMinutes = Number(completion.estimatedMinutes);
         if (!Number.isFinite(completedAt) || completedAt < cutoff || completedAt > now
             || actualMinutes < 5 || !Number.isFinite(estimatedMinutes) || estimatedMinutes < 5) return [];
@@ -145,6 +187,8 @@ export function calculateStudyCalibration(history = getStudyCalibrationHistory()
             ...completion,
             taskType: normalizeStudyTaskType(completion),
             actualMinutes: Math.min(480, actualMinutes),
+            focusMinutes: Math.min(480, focusMinutes),
+            selfReportedMinutes: Math.min(480, selfReportedMinutes),
             estimatedMinutes,
         }];
     });
@@ -163,13 +207,20 @@ export function calculateStudyCalibration(history = getStudyCalibrationHistory()
     const average = (field) => trackedCompletions.length
         ? Math.round(trackedCompletions.reduce((sum, item) => sum + item[field], 0) / trackedCompletions.length)
         : 0;
+    const averageFrom = (field) => {
+        const reported = trackedCompletions.filter((item) => item[field] > 0);
+        return reported.length
+            ? Math.round(reported.reduce((sum, item) => sum + item[field], 0) / reported.length)
+            : 0;
+    };
     return {
         ratios,
         trackedTaskCount: trackedCompletions.length,
         focusSessionCount: recentSessions.length,
         totalFocusMinutes: recentSessions.reduce((sum, session) => sum + Math.max(0, Number(session.minutes) || 0), 0),
         averagePlannedMinutes: average('estimatedMinutes'),
-        averageFocusedMinutes: average('actualMinutes'),
+        averageFocusedMinutes: averageFrom('focusMinutes'),
+        averageSelfReportedMinutes: averageFrom('selfReportedMinutes'),
     };
 }
 

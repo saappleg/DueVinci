@@ -1,5 +1,5 @@
 // --- POMODORO TIMER, SIDEBAR CONTROLS & MULTI-TIMER STATE MACHINE MODULE ---
-import { playTimerAlarm, fireConfetti, recordStudyActivity, escapeHtml, escapeInlineJs } from './utils.js';
+import { playTimerAlarm, fireConfetti, recordStudyActivity, escapeHtml, escapeInlineJs, getLocalDateKey } from './utils.js';
 import { recordCompletedFocusSessionIfEntitled } from './studyCalibration.js';
 
 function timerArg(value) {
@@ -26,6 +26,55 @@ export let customTimersExpanded = typeof localStorage !== 'undefined' ? (localSt
 export let floatingTimerDismissed = false;
 
 const STUDY_FOCUS_CONTEXT_KEY = 'duevinci_active_study_context';
+const COMPLETED_TASK_TIMER_MARKERS_KEY = 'duevinci_completed_task_timer_markers';
+const MAX_COMPLETED_TASK_TIMER_MARKERS = 100;
+
+function readCompletedTaskTimerMarkers(date = getLocalDateKey()) {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+        const markers = JSON.parse(localStorage.getItem(COMPLETED_TASK_TIMER_MARKERS_KEY) || '{}');
+        if (!markers || typeof markers !== 'object' || Array.isArray(markers)) return {};
+        return Object.fromEntries(Object.entries(markers)
+            .filter(([taskId, markedDate]) => taskId && markedDate === date));
+    } catch {
+        return {};
+    }
+}
+
+function saveCompletedTaskTimerMarkers(markers) {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+        localStorage.setItem(COMPLETED_TASK_TIMER_MARKERS_KEY, JSON.stringify(
+            Object.fromEntries(Object.entries(markers).slice(-MAX_COMPLETED_TASK_TIMER_MARKERS))
+        ));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export function recordCompletedTaskTimerMarker(taskId, date = getLocalDateKey()) {
+    if (typeof localStorage === 'undefined' || taskId == null || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return false;
+    const markers = readCompletedTaskTimerMarkers(String(date));
+    markers[String(taskId)] = String(date);
+    return saveCompletedTaskTimerMarkers(markers);
+}
+
+export function hasCompletedTaskTimerSession(taskId, date = getLocalDateKey()) {
+    if (typeof localStorage === 'undefined' || taskId == null) return false;
+    return readCompletedTaskTimerMarkers(String(date))[String(taskId)] === String(date);
+}
+
+export function consumeCompletedTaskTimerMarker(taskId, date = getLocalDateKey()) {
+    if (typeof localStorage === 'undefined' || taskId == null) return false;
+    const markers = readCompletedTaskTimerMarkers(String(date));
+    const key = String(taskId);
+    const matched = markers[key] === String(date);
+    if (!matched) return false;
+    delete markers[key];
+    saveCompletedTaskTimerMarkers(markers);
+    return true;
+}
 
 function getStudyFocusContext() {
     if (typeof localStorage === 'undefined') return null;
@@ -34,7 +83,7 @@ function getStudyFocusContext() {
 
 export function setStudyFocusContext(context = null) {
     if (typeof localStorage === 'undefined') return;
-    if (!context?.taskId) {
+    if (context?.taskId == null) {
         localStorage.removeItem(STUDY_FOCUS_CONTEXT_KEY);
         return;
     }
@@ -51,7 +100,8 @@ function clearStudyFocusContext() {
 
 function recordFinishedStudyFocusSession() {
     const context = getStudyFocusContext();
-    const saved = context?.taskId
+    if (context?.taskId != null) recordCompletedTaskTimerMarker(context.taskId);
+    const saved = context?.taskId != null
         ? recordCompletedFocusSessionIfEntitled({ ...context, minutes: focusMinutes })
         : Promise.resolve(false);
     clearStudyFocusContext();
@@ -521,6 +571,8 @@ _timerScope.initMultiTimersUI = initMultiTimersUI;
 _timerScope.renderTimersManager = renderTimersManager;
 _timerScope.setTimerDuration = setTimerDuration;
 _timerScope.setStudyFocusContext = setStudyFocusContext;
+_timerScope.hasCompletedTaskTimerSession = hasCompletedTaskTimerSession;
+_timerScope.consumeCompletedTaskTimerMarker = consumeCompletedTaskTimerMarker;
 
 // Auto-initialize timer collapse, display, and multi-timers on DOM ready
 if (typeof document !== 'undefined') {
