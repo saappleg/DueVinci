@@ -48,10 +48,10 @@ The browser was restored to desktop Nursing Overview with Follow System selected
 
 ## October 28, 2026 dashboard and study-activity release
 
-Commit [91afa4a](https://github.com/saappleg/DueVinci/commit/91afa4a2b72de97859e5d3aa5b9581d648601152), application line 2.8 / shell `duevinci-v8.54`:
+Release commits [91afa4a](https://github.com/saappleg/DueVinci/commit/91afa4a2b72de97859e5d3aa5b9581d648601152) and [429dc7a](https://github.com/saappleg/DueVinci/commit/429dc7ac2baf76916007acd2f5cd57cdb47ffe3d), application line 2.8 / shell `duevinci-v8.54`:
 
 - **359 tests in 35 files** passed, along with `npm run check:syntax`, `npm run build:css`, and `git diff --check`.
-- [Main CI](https://github.com/saappleg/DueVinci/actions/runs/40797400019), [Pages deploy and post-deploy smoke](https://github.com/saappleg/DueVinci/actions/runs/40797400029), [Pages deployment](https://github.com/saappleg/DueVinci/actions/runs/40797399505), and [wiki sync](https://github.com/saappleg/DueVinci/actions/runs/40797399993) passed.
+- Final [main CI](https://github.com/saappleg/DueVinci/actions/runs/40797807443), [Pages deploy and post-deploy smoke](https://github.com/saappleg/DueVinci/actions/runs/40797807422), [Pages deployment](https://github.com/saappleg/DueVinci/actions/runs/40797806768), and [wiki sync](https://github.com/saappleg/DueVinci/actions/runs/40797807446) passed.
 - Signed-in Chrome showed the updated due-date radar and Dashboard completion count (`73 / 73`), matching Weekly Review's completed total (`73`). Up Next and Daily Brief had no open dated coursework in that account, so no live assignment was changed; category inclusion and the timer-free prompt are covered by regression tests.
 - The page first displayed the prior cached shell; one reload activated `duevinci-v8.54`. The local `verify:production-release` command could not check its required Production environment variables in this shell; the Pages workflow's release verification and configured smoke test passed.
 
