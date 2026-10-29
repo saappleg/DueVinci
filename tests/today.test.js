@@ -77,6 +77,27 @@ describe('Daily Brief study activity', () => {
         expect(JSON.parse(localStorage.getItem('duevinci_activity_dates'))).toContain(date);
         expect(hasCompletedTaskTimerSession('a1', date)).toBe(false);
     });
+
+    it('asks for optional approximate minutes before completing without a same-day timer marker', async () => {
+        localStorage.clear();
+        localStorage.setItem('duevinci_study_calibration_enabled', 'false');
+        const prompt = vi.fn().mockReturnValue('35');
+        vi.stubGlobal('window', { prompt });
+        vi.stubGlobal('document', undefined);
+        const query = {
+            update: vi.fn(function () { return this; }),
+            eq: vi.fn(function () { return this; }),
+            select: vi.fn(function () { return this; }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'a1' }, error: null }),
+        };
+        vi.spyOn(supabaseClient, 'from').mockReturnValue(query);
+
+        expect(await completeTodayTask('a1', 'c1', 'assignment', 'Discussion post', 30)).toBe(true);
+
+        expect(prompt).toHaveBeenCalledWith(expect.stringContaining('Approximate minutes spent'));
+        expect(query.update).toHaveBeenCalledWith({ is_completed: true, progress_percent: 100 });
+        expect(JSON.parse(localStorage.getItem('duevinci_activity_dates'))).toContain(getLocalDateKey());
+    });
 });
 
 describe('Daily Brief assignment summary', () => {

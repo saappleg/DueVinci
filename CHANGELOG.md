@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Replaced the browser-side Tailwind compiler with a generated, pre-cached static stylesheet. CI and the Pages deployment now rebuild the CSS and reject stale committed output.
 - Updated Tailwind CSS to 3.4.19 and Vitest to 4.1.12, with reviewed transitive dependency resolutions and constructable calendar test mocks.
-- Wrapped Canvas and Brightspace credential inputs in submit-handled forms and advanced the PWA shell cache to `duevinci-v8.54`.
+- Wrapped Canvas and Brightspace credential inputs in submit-handled forms.
+- Advanced the PWA shell cache to `duevinci-v8.54` so installed apps receive the coursework and study-activity updates.
 - Aligned Dashboard completion totals with Weekly Review across all assignment categories. Clarified that the dashboard radar shows actual due dates, while Smart Study Plan shows scheduled study days, and expanded Up Next to include dated coursework categories with their type.
 
 ### Fixed
