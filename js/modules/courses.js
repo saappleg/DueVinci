@@ -387,11 +387,40 @@ export function getDashboardCourseworkTypeLabel(assignment = {}) {
         || type.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+export function formatDashboardDueDate(value) {
+    const dateKey = String(value ?? '').slice(0, 10);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!match) return String(value ?? '');
+    const [, year, month, day] = match;
+    const parsedDate = new Date(`${dateKey}T00:00:00.000Z`);
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dateKey) return String(value ?? '');
+
+    let format = 'YYYY-MM-DD';
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const savedFormat = localStorage.getItem('duevinci_date_format');
+            if (['YYYY-MM-DD', 'MM-DD-YYYY', 'DD-MM-YYYY'].includes(savedFormat)) format = savedFormat;
+        }
+    } catch {
+        // Keep the stable ISO date when storage is unavailable.
+    }
+
+    if (format === 'MM-DD-YYYY') return `${month}-${day}-${year}`;
+    if (format === 'DD-MM-YYYY') return `${day}-${month}-${year}`;
+    return `${year}-${month}-${day}`;
+}
+
 export function getDashboardUpNextAssignments(courses = [], assignments = [], referenceDate = new Date(), priorityFilter = 'all') {
     const upcoming = getCurrentStudyWeekAssignments(courses, assignments, referenceDate)
         .filter(isDashboardUpNextItem);
-    if (priorityFilter === 'all') return upcoming;
-    return upcoming.filter((assignment) => (assignment.priority || 'medium') === priorityFilter);
+    const filtered = priorityFilter === 'all'
+        ? upcoming
+        : upcoming.filter((assignment) => (assignment.priority || 'medium') === priorityFilter);
+    return filtered.sort((a, b) => {
+        const dateA = String(a?.due_date || '').slice(0, 10);
+        const dateB = String(b?.due_date || '').slice(0, 10);
+        return dateA.localeCompare(dateB) || compareCourseworkOrder(a, b, courses);
+    });
 }
 
 function isCurriculumChild(item, course) {
@@ -810,7 +839,7 @@ export async function loadDashboardStats() {
             upcoming.forEach(assign => {
                 const course = courses.find(c => c.id === assign.course_id);
                 if (!course) return;
-                const formattedDate = window.formatDate ? window.formatDate(assign.due_date) : assign.due_date;
+                const formattedDate = formatDashboardDueDate(assign.due_date);
                 const unitBadge = assign.unit_number ? `<span class="text-xs bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold mr-1">${isWeeklyCourse(course) ? 'Wk' : 'Unit'} ${assign.unit_number}</span>` : '';
                 const categoryLabel = getDashboardCourseworkTypeLabel(assign);
                 const priority = assign.priority || 'medium';

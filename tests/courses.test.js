@@ -24,6 +24,7 @@ import {
     getAssignmentProgress,
     getCoursePacingProfile,
     getCoursePacingUpdates,
+    formatDashboardDueDate,
     getDashboardCourseworkTypeLabel,
     getDashboardUpNextAssignments,
     renderAssignmentCompletionControl,
@@ -189,6 +190,25 @@ describe('Dashboard Up Next coursework', () => {
         expect(getDashboardCourseworkTypeLabel({ task_type: 'assignment' })).toBe('Assignment');
         expect(getDashboardCourseworkTypeLabel({ task_type: 'discussion' })).toBe('Discussion');
         expect(getDashboardCourseworkTypeLabel({})).toBe('Coursework');
+    });
+
+    it('orders Up Next by due date before using coursework sequence as a tie-breaker', () => {
+        const courses = [{ id: 'course-1', pacing_type: 'self-paced' }];
+        const assignments = [
+            { id: 'later', course_id: 'course-1', title: 'First in curriculum', unit_number: 1, priority: 'high', due_date: '2026-10-31' },
+            { id: 'earlier', course_id: 'course-1', title: 'Second in curriculum', unit_number: 2, priority: 'low', due_date: '2026-10-29' },
+            { id: 'same-date-unit-1', course_id: 'course-1', title: 'Unit one', unit_number: 1, due_date: '2026-10-30' },
+            { id: 'same-date-unit-2', course_id: 'course-1', title: 'Unit two', unit_number: 2, due_date: '2026-10-30' },
+        ];
+
+        expect(getDashboardUpNextAssignments(courses, assignments, new Date(2026, 9, 28, 12)).map((assignment) => assignment.id))
+            .toEqual(['earlier', 'same-date-unit-1', 'same-date-unit-2', 'later']);
+    });
+
+    it('uses the selected date format for dashboard dates without changing date-only values', () => {
+        vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'MM-DD-YYYY') });
+        expect(formatDashboardDueDate('2026-11-01')).toBe('11-01-2026');
+        expect(formatDashboardDueDate('2026-02-30')).toBe('2026-02-30');
     });
 
     it('keeps the existing priority filter for every coursework category', () => {
